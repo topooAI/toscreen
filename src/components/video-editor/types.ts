@@ -11,6 +11,7 @@ export interface ZoomRegion {
   endMs: number;
   depth: ZoomDepth;
   focus: ZoomFocus;
+  clicks?: any[]; // Raw mouse path data for dynamic tracking
 }
 
 export interface TrimRegion {

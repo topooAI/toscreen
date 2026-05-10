@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTimelineContext } from "dnd-timeline";
 import { Button } from "@/components/ui/button";
-import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check } from "lucide-react";
+import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check, Target, Scan } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import TimelineWrapper from "./TimelineWrapper";
@@ -51,6 +51,8 @@ interface TimelineEditorProps {
   onSelectAnnotation?: (id: string | null) => void;
   aspectRatio: AspectRatio;
   onAspectRatioChange: (aspectRatio: AspectRatio) => void;
+  isFullScreenBinding: boolean;
+  onFullScreenBindingChange: (enabled: boolean) => void;
 }
 
 interface TimelineScaleConfig {
@@ -517,6 +519,8 @@ export default function TimelineEditor({
   onSelectAnnotation,
   aspectRatio,
   onAspectRatioChange,
+  isFullScreenBinding,
+  onFullScreenBindingChange,
 }: TimelineEditorProps) {
   const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
   const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
@@ -892,6 +896,21 @@ export default function TimelineEditor({
           </Button>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onFullScreenBindingChange(!isFullScreenBinding)}
+            className={cn(
+              "h-7 w-7 transition-all",
+              isFullScreenBinding 
+                ? "text-[#34B27B] bg-[#34B27B]/10 hover:bg-[#34B27B]/20" 
+                : "text-slate-400 hover:text-[#34B27B] hover:bg-[#34B27B]/10"
+            )}
+            title={isFullScreenBinding ? "Full Screen Priority (Hides Background)" : "Center Priority (Prioritizes Mouse Position)"}
+          >
+            {isFullScreenBinding ? <Scan className="w-4 h-4" /> : <Target className="w-4 h-4" />}
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

@@ -1,10 +1,10 @@
 import { Application, Container, Sprite, Graphics, BlurFilter, Texture } from 'pixi.js';
 import type { ZoomRegion, CropRegion, AnnotationRegion } from '@/components/video-editor/types';
 import { ZOOM_DEPTH_SCALES } from '@/components/video-editor/types';
-import { findDominantRegion } from '@/components/video-editor/videoPlayback/zoomRegionUtils';
+import { findInterpolatedTarget, interpolateZoomScale } from '@/components/video-editor/videoPlayback/zoomRegionUtils';
 import { applyZoomTransform } from '@/components/video-editor/videoPlayback/zoomTransform';
 import { DEFAULT_FOCUS, SMOOTHING_FACTOR, MIN_DELTA } from '@/components/video-editor/videoPlayback/constants';
-import { clampFocusToStage as clampFocusToStageUtil } from '@/components/video-editor/videoPlayback/focusUtils';
+import { clampFocusToStage as clampFocusToStageUtil, videoFocusToStage } from '@/components/video-editor/videoPlayback/focusUtils';
 import { renderAnnotations } from './annotationRenderer';
 
 interface FrameRenderConfig {
@@ -393,20 +393,31 @@ export class FrameRenderer {
   private updateAnimationState(timeMs: number): number {
     if (!this.cameraContainer || !this.layoutCache) return 0;
 
-    const { region, strength } = findDominantRegion(this.config.zoomRegions, timeMs);
+    const { strength, focus, depth } = findInterpolatedTarget(this.config.zoomRegions, timeMs);
     
     const defaultFocus = DEFAULT_FOCUS;
     let targetScaleFactor = 1;
     let targetFocus = { ...defaultFocus };
 
-    if (region && strength > 0) {
-      const zoomScale = ZOOM_DEPTH_SCALES[region.depth];
-      const regionFocus = this.clampFocusToStage(region.focus, region.depth);
+    if (strength > 0 && focus && depth !== null) {
+      const zoomScale = interpolateZoomScale(depth, ZOOM_DEPTH_SCALES);
+      const clampedDepth = Math.round(Math.max(1, Math.min(6, depth))) as 1|2|3|4|5|6;
+      
+      // NEW: Convert video focus to stage focus first!
+      const stageFocus = videoFocusToStage(
+        focus,
+        this.layoutCache.stageSize,
+        this.layoutCache.videoSize,
+        this.layoutCache.baseScale,
+        this.layoutCache.baseOffset
+      );
+      
+      const clampedFocus = this.clampFocusToStage(stageFocus, clampedDepth);
       
       targetScaleFactor = 1 + (zoomScale - 1) * strength;
       targetFocus = {
-        cx: defaultFocus.cx + (regionFocus.cx - defaultFocus.cx) * strength,
-        cy: defaultFocus.cy + (regionFocus.cy - defaultFocus.cy) * strength,
+        cx: defaultFocus.cx + (clampedFocus.cx - defaultFocus.cx) * strength,
+        cy: defaultFocus.cy + (clampedFocus.cy - defaultFocus.cy) * strength,
       };
     }
 

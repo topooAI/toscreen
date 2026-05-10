@@ -62,6 +62,7 @@ export default function VideoEditor() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   const [exportQuality, setExportQuality] = useState<ExportQuality>('good');
+  const [isFullScreenBinding, setIsFullScreenBinding] = useState(true);
 
   const videoPlaybackRef = useRef<VideoPlaybackRef>(null);
   const nextZoomIdRef = useRef(1);
@@ -783,6 +784,7 @@ export default function VideoEditor() {
                       onSelectAnnotation={handleSelectAnnotation}
                       onAnnotationPositionChange={handleAnnotationPositionChange}
                       onAnnotationSizeChange={handleAnnotationSizeChange}
+                      isFullScreenBinding={isFullScreenBinding}
                     />
                   </div>
                 </div>
@@ -832,6 +834,8 @@ export default function VideoEditor() {
                   onSelectAnnotation={handleSelectAnnotation}
                   aspectRatio={aspectRatio}
                   onAspectRatioChange={setAspectRatio}
+                  isFullScreenBinding={isFullScreenBinding}
+                  onFullScreenBindingChange={setIsFullScreenBinding}
                 />
               </div>
             </Panel>

@@ -5,8 +5,8 @@ import { Application, Container, Sprite, Graphics, BlurFilter, Texture, VideoSou
 import { ZOOM_DEPTH_SCALES, type ZoomRegion, type ZoomFocus, type ZoomDepth, type TrimRegion, type AnnotationRegion } from "./types";
 import { DEFAULT_FOCUS, SMOOTHING_FACTOR, MIN_DELTA } from "./videoPlayback/constants";
 import { clamp01 } from "./videoPlayback/mathUtils";
-import { findDominantRegion } from "./videoPlayback/zoomRegionUtils";
-import { clampFocusToStage as clampFocusToStageUtil } from "./videoPlayback/focusUtils";
+import { findInterpolatedTarget, interpolateZoomScale } from "./videoPlayback/zoomRegionUtils";
+import { clampFocusToStage as clampFocusToStageUtil, videoFocusToStage } from "./videoPlayback/focusUtils";
 import { updateOverlayIndicator } from "./videoPlayback/overlayUtils";
 import { layoutVideoContent as layoutVideoContentUtil } from "./videoPlayback/layoutUtils";
 import { applyZoomTransform } from "./videoPlayback/zoomTransform";
@@ -71,8 +71,9 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
   showBlur,
   motionBlurEnabled = true,
   borderRadius = 0,
-  padding = 50,
+  padding = 0,
   cropRegion,
+  isFullScreenBinding = true,
   trimRegions = [],
   aspectRatio,
   annotationRegions = [],
@@ -106,6 +107,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
   const cropBoundsRef = useRef({ startX: 0, endX: 0, startY: 0, endY: 0 });
   const maskGraphicsRef = useRef<Graphics | null>(null);
   const isPlayingRef = useRef(isPlaying);
+  const isFullScreenBindingRef = useRef(isFullScreenBinding);
   const isSeekingRef = useRef(false);
   const allowPlaybackRef = useRef(false);
   const lockedVideoDimensionsRef = useRef<{ width: number; height: number } | null>(null);
@@ -115,7 +117,15 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
   const videoReadyRafRef = useRef<number | null>(null);
 
   const clampFocusToStage = useCallback((focus: ZoomFocus, depth: ZoomDepth) => {
-    return clampFocusToStageUtil(focus, depth, stageSizeRef.current);
+    return clampFocusToStageUtil(
+      focus, 
+      depth, 
+      stageSizeRef.current, 
+      isFullScreenBindingRef.current,
+      videoSizeRef.current,
+      baseScaleRef.current,
+      baseOffsetRef.current
+    );
   }, []);
 
   const updateOverlayForRegion = useCallback((region: ZoomRegion | null, focusOverride?: ZoomFocus) => {
@@ -306,6 +316,10 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
   useEffect(() => {
     zoomRegionsRef.current = zoomRegions;
   }, [zoomRegions]);
+
+  useEffect(() => {
+    isFullScreenBindingRef.current = isFullScreenBinding;
+  }, [isFullScreenBinding]);
 
   useEffect(() => {
     selectedZoomIdRef.current = selectedZoomId;
@@ -626,7 +640,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
     };
 
     const ticker = () => {
-      const { region, strength } = findDominantRegion(zoomRegionsRef.current, currentTimeRef.current);
+      const { strength, focus, depth } = findInterpolatedTarget(zoomRegionsRef.current, currentTimeRef.current);
       
       const defaultFocus = DEFAULT_FOCUS;
       let targetScaleFactor = 1;
@@ -638,9 +652,28 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
       const hasSelectedZoom = selectedId !== null;
       const shouldShowUnzoomedView = hasSelectedZoom && !isPlayingRef.current;
 
-      if (region && strength > 0 && !shouldShowUnzoomedView) {
-        const zoomScale = ZOOM_DEPTH_SCALES[region.depth];
-        const regionFocus = clampFocusToStage(region.focus, region.depth);
+      if (strength > 0 && focus && depth !== null && !shouldShowUnzoomedView) {
+        const zoomScale = interpolateZoomScale(depth, ZOOM_DEPTH_SCALES);
+        const clampedDepth = Math.round(Math.max(1, Math.min(6, depth))) as 1|2|3|4|5|6;
+        
+        // Map video focus to stage focus
+        const stageFocus = videoFocusToStage(
+          focus,
+          stageSizeRef.current,
+          videoSizeRef.current,
+          baseScaleRef.current,
+          baseOffsetRef.current
+        );
+        
+        const regionFocus = clampFocusToStage(
+          stageFocus, 
+          clampedDepth, 
+          stageSizeRef.current, 
+          isFullScreenBindingRef.current,
+          videoSizeRef.current,
+          baseScaleRef.current,
+          baseOffsetRef.current
+        );
         
         // Interpolate scale and focus based on region strength
         targetScaleFactor = 1 + (zoomScale - 1) * strength;
