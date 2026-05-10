@@ -1,0 +1,154 @@
+.electronDrag {
+  -webkit-app-region: drag;
+}
+
+.electronNoDrag {
+  -webkit-app-region: no-drag;
+}
+
+.launchBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(45, 45, 45, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 0 16px; /* Increased from 8px */
+  box-shadow: 
+    0 12px 40px -10px rgba(0, 0, 0, 0.45),
+    0 4px 12px -4px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 10;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: visible;
+  min-height: 64px;
+  height: 64px;
+}
+
+.section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 6px;
+}
+
+.actionButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: transparent;
+  border: none;
+  color: #a1a1aa;
+  cursor: pointer;
+  padding: 0 12px;
+  border-radius: 12px;
+  transition: all 0.15s ease;
+  height: 48px; /* Slightly taller buttons */
+  min-width: 64px;
+}
+
+.actionButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.mediaButton {
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  min-width: unset;
+  padding: 0 14px;
+  gap: 10px;
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: all 0.15s ease;
+  height: 48px;
+}
+
+.mediaButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.mediaLabel {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.recordBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.15);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.recordBtn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 6px rgba(255, 77, 77, 0.2);
+}
+
+.recording {
+  animation: pulse 1.5s infinite;
+  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.5); }
+  70% { box-shadow: 0 0 0 12px rgba(255, 77, 77, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+}
+
+.hudOverlayButton {
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: #fff;
+  opacity: 0.6;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.15s;
+}
+
+.hudOverlayButton:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1) !important;
+}

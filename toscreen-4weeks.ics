@@ -1,0 +1,360 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//toScreen//4-Week Execution Plan//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:toScreen 4-Week Plan
+X-WR-TIMEZONE:Asia/Shanghai
+BEGIN:VEVENT
+UID:d972d107-9f48-4fa8-8ce3-ffeed779ce78@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260504T093000
+DTEND;TZID=Asia/Shanghai:20260504T094000
+SUMMARY:toScreen Week 1 - Foundation - Morning Standup
+DESCRIPTION:Daily alignment. Focus: MVP scope + success metrics lock. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:e7337e8d-4949-415d-a1b4-79fb117f812d@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260504T180000
+DTEND;TZID=Asia/Shanghai:20260504T182000
+SUMMARY:toScreen Week 1 - Foundation - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: MVP scope + success metrics lock. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:9a39de06-e9b0-45e9-8179-76dc6aa79672@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260505T093000
+DTEND;TZID=Asia/Shanghai:20260505T094000
+SUMMARY:toScreen Week 1 - Foundation - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Recording pipeline stability. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:96fffcbc-c046-41a6-a394-c794279cc283@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260505T180000
+DTEND;TZID=Asia/Shanghai:20260505T182000
+SUMMARY:toScreen Week 1 - Foundation - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Recording pipeline stability. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:eaf8d720-ab4f-4e7f-9288-223f12c8cc43@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260506T093000
+DTEND;TZID=Asia/Shanghai:20260506T094000
+SUMMARY:toScreen Week 1 - Foundation - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Export pipeline stability. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:8afd010a-9fb6-4b5f-a419-8d292250b300@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260506T180000
+DTEND;TZID=Asia/Shanghai:20260506T182000
+SUMMARY:toScreen Week 1 - Foundation - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Export pipeline stability. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:4e1262b8-4ed1-49b1-9ac6-c10ee1fd962b@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260507T093000
+DTEND;TZID=Asia/Shanghai:20260507T094000
+SUMMARY:toScreen Week 1 - Foundation - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Auto silence-cut integration. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:b37dd730-d942-4822-968e-49b3d9252b4d@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260507T180000
+DTEND;TZID=Asia/Shanghai:20260507T182000
+SUMMARY:toScreen Week 1 - Foundation - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Auto silence-cut integration. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:1a31469a-4db8-431e-a124-aad435692b83@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260508T093000
+DTEND;TZID=Asia/Shanghai:20260508T094000
+SUMMARY:toScreen Week 1 - Foundation - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Regression + Go/No-Go. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:3216c5ad-1d82-424c-ba4a-009fc9241423@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260508T180000
+DTEND;TZID=Asia/Shanghai:20260508T182000
+SUMMARY:toScreen Week 1 - Foundation - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Regression + Go/No-Go. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:88829fec-a9f6-4c20-bf0c-a1d972fbb58b@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260508T183000
+DTEND;TZID=Asia/Shanghai:20260508T190000
+SUMMARY:toScreen Week 1 - Foundation - Go/No-Go Decision
+DESCRIPTION:Weekly release decision meeting. Inputs: regressions, P0/P1 status, readiness verdict (On track / At risk).
+END:VEVENT
+BEGIN:VEVENT
+UID:acf44ebd-d5dc-4841-af0f-e9a1a47f479f@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260511T093000
+DTEND;TZID=Asia/Shanghai:20260511T094000
+SUMMARY:toScreen Week 2 - Default Experience - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Auto-camera strategy A/B. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:f85ef5b2-fea5-4973-a076-2c1ac020d0ab@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260511T180000
+DTEND;TZID=Asia/Shanghai:20260511T182000
+SUMMARY:toScreen Week 2 - Default Experience - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Auto-camera strategy A/B. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:1ea42db4-9c08-477d-8d9b-21c34453b1bc@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260512T093000
+DTEND;TZID=Asia/Shanghai:20260512T094000
+SUMMARY:toScreen Week 2 - Default Experience - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Cursor highlight preview. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:154f4dea-a559-4e68-a188-6d6881a4c8cf@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260512T180000
+DTEND;TZID=Asia/Shanghai:20260512T182000
+SUMMARY:toScreen Week 2 - Default Experience - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Cursor highlight preview. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:bc54c5e2-49bb-4dac-9da1-0bb03a45c5f5@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260513T093000
+DTEND;TZID=Asia/Shanghai:20260513T094000
+SUMMARY:toScreen Week 2 - Default Experience - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Auto-camera integration. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:d6688a40-c547-4ca6-a970-7078ea607ea9@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260513T180000
+DTEND;TZID=Asia/Shanghai:20260513T182000
+SUMMARY:toScreen Week 2 - Default Experience - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Auto-camera integration. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:29fba220-b1d9-434e-b6f8-906977ff22f0@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260514T093000
+DTEND;TZID=Asia/Shanghai:20260514T094000
+SUMMARY:toScreen Week 2 - Default Experience - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Default parameter tuning. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:da4c1332-4359-41e3-9aa7-df5b6a4461db@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260514T180000
+DTEND;TZID=Asia/Shanghai:20260514T182000
+SUMMARY:toScreen Week 2 - Default Experience - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Default parameter tuning. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:a12bb37d-2af8-4cc6-9829-950564aa1b93@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260515T093000
+DTEND;TZID=Asia/Shanghai:20260515T094000
+SUMMARY:toScreen Week 2 - Default Experience - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Blind compare vs benchmark. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:974bd26e-8126-43a2-add4-b4d2ed1e3a30@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260515T180000
+DTEND;TZID=Asia/Shanghai:20260515T182000
+SUMMARY:toScreen Week 2 - Default Experience - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Blind compare vs benchmark. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:4866e32d-24c9-4f74-a33e-7b51fe1c6c55@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260515T183000
+DTEND;TZID=Asia/Shanghai:20260515T190000
+SUMMARY:toScreen Week 2 - Default Experience - Go/No-Go Decision
+DESCRIPTION:Weekly release decision meeting. Inputs: regressions, P0/P1 status, readiness verdict (On track / At risk).
+END:VEVENT
+BEGIN:VEVENT
+UID:5c64ba7f-d0de-47ab-b434-7885523db886@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260518T093000
+DTEND;TZID=Asia/Shanghai:20260518T094000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Subtitle pipeline wiring. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:6b7fc651-320e-4c7b-ae21-d38703887722@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260518T180000
+DTEND;TZID=Asia/Shanghai:20260518T182000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Subtitle pipeline wiring. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:d56be79f-bde7-4fa8-b310-dbe39520d28f@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260519T093000
+DTEND;TZID=Asia/Shanghai:20260519T094000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Save/restore stress test. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:6e1948f0-9781-4ce0-80d2-eb2cf4c94343@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260519T180000
+DTEND;TZID=Asia/Shanghai:20260519T182000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Save/restore stress test. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:93687b19-601a-4414-973a-7a21bf3c2160@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260520T093000
+DTEND;TZID=Asia/Shanghai:20260520T094000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Release script + checklist. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:4065f205-a15f-4969-970b-36d56b632b15@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260520T180000
+DTEND;TZID=Asia/Shanghai:20260520T182000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Release script + checklist. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:afafe81c-5607-454a-bbb5-4a71212b10ca@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260521T093000
+DTEND;TZID=Asia/Shanghai:20260521T094000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Full pipeline regression. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:50d0baef-c111-4d9b-8eb3-d5df5828178b@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260521T180000
+DTEND;TZID=Asia/Shanghai:20260521T182000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Full pipeline regression. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:08f300e7-58ad-4655-b1e6-6a6914d3e5ce@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260522T093000
+DTEND;TZID=Asia/Shanghai:20260522T094000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Beta candidate review. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:df21077d-0b3e-4fa1-b49c-50d833f87bf8@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260522T180000
+DTEND;TZID=Asia/Shanghai:20260522T182000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Beta candidate review. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:dfa3ea77-bc4c-4c31-aa3c-d3e71b6dde6b@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260522T183000
+DTEND;TZID=Asia/Shanghai:20260522T190000
+SUMMARY:toScreen Week 3 - Beta Skeleton - Go/No-Go Decision
+DESCRIPTION:Weekly release decision meeting. Inputs: regressions, P0/P1 status, readiness verdict (On track / At risk).
+END:VEVENT
+BEGIN:VEVENT
+UID:aa5b7366-18a2-4cf2-a30d-d3be3b06e54c@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260525T093000
+DTEND;TZID=Asia/Shanghai:20260525T094000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Private beta launch + telemetry. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:4ddd4f94-f357-4a8a-9f55-80b4243c190c@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260525T180000
+DTEND;TZID=Asia/Shanghai:20260525T182000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Private beta launch + telemetry. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:5fc892de-066c-46c3-9717-0a6d89dfd4d9@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260526T093000
+DTEND;TZID=Asia/Shanghai:20260526T094000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Feedback triage P0/P1/P2. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:5cb6b59f-475f-4ab7-9d77-685450b15061@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260526T180000
+DTEND;TZID=Asia/Shanghai:20260526T182000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Feedback triage P0/P1/P2. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:b082018c-28ee-4c05-81d4-451a3a055edd@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260527T093000
+DTEND;TZID=Asia/Shanghai:20260527T094000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Fix P0. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:f0c3284d-ea92-4d77-8c29-7de2f4b6d116@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260527T180000
+DTEND;TZID=Asia/Shanghai:20260527T182000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Fix P0. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:13ae69f9-f73e-4543-880b-2fbb9cdfb648@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260528T093000
+DTEND;TZID=Asia/Shanghai:20260528T094000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Fix P1 + retest. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:3b816c6f-b7ee-4b13-8cbd-c415d1d0a224@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260528T180000
+DTEND;TZID=Asia/Shanghai:20260528T182000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Fix P1 + retest. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:cd53171c-23b3-4c0b-9b82-80c4cc805912@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260529T093000
+DTEND;TZID=Asia/Shanghai:20260529T094000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Morning Standup
+DESCRIPTION:Daily alignment. Focus: Ship v0.x + weekly retro. Output: blockers + top 3 goals.
+END:VEVENT
+BEGIN:VEVENT
+UID:583be433-a5a7-403c-b476-0f2828555a28@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260529T180000
+DTEND;TZID=Asia/Shanghai:20260529T182000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Evening Review
+DESCRIPTION:Daily acceptance review. Focus: Ship v0.x + weekly retro. Check metrics: crash rate, export success, export duration.
+END:VEVENT
+BEGIN:VEVENT
+UID:7a5bf4b6-11be-4afa-bdd1-d537e29d53f0@toscreen.local
+DTSTAMP:20260428T105525Z
+DTSTART;TZID=Asia/Shanghai:20260529T183000
+DTEND;TZID=Asia/Shanghai:20260529T190000
+SUMMARY:toScreen Week 4 - Private Beta Loop - Go/No-Go Decision
+DESCRIPTION:Weekly release decision meeting. Inputs: regressions, P0/P1 status, readiness verdict (On track / At risk).
+END:VEVENT
+END:VCALENDAR
