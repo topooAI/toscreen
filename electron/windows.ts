@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const APP_ROOT = path.join(__dirname, '..')
-const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
+const VITE_DEV_SERVER_URL = 'http://127.0.0.1:5173';
 const RENDERER_DIST = path.join(APP_ROOT, 'dist')
 
 let hudOverlayWindow: BrowserWindow | null = null;

@@ -301,8 +301,21 @@ export function registerIpcHandlers(
   // Read clicks.json for a given video path
   ipcMain.handle('read-clicks-json', async (_, videoPath: string) => {
     try {
-      // Assuming videoPath is absolute file:// path or normal path
-      const normalizedPath = videoPath.replace('file://', '');
+      // Robust path decoding for both encoded file:// URLs and raw paths
+      let normalizedPath = videoPath.replace(/^file:\/\/\//, '/').replace(/^file:\/\//, '');
+      
+      // Decode segments individually to be safe
+      normalizedPath = normalizedPath.split('/').map(part => {
+        try {
+          return decodeURIComponent(part);
+        } catch (e) {
+          return part;
+        }
+      }).join('/');
+      
+      // If it's a Windows absolute path that lost its slash, add it back if needed
+      // (though usually normalize handles this)
+      
       const clicksPath = normalizedPath + '.clicks.json';
 
       const content = await fs.readFile(clicksPath, 'utf-8');

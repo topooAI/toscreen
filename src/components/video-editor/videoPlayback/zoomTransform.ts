@@ -34,28 +34,31 @@ export function applyZoomTransform({
     return;
   }
 
-  // The focus point in stage coordinates (where the user clicked/selected)
-  const focusStagePxX = focusX * stageSize.width;
-  const focusStagePxY = focusY * stageSize.height;
+  // The focus point relative to the actual video area
+  const focusVideoPxX = focusX * baseMask.width;
+  const focusVideoPxY = focusY * baseMask.height;
+  
+  // The focus point relative to the stage (before zoom)
+  const focusStagePxX = baseMask.x + focusVideoPxX;
+  const focusStagePxY = baseMask.y + focusVideoPxY;
   
   // Stage center (where we want the focus to end up after zoom)
   const stageCenterX = stageSize.width / 2;
   const stageCenterY = stageSize.height / 2;
-
+ 
   // Apply zoom scale to camera container
   cameraContainer.scale.set(zoomScale);
-
+ 
   // Calculate camera position to keep focus point centered
-  // After scaling, the focus point moves to (focusX * zoomScale, focusY * zoomScale)
-  // We want it at stage center, so offset = center - (focus * scale)
+  // We offset the container so that focusStagePxX * zoomScale moves to stageCenterX
   const cameraX = stageCenterX - focusStagePxX * zoomScale;
   const cameraY = stageCenterY - focusStagePxY * zoomScale;
-
+ 
   cameraContainer.position.set(cameraX, cameraY);
 
   if (blurFilter) {
     const shouldBlur = motionBlurEnabled && isPlaying && motionIntensity > 0.0005;
     const motionBlur = shouldBlur ? Math.min(6, motionIntensity * 120) : 0;
-    blurFilter.blur = motionBlur;
+    blurFilter.strength = motionBlur;
   }
 }

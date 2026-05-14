@@ -9,8 +9,8 @@ import * as fs from "fs/promises";
 import { uIOhook } from "uiohook-napi";
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL$1 = process.env["VITE_DEV_SERVER_URL"];
-const RENDERER_DIST$1 = path.join(APP_ROOT, "dist");
+const VITE_DEV_SERVER_URL$1 = "http://127.0.0.1:5173";
+path.join(APP_ROOT, "dist");
 let hudOverlayWindow = null;
 ipcMain.on("hud-overlay-hide", () => {
   if (hudOverlayWindow && !hudOverlayWindow.isDestroyed()) {
@@ -55,12 +55,8 @@ function createHudOverlayWindow() {
       hudOverlayWindow = null;
     }
   });
-  if (VITE_DEV_SERVER_URL$1) {
+  {
     win.loadURL(VITE_DEV_SERVER_URL$1 + "?windowType=hud-overlay");
-  } else {
-    win.loadFile(path.join(RENDERER_DIST$1, "index.html"), {
-      query: { windowType: "hud-overlay" }
-    });
   }
   return win;
 }
@@ -93,12 +89,8 @@ function createEditorWindow() {
   win.webContents.on("did-finish-load", () => {
     win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
   });
-  if (VITE_DEV_SERVER_URL$1) {
+  {
     win.loadURL(VITE_DEV_SERVER_URL$1 + "?windowType=editor");
-  } else {
-    win.loadFile(path.join(RENDERER_DIST$1, "index.html"), {
-      query: { windowType: "editor" }
-    });
   }
   return win;
 }
@@ -122,12 +114,8 @@ function createSourceSelectorWindow() {
       contextIsolation: true
     }
   });
-  if (VITE_DEV_SERVER_URL$1) {
+  {
     win.loadURL(VITE_DEV_SERVER_URL$1 + "?windowType=source-selector");
-  } else {
-    win.loadFile(path.join(RENDERER_DIST$1, "index.html"), {
-      query: { windowType: "source-selector" }
-    });
   }
   return win;
 }
@@ -526,7 +514,14 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
   });
   ipcMain.handle("read-clicks-json", async (_, videoPath) => {
     try {
-      const normalizedPath = videoPath.replace("file://", "");
+      let normalizedPath = videoPath.replace(/^file:\/\/\//, "/").replace(/^file:\/\//, "");
+      normalizedPath = normalizedPath.split("/").map((part) => {
+        try {
+          return decodeURIComponent(part);
+        } catch (e) {
+          return part;
+        }
+      }).join("/");
       const clicksPath = normalizedPath + ".clicks.json";
       const content = await fs$1.readFile(clicksPath, "utf-8");
       const data = JSON.parse(content);

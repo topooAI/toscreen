@@ -1,11 +1,10 @@
-
-
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
-import VideoPlayback, { VideoPlaybackRef } from "./VideoPlayback";
+import VideoPlayback, { type VideoPlaybackRef } from "./VideoPlayback";
 import PlaybackControls from "./PlaybackControls";
 import TimelineEditor from "./timeline/TimelineEditor";
 import { Sidebar } from "./sidebar/Sidebar";
@@ -72,19 +71,11 @@ export default function VideoEditor() {
   const exporterRef = useRef<VideoExporter | null>(null);
 
   // Helper to convert file path to proper file:// URL
-  const toFileUrl = (filePath: string): string => {
-    // Normalize path separators to forward slashes
-    const normalized = filePath.replace(/\\/g, '/');
-
-    // Check if it's a Windows absolute path (e.g., C:/Users/...)
-    if (normalized.match(/^[a-zA-Z]:/)) {
-      const fileUrl = `file:///${normalized}`;
-      return fileUrl;
-    }
-
-    // Unix-style absolute path
-    const fileUrl = `file://${normalized}`;
-    return fileUrl;
+  const toFileUrl = (path: string) => {
+    if (!path) return '';
+    const normalized = path.replace(/\\/g, '/');
+    const full = `file://${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+    return encodeURI(full);
   };
 
   useEffect(() => {
@@ -93,8 +84,8 @@ export default function VideoEditor() {
         const result = await window.electronAPI.getCurrentVideoPath();
 
         if (result.success && result.path) {
-          const videoUrl = toFileUrl(result.path);
-          setVideoPath(videoUrl);
+          // Keep the RAW path in state for IPC calls
+          setVideoPath(result.path);
         } else {
           setError('No video to load. Please record or select a video.');
         }
@@ -123,8 +114,10 @@ export default function VideoEditor() {
         console.warn('Failed to resolve default wallpaper path:', err);
       }
     })();
+
     return () => { mounted = false };
   }, []);
+
 
   function togglePlayPause() {
     const playback = videoPlaybackRef.current;
@@ -469,7 +462,7 @@ export default function VideoEditor() {
           description: "Try adjusting the debounce settings or recording more distinct clicks.",
         });
       } else {
-        setZoomRegions((prev) => [...prev, ...newRegions]);
+        setZoomRegions(newRegions);
         toast.success(`Generated ${newRegions.length} auto-zoom regions!`, {
           description: "You can adjust or delete them in the timeline."
         });
@@ -506,13 +499,7 @@ export default function VideoEditor() {
           console.log(`[AutoZoom] Generated ${newRegions.length} regions:`, newRegions);
 
           if (newRegions.length > 0) {
-            setZoomRegions((prev) => {
-              const existingIds = new Set(prev.map(r => r.id));
-              const validNewRegions = newRegions.filter(r => !existingIds.has(r.id));
-              if (validNewRegions.length === 0) return prev;
-              return [...prev, ...validNewRegions];
-            });
-
+            setZoomRegions(newRegions);
             toast.success("✨ Auto-Zoom Applied", {
               description: `Automatically created ${newRegions.length} zoom regions based on your clicks.`,
               duration: 4000,
@@ -649,7 +636,7 @@ export default function VideoEditor() {
 
 
       const exporter = new VideoExporter({
-        videoUrl: videoPath,
+        videoUrl: videoPath ? toFileUrl(videoPath) : '',
         width: exportWidth,
         height: exportHeight,
         frameRate: 60,
@@ -723,22 +710,29 @@ export default function VideoEditor() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <div className="text-foreground">Loading video...</div>
+      <div className="flex flex-col h-screen bg-[#09090b] items-center justify-center text-slate-400">
+        <Loader2 className="w-8 h-8 animate-spin mb-4" />
+        <p>Loading your masterpiece...</p>
       </div>
     );
   }
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <div className="text-destructive">{error}</div>
-      </div>
-    );
-  }
-
 
   return (
     <div className="flex flex-col h-screen bg-[#09090b] text-slate-200 overflow-hidden selection:bg-[#34B27B]/30">
+      {error && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-[#09090b]/90 backdrop-blur-sm">
+          <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-center max-w-md">
+            <div className="text-red-500 font-bold mb-2">Failed to load video</div>
+            <div className="text-red-400/60 text-sm mb-4">{error}</div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
       <div
         className="h-10 flex-shrink-0 bg-[#09090b]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-6 z-50"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
@@ -759,7 +753,7 @@ export default function VideoEditor() {
                     <VideoPlayback
                       aspectRatio={aspectRatio}
                       ref={videoPlaybackRef}
-                      videoPath={videoPath || ''}
+                      videoPath={videoPath ? toFileUrl(videoPath) : ''}
                       onDurationChange={setDuration}
                       onTimeUpdate={setCurrentTime}
                       currentTime={currentTime}

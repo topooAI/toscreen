@@ -1,7 +1,7 @@
 {
   "name": "toscreen",
   "private": true,
-  "version": "1.0.2",
+  "version": "0.0.0.11",
   "type": "module",
   "scripts": {
     "dev": "vite",
