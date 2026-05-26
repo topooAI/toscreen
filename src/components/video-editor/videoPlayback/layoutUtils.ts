@@ -25,23 +25,29 @@ interface LayoutResult {
 export function layoutVideoContent(params: LayoutParams): LayoutResult | null {
   const { container, app, videoSprite, maskGraphics, videoElement, cropRegion, lockedVideoDimensions, borderRadius = 0, padding = 0 } = params;
 
-  const videoWidth = lockedVideoDimensions?.width || videoElement.videoWidth;
-  const videoHeight = lockedVideoDimensions?.height || videoElement.videoHeight;
-
-  if (!videoWidth || !videoHeight) {
-    return null;
-  }
-
   const width = container.clientWidth;
   const height = container.clientHeight;
 
-  if (!width || !height) {
-    return null;
+  if (width && height) {
+    app.renderer.resize(width, height);
+    app.canvas.style.width = '100%';
+    app.canvas.style.height = '100%';
   }
 
-  app.renderer.resize(width, height);
-  app.canvas.style.width = '100%';
-  app.canvas.style.height = '100%';
+  const videoWidth = lockedVideoDimensions?.width || videoElement.videoWidth;
+  const videoHeight = lockedVideoDimensions?.height || videoElement.videoHeight;
+
+  if (!videoWidth || !videoHeight || !videoSprite || !maskGraphics) {
+    // Return at least the stage size so background can update
+    return {
+      stageSize: { width: width || 0, height: height || 0 },
+      videoSize: { width: 0, height: 0 },
+      baseScale: 1,
+      baseOffset: { x: 0, y: 0 },
+      maskRect: { x: 0, y: 0, width: 0, height: 0 },
+      cropBounds: { startX: 0, endX: 0, startY: 0, endY: 0 }
+    };
+  }
 
   // Apply crop region
   const crop = cropRegion || { x: 0, y: 0, width: 1, height: 1 };

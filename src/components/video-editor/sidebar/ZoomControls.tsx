@@ -30,7 +30,7 @@ export function ZoomControls({
     onZoomDelete,
     onAutoZoom,
 }: ZoomControlsProps) {
-    const zoomEnabled = Boolean(selectedZoomDepth);
+    const zoomEnabled = Boolean(selectedZoomId);
 
     const handleDeleteClick = () => {
         if (selectedZoomId && onZoomDelete) {

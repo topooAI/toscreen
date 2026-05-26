@@ -63,11 +63,12 @@ class MouseTracker {
             this.recordingBounds = bounds;
         } else {
             const primaryDisplay = screen.getPrimaryDisplay();
+            const scale = primaryDisplay.scaleFactor || 1;
             this.recordingBounds = {
-                x: primaryDisplay.bounds.x,
-                y: primaryDisplay.bounds.y,
-                width: primaryDisplay.bounds.width,
-                height: primaryDisplay.bounds.height,
+                x: primaryDisplay.bounds.x * scale,
+                y: primaryDisplay.bounds.y * scale,
+                width: primaryDisplay.bounds.width * scale,
+                height: primaryDisplay.bounds.height * scale,
             };
         }
 

@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import { useItem } from "dnd-timeline";
 import type { Span } from "dnd-timeline";
 import { cn } from "@/lib/utils";
@@ -25,7 +26,7 @@ const ZOOM_LABELS: Record<number, string> = {
   6: "5×",
 };
 
-export default function Item({ 
+function ItemComponent({ 
   id, 
   span, 
   rowId, 
@@ -118,3 +119,17 @@ export default function Item({
     </div>
   );
 }
+
+const Item = memo(ItemComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.span.start === nextProps.span.start &&
+    prevProps.span.end === nextProps.span.end &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.zoomDepth === nextProps.zoomDepth &&
+    prevProps.variant === nextProps.variant &&
+    prevProps.children === nextProps.children
+  );
+});
+
+export default Item;

@@ -1,4 +1,4 @@
-import { ipcMain, desktopCapturer, BrowserWindow, shell, app, dialog, screen } from 'electron'
+import { ipcMain, desktopCapturer, BrowserWindow, shell, app, dialog } from 'electron'
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -6,20 +6,6 @@ import { RECORDINGS_DIR } from '../main'
 import { mouseTracker } from '../mouseTracker'
 
 let selectedSource: any = null
-
-export async function getSelectedSourceForMediaRequest() {
-  if (!selectedSource) return null;
-  const types = selectedSource.id.startsWith('screen') ? ['screen'] : ['window'];
-  try {
-    const sources = await desktopCapturer.getSources({ types: types as any });
-    const matched = sources.find(s => s.id === selectedSource.id);
-    if (matched) return matched;
-    return sources[0] || null;
-  } catch (err) {
-    console.error('[IPC] Failed to query raw media source:', err);
-    return null;
-  }
-}
 
 export function registerIpcHandlers(
   createEditorWindow: () => void,
@@ -146,31 +132,13 @@ export function registerIpcHandlers(
     }
   })
 
-  ipcMain.handle('set-recording-state', async (_, recording: boolean, videoStartTime?: number) => {
+  ipcMain.handle('set-recording-state', async (_, recording: boolean) => {
     const source = selectedSource || { name: 'Screen' }
 
     if (recording) {
       // Start mouse tracking when recording begins
-      // Detect bounds from the selected screen display
-      let recordingBounds = undefined;
-      if (selectedSource && selectedSource.id.startsWith('screen')) {
-        try {
-          const displays = screen.getAllDisplays();
-          const matchedDisplay = displays.find(d => d.id.toString() === selectedSource.display_id?.toString());
-          if (matchedDisplay) {
-            recordingBounds = {
-              x: matchedDisplay.bounds.x,
-              y: matchedDisplay.bounds.y,
-              width: matchedDisplay.bounds.width,
-              height: matchedDisplay.bounds.height
-            };
-            console.log('[IPC] Matched recording display bounds:', recordingBounds);
-          }
-        } catch (err) {
-          console.error('[IPC] Failed to resolve recording bounds:', err);
-        }
-      }
-      mouseTracker.start(recordingBounds);
+      // Note: bounds will be auto-detected from primary display
+      mouseTracker.start();
       console.log('[IPC] Mouse tracking started for recording');
 
       // Minimize the HUD to avoid capturing it in the recording
@@ -188,7 +156,7 @@ export function registerIpcHandlers(
         try {
           // Save to a temporary file first, will be renamed when video is stored
           const clicksFilePath = path.join(RECORDINGS_DIR, 'temp-clicks.json');
-          await mouseTracker.exportToFile(clicksFilePath, events, bounds, videoStartTime);
+          await mouseTracker.exportToFile(clicksFilePath, events, bounds);
           console.log('[IPC] Clicks exported to temp file', clicksFilePath);
         } catch (error) {
           console.error('[IPC] Failed to export clicks:', error);

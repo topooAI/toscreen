@@ -1,5 +1,14 @@
 import { Container, BlurFilter } from 'pixi.js';
 
+/**
+ * Configuration for visual effects and filters.
+ * This acts as a 'Registry' for all rendering-time effects.
+ */
+export interface EffectConfig {
+  motionBlurEnabled?: boolean;
+  // Future effects can be added here (e.g., colorFilters, noise, etc.)
+}
+
 interface TransformParams {
   cameraContainer: Container;
   blurFilter: BlurFilter | null;
@@ -10,7 +19,8 @@ interface TransformParams {
   focusY: number;
   motionIntensity: number;
   isPlaying: boolean;
-  motionBlurEnabled?: boolean;
+  effects?: EffectConfig; // New registry-style config
+  motionBlurEnabled?: boolean; // Legacy support
 }
 
 export function applyZoomTransform({
@@ -23,8 +33,12 @@ export function applyZoomTransform({
   focusY,
   motionIntensity,
   isPlaying,
-  motionBlurEnabled = true,
+  effects = {},
+  motionBlurEnabled = true, // Default legacy support
 }: TransformParams) {
+  // Use effects config if present, otherwise fallback to legacy props
+  const isMotionBlurActive = effects.motionBlurEnabled ?? motionBlurEnabled;
+
   if (
     stageSize.width <= 0 ||
     stageSize.height <= 0 ||
@@ -34,13 +48,11 @@ export function applyZoomTransform({
     return;
   }
 
-  // The focus point relative to the actual video area
-  const focusVideoPxX = focusX * baseMask.width;
-  const focusVideoPxY = focusY * baseMask.height;
-  
-  // The focus point relative to the stage (before zoom)
-  const focusStagePxX = baseMask.x + focusVideoPxX;
-  const focusStagePxY = baseMask.y + focusVideoPxY;
+  // focusX and focusY are already normalized STAGE coordinates (0-1),
+  // properly computed via videoFocusToStage and clampFocusToStage.
+  // We simply map them directly to absolute stage pixels.
+  const focusStagePxX = focusX * stageSize.width;
+  const focusStagePxY = focusY * stageSize.height;
   
   // Stage center (where we want the focus to end up after zoom)
   const stageCenterX = stageSize.width / 2;
@@ -56,9 +68,11 @@ export function applyZoomTransform({
  
   cameraContainer.position.set(cameraX, cameraY);
 
+  // Apply Filters from the 'Registry' logic
   if (blurFilter) {
-    const shouldBlur = motionBlurEnabled && isPlaying && motionIntensity > 0.0005;
+    const shouldBlur = isMotionBlurActive && isPlaying && motionIntensity > 0.0005;
     const motionBlur = shouldBlur ? Math.min(6, motionIntensity * 120) : 0;
+    // Fix: Using modern '.strength' property instead of deprecated '.blur'
     blurFilter.strength = motionBlur;
   }
 }

@@ -74,6 +74,11 @@ export function generateAutoZooms(
                 if (prevRegion.depth < 6) {
                     prevRegion.depth = (prevRegion.depth + 1) as ZoomDepth;
                 }
+                
+                // CRITICAL FIX: Refresh the clicks array to include the new extended time window
+                // Otherwise the camera stops tracking the mouse during the extended period
+                prevRegion.clicks = sortedClicks.filter(c => c.timestamp >= prevRegion.startMs && c.timestamp <= prevRegion.endMs);
+                
                 lastProcessedTime = click.timestamp;
                 continue;
             }

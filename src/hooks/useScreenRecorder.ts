@@ -53,7 +53,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       mediaRecorder.current.stop();
       setRecording(false);
 
-      window.electronAPI?.setRecordingState(false);
+      window.electronAPI?.setRecordingState(false, startTime.current);
     }
   });
 
@@ -87,19 +87,15 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         return;
       }
 
-      const mediaStream = await (navigator.mediaDevices as any).getUserMedia({
+      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
         audio: false,
         video: {
-          mandatory: {
-            chromeMediaSource: "desktop",
-            chromeMediaSourceId: selectedSource.id,
-            maxWidth: TARGET_WIDTH,
-            maxHeight: TARGET_HEIGHT,
-            maxFrameRate: TARGET_FRAME_RATE,
-            minFrameRate: 30,
-          },
-        },
-      });
+          width: { ideal: TARGET_WIDTH, max: TARGET_WIDTH },
+          height: { ideal: TARGET_HEIGHT, max: TARGET_HEIGHT },
+          frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
+          cursor: "never"
+        }
+      } as any);
       stream.current = mediaStream;
       if (!stream.current) {
         throw new Error("Media stream is not available.");

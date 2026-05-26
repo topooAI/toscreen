@@ -1,4 +1,4 @@
-import type React from 'react';
+import * as React from 'react';
 import type { TrimRegion } from '../types';
 
 interface VideoEventHandlersParams {
@@ -11,6 +11,7 @@ interface VideoEventHandlersParams {
   onPlayStateChange: (playing: boolean) => void;
   onTimeUpdate: (time: number) => void;
   trimRegionsRef: React.MutableRefObject<TrimRegion[]>;
+  isSkippingRef: React.MutableRefObject<boolean>;
 }
 
 export function createVideoEventHandlers(params: VideoEventHandlersParams) {
@@ -24,6 +25,7 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
     onPlayStateChange,
     onTimeUpdate,
     trimRegionsRef,
+    isSkippingRef,
   } = params;
 
   const emitTime = (timeValue: number) => {
@@ -39,25 +41,48 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
     ) || null;
   };
 
+  let lastEmitTimestamp = 0;
+
   function updateTime() {
     if (!video) return;
     
+    const now = performance.now();
     const currentTimeMs = video.currentTime * 1000;
     const activeTrimRegion = findActiveTrimRegion(currentTimeMs);
     
     // If we're in a trim region during playback, skip to the end of it
-    if (activeTrimRegion && !video.paused && !video.ended) {
+    if (activeTrimRegion && !video.paused && !video.ended && !isSkippingRef.current) {
+      isSkippingRef.current = true;
       const skipToTime = activeTrimRegion.endMs / 1000;
       
-      // If the skip would take us past the video duration, pause instead
       if (skipToTime >= video.duration) {
         video.pause();
+        isSkippingRef.current = false;
       } else {
         video.currentTime = skipToTime;
-        emitTime(skipToTime);
+        
+        // Wait for the decoder to actually render the new frame before updating PIXI
+        const resumePlayback = () => {
+          isSkippingRef.current = false;
+          emitTime(video.currentTime);
+        };
+
+        if ('requestVideoFrameCallback' in video) {
+          (video as any).requestVideoFrameCallback(resumePlayback);
+        } else {
+          video.addEventListener('seeked', function onSeeked() {
+            video.removeEventListener('seeked', onSeeked);
+            resumePlayback();
+          });
+        }
       }
-    } else {
-      emitTime(video.currentTime);
+    } else if (!isSkippingRef.current) {
+      // Throttle UI updates to ~30fps (every 32ms) to reduce React render pressure
+      // while PixiJS continues to render at 60fps in its own ticker.
+      if (now - lastEmitTimestamp >= 32 || video.paused || video.ended) {
+        emitTime(video.currentTime);
+        lastEmitTimestamp = now;
+      }
     }
     
     if (!video.paused && !video.ended) {

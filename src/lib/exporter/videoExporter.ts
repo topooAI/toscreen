@@ -20,6 +20,11 @@ interface VideoExporterConfig extends ExportConfig {
   annotationRegions?: AnnotationRegion[];
   previewWidth?: number;
   previewHeight?: number;
+  cursorData?: any[];
+  cursorSize?: number;
+  cursorSmoothing?: boolean;
+  showVectorCursor?: boolean;
+  cursorOffset?: number;
   onProgress?: (progress: ExportProgress) => void;
 }
 
@@ -82,10 +87,18 @@ export class VideoExporter {
       this.decoder = new VideoFileDecoder();
       const videoInfo = await this.decoder.loadVideo(this.config.videoUrl);
 
-      // Initialize frame renderer
+      // Force dimensions to be multiples of 16 for universal encoder compatibility
+      const safeWidth = Math.floor(this.config.width / 16) * 16;
+      const safeHeight = Math.floor(this.config.height / 16) * 16;
+      
+      // Update config with safe dimensions so all subsequent components use the same sizes
+      this.config.width = safeWidth;
+      this.config.height = safeHeight;
+
+      // Initialize frame renderer with safe, encoder-friendly dimensions
       this.renderer = new FrameRenderer({
-        width: this.config.width,
-        height: this.config.height,
+        width: safeWidth,
+        height: safeHeight,
         wallpaper: this.config.wallpaper,
         zoomRegions: this.config.zoomRegions,
         showShadow: this.config.showShadow,
@@ -100,6 +113,11 @@ export class VideoExporter {
         annotationRegions: this.config.annotationRegions,
         previewWidth: this.config.previewWidth,
         previewHeight: this.config.previewHeight,
+        cursorData: this.config.cursorData,
+        cursorSize: this.config.cursorSize,
+        cursorSmoothing: this.config.cursorSmoothing,
+        showVectorCursor: this.config.showVectorCursor,
+        cursorOffset: this.config.cursorOffset,
       });
       await this.renderer.initialize();
 
@@ -110,120 +128,133 @@ export class VideoExporter {
       this.muxer = new VideoMuxer(this.config, false);
       await this.muxer.initialize();
 
-      // Get the video element for frame extraction
+      const totalDuration = videoInfo.duration;
+      const effectiveDuration = this.getEffectiveDuration(totalDuration);
+      const frameDuration = 1 / this.config.frameRate;
+      const totalFrames = Math.floor(effectiveDuration * this.config.frameRate);
+      const startTime = 0;
+
+      console.log(`[VideoExporter] Original duration: ${totalDuration.toFixed(3)} s`);
+      console.log(`[VideoExporter] Effective duration: ${effectiveDuration.toFixed(3)} s`);
+      console.log(`[VideoExporter] Total frames to export: ${totalFrames}`);
+
       const videoElement = this.decoder.getVideoElement();
-      if (!videoElement) {
-        throw new Error('Video element not available');
+      if (!videoElement) throw new Error('Video element not found');
+
+      const onProgress = this.config.onProgress || (() => {});
+
+      // --- PROACTIVE STATE CHECK ---
+      if (!this.encoder || this.encoder.state === 'closed') {
+        throw new Error('Encoder failed to initialize properly.');
       }
 
-      // Calculate effective duration and frame count (excluding trim regions)
-      const effectiveDuration = this.getEffectiveDuration(videoInfo.duration);
-      const totalFrames = Math.ceil(effectiveDuration * this.config.frameRate);
-      
-      console.log('[VideoExporter] Original duration:', videoInfo.duration, 's');
-      console.log('[VideoExporter] Effective duration:', effectiveDuration, 's');
-      console.log('[VideoExporter] Total frames to export:', totalFrames);
+      for (let i = 0; i < totalFrames; i++) {
+        if (this.cancelled) {
+          return { success: false, error: 'Export cancelled' };
+        }
 
-      // Process frames continuously without batching delays
-      const frameDuration = 1_000_000 / this.config.frameRate; // in microseconds
-      let frameIndex = 0;
-      const timeStep = 1 / this.config.frameRate;
-
-      while (frameIndex < totalFrames && !this.cancelled) {
-        const i = frameIndex;
-        const timestamp = i * frameDuration;
-
-        // Map effective time to source time (accounting for trim regions)
-        const effectiveTimeMs = (i * timeStep) * 1000;
-        const sourceTimeMs = this.mapEffectiveToSourceTime(effectiveTimeMs);
-        const videoTime = sourceTimeMs / 1000;
-          
+        const videoTime = (i / this.config.frameRate) + startTime;
+        const timestamp = i * frameDuration * 1_000_000; // in microseconds
+        const sourceTimeMs = (videoTime * 1000);
+           
         // Seek if needed or wait for first frame to be ready
         const needsSeek = Math.abs(videoElement.currentTime - videoTime) > 0.001;
 
         if (needsSeek) {
-          // Attach listener BEFORE setting currentTime to avoid race condition
           const seekedPromise = new Promise<void>(resolve => {
             videoElement.addEventListener('seeked', () => resolve(), { once: true });
           });
-          
           videoElement.currentTime = videoTime;
           await seekedPromise;
-        } else if (i === 0) {
-          // Only for the very first frame, wait for it to be ready
+        }
+
+        // --- CRITICAL WAIT: Ensure video actually has pixel data ---
+        if (videoElement.readyState < 2) { // 2 = HAVE_CURRENT_DATA
+          await new Promise<void>(resolve => {
+            const onReady = () => {
+              videoElement.removeEventListener('loadeddata', onReady);
+              videoElement.removeEventListener('canplay', onReady);
+              resolve();
+            };
+            videoElement.addEventListener('loadeddata', onReady);
+            videoElement.addEventListener('canplay', onReady);
+          });
+        }
+
+        // For the very first frame, use requestVideoFrameCallback for absolute guarantee
+        // that the frame is painted in the browser's compositor.
+        if (i === 0 && 'requestVideoFrameCallback' in videoElement) {
           await new Promise<void>(resolve => {
             videoElement.requestVideoFrameCallback(() => resolve());
           });
         }
 
-        // Create a VideoFrame from the video element (on GPU!)
-        const videoFrame = new VideoFrame(videoElement, {
-          timestamp,
-        });
+        // Final check before rendering
+        if (!this.encoder || this.encoder.state === 'closed') {
+          throw new Error(`Encoder died unexpectedly at frame ${i + 1}`);
+        }
+
+        // Capture a static snapshot of the current video frame using ImageBitmap
+        // This completely bypasses PixiJS's unstable VideoResource management during rapid seeking.
+        const sourceBitmap = await createImageBitmap(videoElement);
 
         // Render the frame with all effects using source timestamp
         const sourceTimestamp = sourceTimeMs * 1000; // Convert to microseconds
-        await this.renderer!.renderFrame(videoFrame, sourceTimestamp);
+        await this.renderer!.renderFrame(sourceBitmap, sourceTimestamp);
         
-        videoFrame.close();
+        // Clean up the source bitmap to prevent memory leaks
+        sourceBitmap.close();
 
         const canvas = this.renderer!.getCanvas();
+        
+        // Final sanity check before encoding
+        if (this.encoder.state === 'closed') {
+          throw new Error('Encoder closed before it could process the frame');
+        }
 
-        // Create VideoFrame from canvas on GPU without reading pixels
-        // @ts-ignore - colorSpace not in TypeScript definitions but works at runtime
-        const exportFrame = new VideoFrame(canvas, {
-          timestamp,
-          duration: frameDuration,
-          colorSpace: {
-            primaries: 'bt709',
-            transfer: 'iec61966-2-1',
-            matrix: 'rgb',
-            fullRange: true,
-          },
+        // Use ImageBitmap for safer and more stable frame capture (OpenScreen style)
+        const exportBitmap = await createImageBitmap(canvas);
+        const exportFrame = new VideoFrame(exportBitmap, {
+          timestamp: Math.round(timestamp),
+          duration: Math.round(frameDuration * 1_000_000),
         });
 
-        // Check encoder queue before encoding to keep it full
-        while (this.encodeQueue >= this.MAX_ENCODE_QUEUE && !this.cancelled) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-
-        if (this.encoder && this.encoder.state === 'configured') {
-          this.encodeQueue++;
-          this.encoder.encode(exportFrame, { keyFrame: i % 150 === 0 });
-        } else {
-          console.warn(`[Frame ${i}] Encoder not ready! State: ${this.encoder?.state}`);
-        }
-
+        // FORCE the first real frame to be a keyframe. 
+        // The encoder might have used its natural keyframe interval during the test-drive.
+        this.encoder.encode(exportFrame, { keyFrame: i === 0 });
+        
         exportFrame.close();
+        exportBitmap.close();
 
-        frameIndex++;
-
-        // Update progress
-        if (this.config.onProgress) {
-          this.config.onProgress({
-            currentFrame: frameIndex,
-            totalFrames,
-            percentage: (frameIndex / totalFrames) * 100,
-            estimatedTimeRemaining: 0,
-          });
+        // Control queue depth to avoid OOM
+        this.encodeQueue++;
+        while (this.encodeQueue >= this.MAX_ENCODE_QUEUE && !this.cancelled) {
+          await new Promise(resolve => setTimeout(resolve, 1));
         }
+
+        onProgress({
+          percent: Math.round(((i + 1) / totalFrames) * 100),
+          currentFrame: i + 1,
+          totalFrames,
+          percentage: (i + 1) / totalFrames * 100,
+          estimatedTimeRemaining: 0,
+        });
       }
 
-      if (this.cancelled) {
-        return { success: false, error: 'Export cancelled' };
-      }
-
-      // Finalize encoding
-      if (this.encoder && this.encoder.state === 'configured') {
-        await this.encoder.flush();
-      }
-
-      // Wait for all muxing operations to complete
+      // Wait for all frames to be encoded
+      await this.encoder.flush();
+      
+      // Wait for all muxing promises to finish
       await Promise.all(this.muxingPromises);
-
-      // Finalize muxer and get output blob
+      
+      // Finalize the muxer
       const blob = await this.muxer!.finalize();
-
+      
+      // SANITY CHECK: Ensure we actually got data (not just headers)
+      if (blob.size < 1024) {
+        throw new Error('Export produced an empty file. This usually means the encoder failed silently.');
+      }
+      
       return { success: true, blob };
     } catch (error) {
       console.error('Export error:', error);
@@ -236,143 +267,197 @@ export class VideoExporter {
     }
   }
 
-  private async initializeEncoder(): Promise<void> {
-    this.encodeQueue = 0;
-    this.muxingPromises = [];
-    this.chunkCount = 0;
-    let videoDescription: Uint8Array | undefined;
+  private handleEncodedChunk(chunk: EncodedVideoChunk, meta?: EncodedVideoChunkMetadata) {
+    if (!this.muxer || this.cancelled) return;
 
-    this.encoder = new VideoEncoder({
-      output: (chunk, meta) => {
-        // Capture decoder config metadata from encoder output
-        if (meta?.decoderConfig?.description && !videoDescription) {
-          const desc = meta.decoderConfig.description;
-          videoDescription = new Uint8Array(desc instanceof ArrayBuffer ? desc : (desc as any));
-          this.videoDescription = videoDescription;
-        }
-        // Capture colorSpace from encoder metadata if provided
-        if (meta?.decoderConfig?.colorSpace && !this.videoColorSpace) {
-          this.videoColorSpace = meta.decoderConfig.colorSpace;
-        }
-
-        // Stream chunk to muxer immediately (parallel processing)
-        const isFirstChunk = this.chunkCount === 0;
-        this.chunkCount++;
-
-        const muxingPromise = (async () => {
-          try {
-            if (isFirstChunk && this.videoDescription) {
-              // Add decoder config for the first chunk
-              const colorSpace = this.videoColorSpace || {
-                primaries: 'bt709',
-                transfer: 'iec61966-2-1',
-                matrix: 'rgb',
-                fullRange: true,
-              };
-
-              const metadata: EncodedVideoChunkMetadata = {
-                decoderConfig: {
-                  codec: this.config.codec || 'avc1.640033',
-                  codedWidth: this.config.width,
-                  codedHeight: this.config.height,
-                  description: this.videoDescription,
-                  colorSpace,
-                },
-              };
-
-              await this.muxer!.addVideoChunk(chunk, metadata);
-            } else {
-              await this.muxer!.addVideoChunk(chunk, meta);
-            }
-          } catch (error) {
-            console.error('Muxing error:', error);
-          }
-        })();
-
-        this.muxingPromises.push(muxingPromise);
-        this.encodeQueue--;
-      },
-      error: (error) => {
-        console.error('[VideoExporter] Encoder error:', error);
-        // Stop export encoding failed
-        this.cancelled = true;
-      },
-    });
-
-    const codec = this.config.codec || 'avc1.640033';
+    // Capture decoder config metadata from encoder output
+    if (meta?.decoderConfig?.description && !this.videoDescription) {
+      const desc = meta.decoderConfig.description;
+      this.videoDescription = new Uint8Array(desc instanceof ArrayBuffer ? desc : (desc as any));
+    }
     
-    const encoderConfig: VideoEncoderConfig = {
-      codec,
-      width: this.config.width,
-      height: this.config.height,
-      bitrate: this.config.bitrate,
-      framerate: this.config.frameRate,
-      latencyMode: 'realtime',
-      bitrateMode: 'variable',
-      hardwareAcceleration: 'prefer-hardware',
-    };
-
-    // Check hardware support first
-    const hardwareSupport = await VideoEncoder.isConfigSupported(encoderConfig);
-
-    if (hardwareSupport.supported) {
-      // Use hardware encoding
-      console.log('[VideoExporter] Using hardware acceleration');
-      this.encoder.configure(encoderConfig);
-    } else {
-      // Fall back to software encoding
-      console.log('[VideoExporter] Hardware not supported, using software encoding');
-      encoderConfig.hardwareAcceleration = 'prefer-software';
-      
-      const softwareSupport = await VideoEncoder.isConfigSupported(encoderConfig);
-      if (!softwareSupport.supported) {
-        throw new Error('Video encoding not supported on this system');
-      }
-      
-      this.encoder.configure(encoderConfig);
+    // Capture colorSpace
+    if (meta?.decoderConfig?.colorSpace && !this.videoColorSpace) {
+      this.videoColorSpace = meta.decoderConfig.colorSpace;
     }
-  }
 
-  cancel(): void {
-    this.cancelled = true;
-    this.cleanup();
-  }
+    const isFirstChunk = this.chunkCount === 0;
+    this.chunkCount++;
 
-  private cleanup(): void {
-    if (this.encoder) {
+    const muxingPromise = (async () => {
       try {
-        if (this.encoder.state === 'configured') {
-          this.encoder.close();
+        if (isFirstChunk && this.videoDescription) {
+          const colorSpace = this.videoColorSpace || {
+            primaries: 'bt709',
+            transfer: 'iec61966-2-1',
+            matrix: 'rgb',
+            fullRange: true,
+          };
+
+          const metadata: EncodedVideoChunkMetadata = {
+            decoderConfig: {
+              codec: this.config.codec || 'avc1.4D4028',
+              codedWidth: this.config.width,
+              codedHeight: this.config.height,
+              description: this.videoDescription,
+              colorSpace,
+            },
+          };
+
+          await this.muxer!.addVideoChunk(chunk, metadata);
+        } else {
+          await this.muxer!.addVideoChunk(chunk, meta);
         }
-      } catch (e) {
-        console.warn('Error closing encoder:', e);
+      } catch (error) {
+        console.error('Muxing error:', error);
       }
-      this.encoder = null;
-    }
+    })();
 
-    if (this.decoder) {
-      try {
-        this.decoder.destroy();
-      } catch (e) {
-        console.warn('Error destroying decoder:', e);
-      }
-      this.decoder = null;
-    }
+    this.muxingPromises.push(muxingPromise);
+    this.encodeQueue--;
+  }
 
-    if (this.renderer) {
-      try {
-        this.renderer.destroy();
-      } catch (e) {
-        console.warn('Error destroying renderer:', e);
-      }
-      this.renderer = null;
-    }
-
-    this.muxer = null;
+  private async initializeEncoder(): Promise<void> {
     this.encodeQueue = 0;
     this.muxingPromises = [];
     this.chunkCount = 0;
     this.videoDescription = undefined;
     this.videoColorSpace = undefined;
+
+    // Force dimensions to be multiples of 16
+    const exportWidth = Math.floor(this.config.width / 16) * 16;
+    const exportHeight = Math.floor(this.config.height / 16) * 16;
+    
+    console.log(`[VideoExporter] Initializing encoder for ${exportWidth}x${exportHeight}`);
+
+    const tryConfigure = async (currentCodec: string, hw: HardwareAcceleration): Promise<boolean> => {
+      return new Promise(async (resolve) => {
+        let isResolved = false;
+        let testFrameEncoded = false;
+
+        const encoder = new VideoEncoder({
+          output: (chunk, meta) => {
+            if (!testFrameEncoded) {
+              // TEST FRAME SUCCESS!
+              // CRITICAL: We MUST capture the decoder config here because the encoder 
+              // often only emits it on the very first frame (which is this test frame).
+              if (meta?.decoderConfig?.description && !this.videoDescription) {
+                const desc = meta.decoderConfig.description;
+                this.videoDescription = new Uint8Array(desc instanceof ArrayBuffer ? desc : (desc as any));
+              }
+              if (meta?.decoderConfig?.colorSpace && !this.videoColorSpace) {
+                this.videoColorSpace = meta.decoderConfig.colorSpace;
+              }
+
+              testFrameEncoded = true;
+              if (!isResolved) {
+                this.encoder = encoder;
+                isResolved = true;
+                resolve(true);
+              }
+            } else {
+              // Route real frames to the muxer
+              this.handleEncodedChunk(chunk, meta);
+            }
+          },
+          error: (err) => {
+            console.warn(`[VideoExporter] Test frame failed for ${hw}/${currentCodec}:`, err);
+            if (!isResolved) {
+              isResolved = true;
+              resolve(false);
+            }
+          },
+        });
+
+        const encoderConfig: VideoEncoderConfig = {
+          codec: currentCodec,
+          width: exportWidth,
+          height: exportHeight,
+          bitrate: Math.min(this.config.bitrate, 10_000_000),
+          framerate: this.config.frameRate,
+          hardwareAcceleration: hw,
+        };
+
+        try {
+          const support = await VideoEncoder.isConfigSupported(encoderConfig);
+          if (support.supported && support.config) {
+            console.log(`[VideoExporter] Testing ${hw} with ${currentCodec}...`);
+            encoder.configure(support.config);
+            
+            // --- TEST DRIVE ---
+            // Create a tiny black canvas for a test frame
+            const testCanvas = document.createElement('canvas');
+            testCanvas.width = exportWidth;
+            testCanvas.height = exportHeight;
+            const testCtx = testCanvas.getContext('2d')!;
+            testCtx.fillStyle = 'black';
+            testCtx.fillRect(0, 0, exportWidth, exportHeight);
+
+            const testFrame = new VideoFrame(testCanvas, {
+              timestamp: 0,
+              duration: 1000,
+            });
+
+            encoder.encode(testFrame, { keyFrame: true });
+            testFrame.close();
+            await encoder.flush();
+
+            // The 'output' or 'error' callback will resolve the promise
+          } else {
+            resolve(false);
+          }
+        } catch (e) {
+          console.warn(`[VideoExporter] Config rejection for ${hw}/${currentCodec}:`, e);
+          resolve(false);
+        }
+
+        // Safety timeout in case flush() hangs
+        setTimeout(() => {
+          if (!isResolved) {
+            isResolved = true;
+            resolve(false);
+          }
+        }, 2000);
+      });
+    };
+
+    // Retry Strategy (Hardware High -> Hardware Baseline -> Software Baseline)
+    const configs = [
+      { codec: 'avc1.640028', hw: 'prefer-hardware' as const }, // High 4.0
+      { codec: 'avc1.4D4028', hw: 'prefer-hardware' as const }, // Main 4.0
+      { codec: 'avc1.42E028', hw: 'prefer-hardware' as const }, // Baseline 4.0
+      { codec: 'avc1.42E028', hw: 'prefer-software' as const }, // Software Baseline
+    ];
+
+    for (const conf of configs) {
+      if (await tryConfigure(conf.codec, conf.hw)) {
+        console.log(`[VideoExporter] Selected stable config: ${conf.hw} / ${conf.codec}`);
+        return;
+      }
+    }
+
+    throw new Error('Video encoding not supported on this system.');
+  }
+
+  cancel(): void {
+    this.cancelled = true;
+  }
+
+  private cleanup(): void {
+    if (this.encoder) {
+      try {
+        if (this.encoder.state !== 'closed') this.encoder.close();
+      } catch (e) {}
+      this.encoder = null;
+    }
+    if (this.decoder) {
+      this.decoder.destroy();
+      this.decoder = null;
+    }
+    if (this.renderer) {
+      this.renderer.destroy();
+      this.renderer = null;
+    }
+    this.muxer = null;
   }
 }

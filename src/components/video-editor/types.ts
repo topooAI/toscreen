@@ -14,6 +14,13 @@ export interface ZoomRegion {
   clicks?: any[]; // Raw mouse path data for dynamic tracking
 }
 
+export interface CursorDataPoint {
+  timestampMs: number;
+  x: number; // Normalized (0-1) horizontally
+  y: number; // Normalized (0-1) vertically
+  isClick?: boolean;
+}
+
 export interface TrimRegion {
   id: string;
   startMs: number;

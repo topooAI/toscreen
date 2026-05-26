@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Download, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import type { ExportProgress } from '@/lib/exporter';
+import { Button } from "../ui/button";
+import type { ExportProgress } from '../../lib/exporter';
 
 interface ExportDialogProps {
   isOpen: boolean;

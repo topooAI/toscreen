@@ -420,6 +420,7 @@ export class FrameRenderer {
       baseScale: scale,
       baseOffset: { x: spriteX, y: spriteY },
       maskRect: { x: maskX, y: maskY, width: croppedDisplayWidth, height: croppedDisplayHeight },
+      cropBounds: { startX: cropStartX, endX: cropEndX, startY: cropStartY, endY: cropEndY },
     };
   }
 
@@ -571,9 +572,9 @@ export class FrameRenderer {
   private drawMacCursor(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
     ctx.save();
     
-    // The tip of the pointer is mathematically positioned at local (0, 0), so no offset subtraction needed
-    const targetX = x;
-    const targetY = y;
+    // Shift target position so the pointer tip (5.5, 3.5) aligns perfectly with (x, y)
+    const targetX = x - 5.5 * scale;
+    const targetY = y - 3.5 * scale;
     
     // Drop shadow
     ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
@@ -581,15 +582,14 @@ export class FrameRenderer {
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 3 * scale;
     
-    // Draw the crisp macOS vector cursor scaled relative to the tip at (0, 0)
     ctx.beginPath();
-    ctx.moveTo(targetX, targetY);
-    ctx.lineTo(targetX, targetY + 20 * scale);
-    ctx.lineTo(targetX + 5.7 * scale, targetY + 14.3 * scale);
-    ctx.lineTo(targetX + 10.7 * scale, scale * 24.3 + targetY);
-    ctx.lineTo(targetX + 14.3 * scale, scale * 22.1 + targetY);
-    ctx.lineTo(targetX + 9.3 * scale, targetY + 12.1 * scale);
-    ctx.lineTo(targetX + 18 * scale, targetY + 12.1 * scale);
+    ctx.moveTo(targetX + 5.5 * scale, targetY + 3.5 * scale);
+    ctx.lineTo(targetX + 5.5 * scale, targetY + 23.5 * scale);
+    ctx.lineTo(targetX + 11.2 * scale, targetY + 17.8 * scale);
+    ctx.lineTo(targetX + 16.2 * scale, targetY + 27.8 * scale);
+    ctx.lineTo(targetX + 19.8 * scale, targetY + 25.6 * scale);
+    ctx.lineTo(targetX + 14.8 * scale, targetY + 15.6 * scale);
+    ctx.lineTo(targetX + 23.5 * scale, targetY + 15.6 * scale);
     ctx.closePath();
     
     ctx.fillStyle = 'black';
@@ -679,8 +679,8 @@ export class FrameRenderer {
     const cursorSize = this.config.cursorSize || 1.5;
 
     let jiggleScale = 1.0;
-    const lastClick = [...cursorData].reverse().find(
-      (c: any) => c.type === 'click' && c.timestamp <= currentTimeMs && (currentTimeMs - c.timestamp) < 200
+    const lastClick = cursorData.findLast(
+      c => c.type === 'click' && c.timestamp <= currentTimeMs && (currentTimeMs - c.timestamp) < 200
     );
     if (lastClick) {
       const t = currentTimeMs - lastClick.timestamp;

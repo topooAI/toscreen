@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, session } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
@@ -161,41 +161,6 @@ app.whenReady().then(async () => {
   // Ensure recordings directory exists
   await ensureRecordingsDir()
 
-  // Diagnostic Logs for Display Configuration
-  try {
-    const { screen } = await import('electron');
-    console.log('[DIAGNOSTIC] Primary Display Bounds:', screen.getPrimaryDisplay().bounds, 'Scale:', screen.getPrimaryDisplay().scaleFactor);
-    console.log('[DIAGNOSTIC] All Displays:', screen.getAllDisplays().map(d => ({
-      id: d.id,
-      bounds: d.bounds,
-      scaleFactor: d.scaleFactor
-    })));
-  } catch (err) {
-    console.error('[DIAGNOSTIC] Failed to print screen info:', err);
-  }
-
-  // Register DisplayMediaRequestHandler to bypass standard system capture prompts in getDisplayMedia!
-  session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
-    import('./ipc/handlers').then(({ getSelectedSourceForMediaRequest }) => {
-      getSelectedSourceForMediaRequest().then((rawSource) => {
-        if (rawSource) {
-          callback({
-            video: rawSource,
-            enableLocalEcho: true
-          });
-        } else {
-          callback({});
-        }
-      }).catch((err) => {
-        console.error('[Main] Failed to get selected source:', err);
-        callback({});
-      });
-    }).catch((err) => {
-      console.error('[Main] Failed to import handlers:', err);
-      callback({});
-    });
-  });
-
   registerIpcHandlers(
     createEditorWindowWrapper,
     createSourceSelectorWindowWrapper,
@@ -210,5 +175,5 @@ app.whenReady().then(async () => {
       }
     }
   )
-  createWindow()
+  createEditorWindowWrapper()
 })

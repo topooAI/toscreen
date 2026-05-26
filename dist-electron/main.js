@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { ipcMain, screen, BrowserWindow, desktopCapturer, shell, app, dialog, nativeImage, Tray, Menu } from "electron";
+import { ipcMain, screen, BrowserWindow, desktopCapturer, shell, app, dialog, nativeImage, session, Tray, Menu } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs$1 from "node:fs/promises";
@@ -9,7 +9,7 @@ import * as fs from "fs/promises";
 import { uIOhook } from "uiohook-napi";
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL$1 = "http://127.0.0.1:5173";
+const VITE_DEV_SERVER_URL$1 = process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5173";
 path.join(APP_ROOT, "dist");
 let hudOverlayWindow = null;
 ipcMain.on("hud-overlay-hide", () => {
@@ -154,8 +154,8 @@ class MouseTracker {
     } else {
       const primaryDisplay = screen.getPrimaryDisplay();
       this.recordingBounds = {
-        x: 0,
-        y: 0,
+        x: primaryDisplay.bounds.x,
+        y: primaryDisplay.bounds.y,
         width: primaryDisplay.bounds.width,
         height: primaryDisplay.bounds.height
       };
@@ -185,13 +185,18 @@ class MouseTracker {
     return { events: capturedEvents, bounds: capturedBounds };
   }
   /**
-   * Export click events to JSON file
+   * Export click events to JSON file with absolute start time alignment
    */
-  async exportToFile(outputPath, events, bounds) {
+  async exportToFile(outputPath, events, bounds, videoStartTime) {
+    const processedEvents = videoStartTime ? events.map((e) => ({
+      ...e,
+      timestamp: e.absoluteTime - videoStartTime
+    })) : events;
     const data = {
       recordingBounds: bounds,
       startTime: this.startTime,
-      events
+      videoStartTime: videoStartTime || this.startTime,
+      events: processedEvents
     };
     await fs.writeFile(
       outputPath,
@@ -200,7 +205,7 @@ class MouseTracker {
     );
     this.events = [];
     this.recordingBounds = null;
-    console.log("[MouseTracker] Exported to", outputPath);
+    console.log("[MouseTracker] Exported to", outputPath, videoStartTime ? `with alignment relative to ${videoStartTime}` : "");
   }
   /**
    * Get current tracking status
@@ -221,18 +226,26 @@ class MouseTracker {
         this.addEvent(e.x, e.y, "click");
       }
     });
-    uIOhook.on("mousemove", (e) => {
-      this.lastX = e.x;
-      this.lastY = e.y;
+    const handleMoveOrDrag = (x, y) => {
+      this.lastX = x;
+      this.lastY = y;
       if (!this.isTracking) return;
       const now = Date.now();
-      const dist = Math.sqrt(Math.pow(e.x - this.lastRecordedX, 2) + Math.pow(e.y - this.lastRecordedY, 2));
-      if (dist > 100 || now - this.lastMoveTime > 1e3 && dist > 10) {
-        this.addEvent(e.x, e.y, "move");
-        this.lastRecordedX = e.x;
-        this.lastRecordedY = e.y;
-        this.lastMoveTime = now;
+      const timeElapsed = now - this.lastMoveTime;
+      if (timeElapsed >= 16) {
+        if (x !== this.lastRecordedX || y !== this.lastRecordedY) {
+          this.addEvent(x, y, "move");
+          this.lastRecordedX = x;
+          this.lastRecordedY = y;
+          this.lastMoveTime = now;
+        }
       }
+    };
+    uIOhook.on("mousemove", (e) => {
+      handleMoveOrDrag(e.x, e.y);
+    });
+    uIOhook.on("mousedrag", (e) => {
+      handleMoveOrDrag(e.x, e.y);
     });
     uIOhook.on("keydown", (e) => {
       if (!this.isTracking) return;
@@ -250,18 +263,17 @@ class MouseTracker {
     uIOhook.removeAllListeners();
     console.log("[MouseTracker] uIOhook stopped");
   }
-  /**
-   * Add an event to the session
-   */
   addEvent(x, y, type, data) {
     if (!this.isTracking || !this.recordingBounds) {
       return;
     }
-    const timestamp = Date.now() - this.startTime;
+    const absoluteTime = Date.now();
+    const timestamp = absoluteTime - this.startTime;
     const cx = (x - this.recordingBounds.x) / this.recordingBounds.width;
     const cy = (y - this.recordingBounds.y) / this.recordingBounds.height;
     const event = {
       timestamp,
+      absoluteTime,
       x,
       y,
       cx,
@@ -276,11 +288,23 @@ class MouseTracker {
       }
     }
     this.events.push(event);
-    console.log(`[MouseTracker] ${type} recorded`, { x, y, timestamp, cx, cy });
   }
 }
 const mouseTracker = new MouseTracker();
 let selectedSource = null;
+async function getSelectedSourceForMediaRequest() {
+  if (!selectedSource) return null;
+  const types = selectedSource.id.startsWith("screen") ? ["screen"] : ["window"];
+  try {
+    const sources = await desktopCapturer.getSources({ types });
+    const matched = sources.find((s) => s.id === selectedSource.id);
+    if (matched) return matched;
+    return sources[0] || null;
+  } catch (err) {
+    console.error("[IPC] Failed to query raw media source:", err);
+    return null;
+  }
+}
 function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, getMainWindow, getSourceSelectorWindow, onRecordingStateChange) {
   (async () => {
     try {
@@ -378,10 +402,31 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
       return { success: false, message: "Failed to get video path", error: String(error) };
     }
   });
-  ipcMain.handle("set-recording-state", async (_, recording) => {
+  ipcMain.handle("set-recording-state", async (_, recording, videoStartTime) => {
     const source = selectedSource || { name: "Screen" };
     if (recording) {
-      mouseTracker.start();
+      let recordingBounds = void 0;
+      if (selectedSource && selectedSource.id.startsWith("screen")) {
+        try {
+          const displays = screen.getAllDisplays();
+          const matchedDisplay = displays.find((d) => {
+            var _a;
+            return d.id.toString() === ((_a = selectedSource.display_id) == null ? void 0 : _a.toString());
+          });
+          if (matchedDisplay) {
+            recordingBounds = {
+              x: matchedDisplay.bounds.x,
+              y: matchedDisplay.bounds.y,
+              width: matchedDisplay.bounds.width,
+              height: matchedDisplay.bounds.height
+            };
+            console.log("[IPC] Matched recording display bounds:", recordingBounds);
+          }
+        } catch (err) {
+          console.error("[IPC] Failed to resolve recording bounds:", err);
+        }
+      }
+      mouseTracker.start(recordingBounds);
       console.log("[IPC] Mouse tracking started for recording");
       const mainWin = getMainWindow();
       if (mainWin) {
@@ -393,7 +438,7 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
       if (events.length > 0) {
         try {
           const clicksFilePath = path.join(RECORDINGS_DIR, "temp-clicks.json");
-          await mouseTracker.exportToFile(clicksFilePath, events, bounds);
+          await mouseTracker.exportToFile(clicksFilePath, events, bounds, videoStartTime);
           console.log("[IPC] Clicks exported to temp file", clicksFilePath);
         } catch (error) {
           console.error("[IPC] Failed to export clicks:", error);
@@ -532,7 +577,22 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
     }
   });
 }
+const handlers = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+  __proto__: null,
+  getSelectedSourceForMediaRequest,
+  registerIpcHandlers
+}, Symbol.toStringTag, { value: "Module" }));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const wrapConsole = (method) => {
+  const original = console[method];
+  console[method] = (...args) => {
+    try {
+      original.apply(console, args);
+    } catch (e) {
+    }
+  };
+};
+["log", "error", "warn", "info"].forEach((m) => wrapConsole(m));
 const RECORDINGS_DIR = path.join(app.getPath("userData"), "recordings");
 async function ensureRecordingsDir() {
   try {
@@ -631,6 +691,37 @@ app.whenReady().then(async () => {
   createTray();
   updateTrayMenu();
   await ensureRecordingsDir();
+  try {
+    const { screen: screen2 } = await import("electron");
+    console.log("[DIAGNOSTIC] Primary Display Bounds:", screen2.getPrimaryDisplay().bounds, "Scale:", screen2.getPrimaryDisplay().scaleFactor);
+    console.log("[DIAGNOSTIC] All Displays:", screen2.getAllDisplays().map((d) => ({
+      id: d.id,
+      bounds: d.bounds,
+      scaleFactor: d.scaleFactor
+    })));
+  } catch (err) {
+    console.error("[DIAGNOSTIC] Failed to print screen info:", err);
+  }
+  session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
+    Promise.resolve().then(() => handlers).then(({ getSelectedSourceForMediaRequest: getSelectedSourceForMediaRequest2 }) => {
+      getSelectedSourceForMediaRequest2().then((rawSource) => {
+        if (rawSource) {
+          callback({
+            video: rawSource,
+            enableLocalEcho: true
+          });
+        } else {
+          callback({});
+        }
+      }).catch((err) => {
+        console.error("[Main] Failed to get selected source:", err);
+        callback({});
+      });
+    }).catch((err) => {
+      console.error("[Main] Failed to import handlers:", err);
+      callback({});
+    });
+  });
   registerIpcHandlers(
     createEditorWindowWrapper,
     createSourceSelectorWindowWrapper,

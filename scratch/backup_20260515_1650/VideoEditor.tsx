@@ -58,13 +58,6 @@ export default function VideoEditor() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-
-  // Premium Cursor Customization Settings (Screen Studio parity)
-  const [cursorSize, setCursorSize] = useState(1.5);
-  const [cursorSmoothing, setCursorSmoothing] = useState(true);
-  const [showVectorCursor, setShowVectorCursor] = useState(true);
-  const [cursorOffset, setCursorOffset] = useState(-180);
-  const [cursorData, setCursorData] = useState<any[]>([]);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   const [exportQuality, setExportQuality] = useState<ExportQuality>('good');
@@ -110,6 +103,8 @@ export default function VideoEditor() {
     }
     loadVideo();
   }, []);
+
+
 
   // Initialize default wallpaper with resolved asset path
   useEffect(() => {
@@ -209,21 +204,6 @@ export default function VideoEditor() {
           : region,
       ),
     );
-  }, []);
-
-  const handleZoomSplit = useCallback((id: string, splitAtMs: number) => {
-    setZoomRegions((prev) => {
-      const region = prev.find(r => r.id === id);
-      if (!region) return prev;
-
-      const newId = `zoom-${nextZoomIdRef.current++}`;
-      const firstHalf: ZoomRegion = { ...region, endMs: splitAtMs };
-      const secondHalf: ZoomRegion = { ...region, id: newId, startMs: splitAtMs };
-
-      const newRegions = prev.filter(r => r.id !== id);
-      newRegions.push(firstHalf, secondHalf);
-      return newRegions;
-    });
   }, []);
 
   const handleTrimSpanChange = useCallback((id: string, span: Span) => {
@@ -519,7 +499,6 @@ export default function VideoEditor() {
         const result = await window.electronAPI.readClicksJson(videoPath);
         if (mounted && result.success && result.clicks && result.clicks.length > 0) {
           console.log(`[AutoZoom] Found ${result.clicks.length} clicks, applying automatically.`);
-          setCursorData(result.clicks); // Save actual cursor coordinates array
 
           // Generate regions immediately
           const newRegions = generateAutoZooms(result.clicks);
@@ -532,10 +511,6 @@ export default function VideoEditor() {
               duration: 4000,
             });
           }
-        } else {
-          if (mounted) {
-            setCursorData([]);
-          }
         }
       } catch (err) {
         console.error("Failed to check for auto-zoom data:", err);
@@ -544,7 +519,7 @@ export default function VideoEditor() {
 
     checkAutoZoomData();
     return () => { mounted = false; };
-  }, [videoPath]); 
+  }, [videoPath]); // Removed handleAutoZoom dependency to avoid circularity if it changes, though it is stable via useCallback
 
   const handleExport = useCallback(async () => {
     if (!videoPath) {
@@ -588,7 +563,56 @@ export default function VideoEditor() {
         // Use source resolution
         exportWidth = sourceWidth;
         exportHeight = sourceHeight;
+
+        if (aspectRatioValue === 1) {
+          // Square (1:1): use smaller dimension to avoid codec limits
+          const baseDimension = Math.floor(Math.min(sourceWidth, sourceHeight) / 2) * 2;
+          exportWidth = baseDimension;
+          exportHeight = baseDimension;
+        } else if (aspectRatioValue > 1) {
+          // Landscape: find largest even dimensions that exactly match aspect ratio
+          const baseWidth = Math.floor(sourceWidth / 2) * 2;
+          // Iterate down from baseWidth to find exact match
+          let found = false;
+          for (let w = baseWidth; w >= 100 && !found; w -= 2) {
+            const h = Math.round(w / aspectRatioValue);
+            if (h % 2 === 0 && Math.abs((w / h) - aspectRatioValue) < 0.0001) {
+              exportWidth = w;
+              exportHeight = h;
+              found = true;
+            }
+          }
+          if (!found) {
+            exportWidth = baseWidth;
+            exportHeight = Math.floor((baseWidth / aspectRatioValue) / 2) * 2;
+          }
+        } else {
+          // Portrait: find largest even dimensions that exactly match aspect ratio
+          const baseHeight = Math.floor(sourceHeight / 2) * 2;
+          // Iterate down from baseHeight to find exact match
+          let found = false;
+          for (let h = baseHeight; h >= 100 && !found; h -= 2) {
+            const w = Math.round(h * aspectRatioValue);
+            if (w % 2 === 0 && Math.abs((w / h) - aspectRatioValue) < 0.0001) {
+              exportWidth = w;
+              exportHeight = h;
+              found = true;
+            }
+          }
+          if (!found) {
+            exportHeight = baseHeight;
+            exportWidth = Math.floor((baseHeight * aspectRatioValue) / 2) * 2;
+          }
+        }
+
+        // Calculate visually lossless bitrate matching screen recording optimization
+        const totalPixels = exportWidth * exportHeight;
         bitrate = 30_000_000;
+        if (totalPixels > 1920 * 1080 && totalPixels <= 2560 * 1440) {
+          bitrate = 50_000_000;
+        } else if (totalPixels > 2560 * 1440) {
+          bitrate = 80_000_000;
+        }
       } else {
         // Use quality-based target resolution
         const targetHeight = exportQuality === 'medium' ? 720 : 1080;
@@ -621,8 +645,9 @@ export default function VideoEditor() {
         videoUrl: videoPath ? toFileUrl(videoPath) : '',
         width: exportWidth,
         height: exportHeight,
-        frameRate: 30, // Optimized for speed
-        bitrate: Math.min(bitrate, 15_000_000),
+        frameRate: 60,
+        bitrate,
+        codec: 'avc1.640033',
         wallpaper,
         zoomRegions,
         trimRegions,
@@ -636,11 +661,6 @@ export default function VideoEditor() {
         annotationRegions,
         previewWidth,
         previewHeight,
-        cursorData,
-        cursorSize,
-        cursorSmoothing,
-        showVectorCursor,
-        cursorOffset,
         onProgress: (progress: ExportProgress) => {
           setExportProgress(progress);
         },
@@ -702,7 +722,6 @@ export default function VideoEditor() {
       </div>
     );
   }
-
 
   return (
     <div className="flex flex-col h-screen bg-[#09090b] text-slate-200 overflow-hidden selection:bg-[#34B27B]/30">
@@ -766,11 +785,6 @@ export default function VideoEditor() {
                       onAnnotationPositionChange={handleAnnotationPositionChange}
                       onAnnotationSizeChange={handleAnnotationSizeChange}
                       isFullScreenBinding={isFullScreenBinding}
-                      cursorSize={cursorSize}
-                      cursorSmoothing={cursorSmoothing}
-                      showVectorCursor={showVectorCursor}
-                      cursorData={cursorData}
-                      cursorOffset={cursorOffset}
                     />
                   </div>
                 </div>
@@ -803,7 +817,6 @@ export default function VideoEditor() {
                   zoomRegions={zoomRegions}
                   onZoomAdded={handleZoomAdded}
                   onZoomSpanChange={handleZoomSpanChange}
-                  onZoomSplit={handleZoomSplit}
                   onZoomDelete={handleZoomDelete}
                   selectedZoomId={selectedZoomId}
                   onSelectZoom={handleSelectZoom}
@@ -864,14 +877,6 @@ export default function VideoEditor() {
           onAnnotationFigureDataChange={handleAnnotationFigureDataChange}
           onAnnotationDelete={handleAnnotationDelete}
           onAutoZoom={handleAutoZoom}
-          cursorSize={cursorSize}
-          onCursorSizeChange={setCursorSize}
-          cursorSmoothing={cursorSmoothing}
-          onCursorSmoothingChange={setCursorSmoothing}
-          showVectorCursor={showVectorCursor}
-          onShowVectorCursorChange={setShowVectorCursor}
-          cursorOffset={cursorOffset}
-          onCursorOffsetChange={setCursorOffset}
         />
       </div>
 

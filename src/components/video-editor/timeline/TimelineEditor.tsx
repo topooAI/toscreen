@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTimelineContext } from "dnd-timeline";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../ui/button";
 import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check, Target, Scan } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../lib/utils";
 import TimelineWrapper from "./TimelineWrapper";
 import Row from "./Row";
 import Item from "./Item";
@@ -16,9 +16,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { type AspectRatio, getAspectRatioLabel } from "@/utils/aspectRatioUtils";
-import { formatShortcut } from "@/utils/platformUtils";
+} from "../../ui/dropdown-menu";
+import { type AspectRatio, getAspectRatioLabel } from "../../../utils/aspectRatioUtils";
+import { formatShortcut } from "../../../utils/platformUtils";
 
 const ZOOM_ROW_ID = "row-zoom";
 const TRIM_ROW_ID = "row-trim";
@@ -34,6 +34,7 @@ interface TimelineEditorProps {
   zoomRegions: ZoomRegion[];
   onZoomAdded: (span: Span) => void;
   onZoomSpanChange: (id: string, span: Span) => void;
+  onZoomSplit?: (id: string, splitAtMs: number) => void;
   onZoomDelete: (id: string) => void;
   selectedZoomId: string | null;
   onSelectZoom: (id: string | null) => void;
@@ -245,7 +246,7 @@ function PlaybackCursor({
   );
 }
 
-function TimelineAxis({
+const TimelineAxis = memo(({
   intervalMs,
   videoDurationMs,
   currentTimeMs,
@@ -253,7 +254,7 @@ function TimelineAxis({
   intervalMs: number;
   videoDurationMs: number;
   currentTimeMs: number;
-}) {
+}) => {
   const { sidebarWidth, direction, range, valueToPixels } = useTimelineContext();
   const sideProperty = direction === "rtl" ? "right" : "left";
 
@@ -287,13 +288,11 @@ function TimelineAxis({
       .filter(time => time <= maxTime)
       .sort((a, b) => a - b);
 
-    // Generate minor ticks (4 ticks between major intervals)
     const minorTicks = [];
     const minorInterval = intervalMs / 5;
     
     for (let time = firstMarker; time <= maxTime; time += minorInterval) {
       if (time >= visibleStart && time <= visibleEnd) {
-        // Skip if it's close to a major marker
         const isMajor = Math.abs(time % intervalMs) < 1;
         if (!isMajor) {
           minorTicks.push(time);
@@ -317,7 +316,6 @@ function TimelineAxis({
         [sideProperty === "right" ? "marginRight" : "marginLeft"]: `${sidebarWidth}px`,
       }}
     >
-      {/* Minor Ticks */}
       {markers.minorTicks.map((time) => {
         const offset = valueToPixels(time - range.start);
         return (
@@ -329,29 +327,24 @@ function TimelineAxis({
         );
       })}
 
-      {/* Major Markers */}
       {markers.markers.map((marker) => {
         const offset = valueToPixels(marker.time - range.start);
-        const markerStyle: React.CSSProperties = {
-          position: "absolute",
-          bottom: 0,
-          height: "100%",
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "flex-end",
-          [sideProperty]: `${offset}px`,
-        };
-
         return (
-          <div key={marker.time} style={markerStyle}>
+          <div 
+            key={marker.time} 
+            style={{
+              position: "absolute",
+              bottom: 0,
+              height: "100%",
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "flex-end",
+              [sideProperty]: `${offset}px`,
+            }}
+          >
             <div className="flex flex-col items-center pb-1">
               <div className="h-2 w-[1px] bg-white/20 mb-1" />
-              <span
-                className={cn(
-                  "text-[10px] font-medium tabular-nums tracking-tight",
-                  marker.time === currentTimeMs ? "text-[#34B27B]" : "text-slate-500"
-                )}
-              >
+              <span className="text-[10px] font-medium tabular-nums tracking-tight text-slate-500">
                 {marker.label}
               </span>
             </div>
@@ -360,7 +353,13 @@ function TimelineAxis({
       })}
     </div>
   );
-}
+}, (prev, next) => {
+  // Only re-render axis if scale or duration changes
+  return (
+    prev.intervalMs === next.intervalMs &&
+    prev.videoDurationMs === next.videoDurationMs
+  );
+});
 
 function Timeline({
   items,
@@ -502,6 +501,7 @@ export default function TimelineEditor({
   zoomRegions,
   onZoomAdded,
   onZoomSpanChange,
+  onZoomSplit,
   onZoomDelete,
   selectedZoomId,
   onSelectZoom,
@@ -727,6 +727,21 @@ export default function TimelineEditor({
     onAnnotationAdded({ start: startPos, end: endPos });
   }, [videoDuration, totalMs, currentTimeMs, onAnnotationAdded]);
 
+  const handleSplitZoom = useCallback(() => {
+    if (!selectedZoomId || !onZoomSplit) return;
+    
+    const region = zoomRegions.find(r => r.id === selectedZoomId);
+    if (!region) return;
+    
+    if (currentTimeMs > region.startMs + 50 && currentTimeMs < region.endMs - 50) {
+      onZoomSplit(selectedZoomId, currentTimeMs);
+    } else {
+      toast.error("Cannot split here", {
+        description: "Playhead must be inside the selected zoom region with enough margin.",
+      });
+    }
+  }, [selectedZoomId, currentTimeMs, zoomRegions, onZoomSplit]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -744,6 +759,11 @@ export default function TimelineEditor({
       }
       if (e.key === 'a' || e.key === 'A') {
         handleAddAnnotation();
+      }
+      if (e.key === 's' || e.key === 'S') {
+        if (selectedZoomId) {
+          handleSplitZoom();
+        }
       }
       
       // Tab: Cycle through overlapping annotations at current time

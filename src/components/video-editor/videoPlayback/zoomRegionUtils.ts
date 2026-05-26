@@ -3,7 +3,9 @@ import { smoothStep } from "./mathUtils";
 import { TRANSITION_WINDOW_MS } from "./constants";
 
 export function computeRegionStrength(region: ZoomRegion, timeMs: number) {
-  if (timeMs >= region.startMs && timeMs <= region.endMs) {
+  // Add a tiny tolerance (2ms) for floating point time comparison
+  const tolerance = 2;
+  if (timeMs >= (region.startMs - tolerance) && timeMs <= (region.endMs + tolerance)) {
     return 1;
   }
   return 0;

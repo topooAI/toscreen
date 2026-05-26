@@ -1,17 +1,18 @@
 import { useState } from "react";
 
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { cn } from "../../../lib/utils";
+import { Button } from "../../ui/button";
 import { Bug, Crop, Download, Star, X } from "lucide-react";
 import type { ZoomDepth, CropRegion, AnnotationRegion, AnnotationType } from "../types";
 import { CropControl } from "../CropControl";
 import { AnnotationSettingsPanel } from "../AnnotationSettingsPanel";
-import { type AspectRatio } from "@/utils/aspectRatioUtils";
-import type { ExportQuality } from "@/lib/exporter";
+import { type AspectRatio } from "../../../utils/aspectRatioUtils";
+import type { ExportQuality } from "../../../lib/exporter";
 
 import { BackgroundControls } from "./BackgroundControls";
 import { LayoutControls } from "./LayoutControls";
 import { ZoomControls } from "./ZoomControls";
+import { CursorControls } from "./CursorControls";
 
 interface SidebarProps {
     selected: string;
@@ -54,6 +55,15 @@ interface SidebarProps {
     onAnnotationDelete?: (id: string) => void;
     // Actions
     onAutoZoom?: () => void;
+    // Cursor props
+    cursorSize?: number;
+    onCursorSizeChange?: (size: number) => void;
+    cursorSmoothing?: boolean;
+    onCursorSmoothingChange?: (smooth: boolean) => void;
+    showVectorCursor?: boolean;
+    onShowVectorCursorChange?: (show: boolean) => void;
+    cursorOffset?: number;
+    onCursorOffsetChange?: (offset: number) => void;
 }
 
 export function Sidebar(props: SidebarProps) {
@@ -95,6 +105,25 @@ export function Sidebar(props: SidebarProps) {
                         selectedZoomId={props.selectedZoomId}
                         onZoomDelete={props.onZoomDelete}
                         onAutoZoom={props.onAutoZoom}
+                    />
+                </section>
+
+                <div className="h-px bg-white/5 w-full" />
+
+                {/* Section: Cursor Settings */}
+                <section>
+                    <h3 className="text-sm font-semibold text-white/90 mb-4 flex items-center gap-2">
+                        Cursor Settings
+                    </h3>
+                    <CursorControls
+                        cursorSize={props.cursorSize}
+                        onCursorSizeChange={props.onCursorSizeChange}
+                        cursorSmoothing={props.cursorSmoothing}
+                        onCursorSmoothingChange={props.onCursorSmoothingChange}
+                        showVectorCursor={props.showVectorCursor}
+                        onShowVectorCursorChange={props.onShowVectorCursorChange}
+                        cursorOffset={props.cursorOffset}
+                        onCursorOffsetChange={props.onCursorOffsetChange}
                     />
                 </section>
 

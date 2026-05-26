@@ -1,4 +1,4 @@
-import { ipcMain, desktopCapturer, BrowserWindow, shell, app, dialog, screen } from 'electron'
+import { ipcMain, desktopCapturer, BrowserWindow, shell, app, dialog } from 'electron'
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -151,26 +151,8 @@ export function registerIpcHandlers(
 
     if (recording) {
       // Start mouse tracking when recording begins
-      // Detect bounds from the selected screen display
-      let recordingBounds = undefined;
-      if (selectedSource && selectedSource.id.startsWith('screen')) {
-        try {
-          const displays = screen.getAllDisplays();
-          const matchedDisplay = displays.find(d => d.id.toString() === selectedSource.display_id?.toString());
-          if (matchedDisplay) {
-            recordingBounds = {
-              x: matchedDisplay.bounds.x,
-              y: matchedDisplay.bounds.y,
-              width: matchedDisplay.bounds.width,
-              height: matchedDisplay.bounds.height
-            };
-            console.log('[IPC] Matched recording display bounds:', recordingBounds);
-          }
-        } catch (err) {
-          console.error('[IPC] Failed to resolve recording bounds:', err);
-        }
-      }
-      mouseTracker.start(recordingBounds);
+      // Note: bounds will be auto-detected from primary display
+      mouseTracker.start();
       console.log('[IPC] Mouse tracking started for recording');
 
       // Minimize the HUD to avoid capturing it in the recording

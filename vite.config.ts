@@ -51,13 +51,9 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        manualChunks: {
-          'pixi': ['pixi.js'],
-          'react-vendor': ['react', 'react-dom'],
-          'video-processing': ['mediabunny', 'mp4box', '@fix-webm-duration/fix']
-        }
+        // Default chunking for maximum stability during development
       }
     },
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 2000
   }
 })
