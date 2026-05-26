@@ -12,6 +12,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   const stream = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
   const startTime = useRef<number>(0);
+  const isNativeRef = useRef<boolean>(false);
 
   // Target visually lossless 4K @ 60fps; fall back gracefully when hardware cannot keep up
   const TARGET_FRAME_RATE = 60;
@@ -45,8 +46,16 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     return Math.round(18_000_000 * highFrameRateBoost);
   };
 
-  const stopRecording = useRef(() => {
-    if (mediaRecorder.current?.state === "recording") {
+  const stopRecording = useRef(async () => {
+    if (isNativeRef.current) {
+      const result = await window.electronAPI.stopNativeRecording();
+      setRecording(false);
+      isNativeRef.current = false;
+      if (result.success && result.outputPath) {
+        await window.electronAPI.setCurrentVideoPath(result.outputPath);
+      }
+      await window.electronAPI.switchToEditor();
+    } else if (mediaRecorder.current?.state === "recording") {
       if (stream.current) {
         stream.current.getTracks().forEach(track => track.stop());
       }
@@ -69,12 +78,18 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     return () => {
       if (cleanup) cleanup();
       
-      if (mediaRecorder.current?.state === "recording") {
-        mediaRecorder.current.stop();
-      }
-      if (stream.current) {
-        stream.current.getTracks().forEach(track => track.stop());
-        stream.current = null;
+      if (isNativeRef.current) {
+        window.electronAPI.stopNativeRecording().catch(err => {
+          console.error('[useScreenRecorder] Failed cleanup native stop:', err);
+        });
+      } else {
+        if (mediaRecorder.current?.state === "recording") {
+          mediaRecorder.current.stop();
+        }
+        if (stream.current) {
+          stream.current.getTracks().forEach(track => track.stop());
+          stream.current = null;
+        }
       }
     };
   }, []);
@@ -85,6 +100,20 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       if (!selectedSource) {
         alert("Please select a source to record");
         return;
+      }
+
+      // Check if native SCK recording is available
+      const isNativeAvailable = await window.electronAPI.isNativeRecordingAvailable();
+      if (isNativeAvailable) {
+        const result = await window.electronAPI.startNativeRecording();
+        if (result.success) {
+          isNativeRef.current = true;
+          startTime.current = Date.now();
+          setRecording(true);
+          return;
+        } else {
+          console.warn('Native recording start failed, falling back to WebRTC:', result.error);
+        }
       }
 
       const mediaStream = await navigator.mediaDevices.getDisplayMedia({

@@ -78,6 +78,8 @@ export function useCursorRenderer({
       </svg>
     `;
 
+    const svgEl = cursor.querySelector('svg') as SVGSVGElement | null;
+
     parent.appendChild(cursor);
 
     let lastClickIndex = -1;
@@ -198,21 +200,25 @@ export function useCursorRenderer({
       const parentHeight = parent.clientHeight;
 
       // Check if vector cursor should be visible
-      const isVisible = showVectorCursorRef.current && (parentWidth > 0 && parentHeight > 0);
+      // Now, even if showVectorCursor is false (user wants Native Cursor look), 
+      // we still show our vector cursor but render it in standard native style.
+      const isVisible = parentWidth > 0 && parentHeight > 0;
       cursor.style.display = isVisible ? 'block' : 'none';
 
-      // Detect clicks to trigger Jiggle animation
-      if (p1.isClick && currentIndex !== lastClickIndex) {
+      // Detect clicks to trigger Jiggle animation (only for Premium Vector Cursor)
+      const isVectorStyle = showVectorCursorRef.current;
+      if (isVectorStyle && p1.isClick && currentIndex !== lastClickIndex) {
         lastClickIndex = currentIndex;
         clickAnimationStateRef.current = { timeSinceClick: 0, isAnimating: true };
       }
 
-      // Jiggle Physics Animation (Scale down and spring back)
+      // Jiggle Physics Animation (Scale down and spring back) - only for premium large cursor
       const currentSize = cursorSizeRef.current;
-      const displayScale = currentSize * 1.6; // 1.6x multiplier for premium Screen Studio enlarged look!
+      // When showVectorCursor is false, force 0.6x base size to match macOS native cursor size perfectly
+      const displayScale = isVectorStyle ? currentSize * 1.6 : 0.62; 
 
       let jiggleScale = 1.0;
-      if (clickAnimationStateRef.current.isAnimating) {
+      if (isVectorStyle && clickAnimationStateRef.current.isAnimating) {
         clickAnimationStateRef.current.timeSinceClick += time.deltaMS;
         const t = clickAnimationStateRef.current.timeSinceClick;
         
@@ -222,6 +228,17 @@ export function useCursorRenderer({
           jiggleScale = 1.0 - 0.2 * Math.cos(t * 0.05) * Math.exp(-t * 0.02);
         } else {
           clickAnimationStateRef.current.isAnimating = false;
+        }
+      }
+
+      // Dynamically toggle drop shadow filter based on style selection
+      if (svgEl) {
+        if (isVectorStyle) {
+          // Premium large style: robust professional soft shadow
+          svgEl.style.filter = 'drop-shadow(0px 3px 5px rgba(0,0,0,0.35))';
+        } else {
+          // Native style: very sharp/subtle standard small cursor shadow
+          svgEl.style.filter = 'drop-shadow(0px 1px 2px rgba(0,0,0,0.45))';
         }
       }
 

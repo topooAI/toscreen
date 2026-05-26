@@ -568,7 +568,7 @@ export class FrameRenderer {
   }
 
 
-  private drawMacCursor(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
+  private drawMacCursor(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, isVectorStyle = true) {
     ctx.save();
     
     // The tip of the pointer is mathematically positioned at local (0, 0), so no offset subtraction needed
@@ -576,10 +576,17 @@ export class FrameRenderer {
     const targetY = y;
     
     // Drop shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-    ctx.shadowBlur = 5 * scale;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 3 * scale;
+    if (isVectorStyle) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+      ctx.shadowBlur = 5 * scale;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 3 * scale;
+    } else {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = 2 * scale;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 1 * scale;
+    }
     
     // Draw the crisp macOS vector cursor scaled relative to the tip at (0, 0)
     ctx.beginPath();
@@ -675,20 +682,25 @@ export class FrameRenderer {
       finalY = currentY * this.config.height;
     }
 
+    const isVectorStyle = this.config.showVectorCursor !== false;
     const scaleFactor = (this.config.width / (this.config.previewWidth || 1920));
     const cursorSize = this.config.cursorSize || 1.5;
 
     let jiggleScale = 1.0;
-    const lastClick = [...cursorData].reverse().find(
-      (c: any) => c.type === 'click' && c.timestamp <= currentTimeMs && (currentTimeMs - c.timestamp) < 200
-    );
-    if (lastClick) {
-      const t = currentTimeMs - lastClick.timestamp;
-      jiggleScale = 1.0 - 0.2 * Math.cos(t * 0.05) * Math.exp(-t * 0.02);
+    if (isVectorStyle) {
+      const lastClick = [...cursorData].reverse().find(
+        (c: any) => c.type === 'click' && c.timestamp <= currentTimeMs && (currentTimeMs - c.timestamp) < 200
+      );
+      if (lastClick) {
+        const t = currentTimeMs - lastClick.timestamp;
+        jiggleScale = 1.0 - 0.2 * Math.cos(t * 0.05) * Math.exp(-t * 0.02);
+      }
     }
 
-    const finalScale = jiggleScale * cursorSize * 1.6 * scaleFactor;
-    this.drawMacCursor(this.compositeCtx, finalX, finalY, finalScale);
+    const displayScale = isVectorStyle ? cursorSize * 1.6 : 0.62;
+    const finalScale = jiggleScale * displayScale * scaleFactor;
+
+    this.drawMacCursor(this.compositeCtx, finalX, finalY, finalScale, isVectorStyle);
   }
 
   destroy(): void {

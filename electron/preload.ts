@@ -73,4 +73,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readClicksJson: (videoPath: string) => {
     return ipcRenderer.invoke('read-clicks-json', videoPath)
   },
+  isNativeRecordingAvailable: () => {
+    return ipcRenderer.invoke('is-native-recording-available')
+  },
+  startNativeRecording: () => {
+    return ipcRenderer.invoke('start-native-recording')
+  },
+  stopNativeRecording: () => {
+    return ipcRenderer.invoke('stop-native-recording')
+  },
 })

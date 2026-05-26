@@ -44,6 +44,9 @@ interface Window {
     recordMouseClick: (x: number, y: number) => Promise<{ success: boolean }>
     getMouseTrackingStatus: () => Promise<{ isTracking: boolean; eventCount: number }>
     readClicksJson: (videoPath: string) => Promise<{ success: boolean; clicks?: any[] }>;
+    isNativeRecordingAvailable: () => Promise<boolean>;
+    startNativeRecording: () => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+    stopNativeRecording: () => Promise<{ success: boolean; outputPath?: string; error?: string }>;
     hudOverlayHide: () => void;
     hudOverlayClose: () => void;
   }

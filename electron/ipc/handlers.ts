@@ -5,6 +5,12 @@ import path from 'node:path'
 import { RECORDINGS_DIR } from '../main'
 import { mouseTracker } from '../mouseTracker'
 
+import {
+  isNativeRecordingAvailable,
+  startNativeRecording,
+  stopNativeRecording
+} from '../nativeRecorder'
+
 let selectedSource: any = null
 
 export async function getSelectedSourceForMediaRequest() {
@@ -130,7 +136,7 @@ export function registerIpcHandlers(
   ipcMain.handle('get-recorded-video-path', async () => {
     try {
       const files = await fs.readdir(RECORDINGS_DIR)
-      const videoFiles = files.filter(file => file.endsWith('.webm'))
+      const videoFiles = files.filter(file => file.endsWith('.webm') || file.endsWith('.mov'))
 
       if (videoFiles.length === 0) {
         return { success: false, message: 'No recorded video found' }
@@ -144,6 +150,87 @@ export function registerIpcHandlers(
       console.error('Failed to get video path:', error)
       return { success: false, message: 'Failed to get video path', error: String(error) }
     }
+  })
+
+  ipcMain.handle('is-native-recording-available', () => {
+    return isNativeRecordingAvailable()
+  })
+
+  ipcMain.handle('start-native-recording', async () => {
+    const isAvailable = isNativeRecordingAvailable()
+    if (!isAvailable) {
+      return { success: false, error: 'Native recording is not available on this platform.' }
+    }
+
+    let recordingBounds = undefined
+    let displayId = undefined
+    if (selectedSource && selectedSource.id.startsWith('screen')) {
+      try {
+        const displays = screen.getAllDisplays()
+        const matchedDisplay = displays.find(d => d.id.toString() === selectedSource.display_id?.toString())
+        if (matchedDisplay) {
+          recordingBounds = {
+            x: matchedDisplay.bounds.x,
+            y: matchedDisplay.bounds.y,
+            width: matchedDisplay.bounds.width,
+            height: matchedDisplay.bounds.height
+          }
+          displayId = Number(matchedDisplay.id)
+        }
+      } catch (err) {
+        console.error('[IPC] Failed to resolve recording bounds:', err)
+      }
+    }
+
+    const result = await startNativeRecording({ showCursor: false, displayId })
+    if (result.success) {
+      mouseTracker.start(recordingBounds)
+      
+      const mainWin = getMainWindow()
+      if (mainWin) {
+        mainWin.minimize()
+      }
+
+      if (onRecordingStateChange) {
+        const sourceName = selectedSource?.name || 'Screen'
+        onRecordingStateChange(true, sourceName)
+      }
+    }
+
+    return result
+  })
+
+  ipcMain.handle('stop-native-recording', async () => {
+    const result = await stopNativeRecording()
+    
+    // Stop mouse tracking and export clicks
+    const { events, bounds } = mouseTracker.stop()
+    if (result.success && result.outputPath) {
+      if (events.length > 0) {
+        try {
+          const clicksPath = result.outputPath + '.clicks.json'
+          await mouseTracker.exportToFile(clicksPath, events, bounds, undefined)
+          console.log('[IPC] Exported clicks to native recording path:', clicksPath)
+        } catch (error) {
+          console.error('[IPC] Failed to export clicks for native recording:', error)
+        }
+      }
+
+      currentVideoPath = result.outputPath
+    }
+
+    // Restore the HUD after recording ends
+    const mainWin = getMainWindow()
+    if (mainWin) {
+      mainWin.restore()
+      mainWin.focus()
+    }
+
+    if (onRecordingStateChange) {
+      onRecordingStateChange(false, selectedSource?.name || 'Screen')
+    }
+
+    return result
   })
 
   ipcMain.handle('set-recording-state', async (_, recording: boolean, videoStartTime?: number) => {

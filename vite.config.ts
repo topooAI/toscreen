@@ -15,7 +15,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['uiohook-napi'],
+              external: ['uiohook-napi', 'node-mac-recorder'],
             },
           }
         }
