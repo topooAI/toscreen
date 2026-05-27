@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 import VideoPlayback, { type VideoPlaybackRef } from "./VideoPlayback";
-import PlaybackControls from "./PlaybackControls";
 import TimelineEditor from "./timeline/TimelineEditor";
 import { Sidebar } from "./sidebar/Sidebar";
 import { ExportDialog } from "./ExportDialog";
@@ -774,18 +773,6 @@ export default function VideoEditor() {
                     />
                   </div>
                 </div>
-                {/* Playback controls */}
-                <div className="w-full flex justify-center items-center" style={{ height: '48px', flexShrink: 0, padding: '6px 12px', margin: '6px 0 6px 0' }}>
-                  <div style={{ width: '100%', maxWidth: '700px' }}>
-                    <PlaybackControls
-                      isPlaying={isPlaying}
-                      currentTime={currentTime}
-                      duration={duration}
-                      onTogglePlayPause={togglePlayPause}
-                      onSeek={handleSeek}
-                    />
-                  </div>
-                </div>
               </div>
             </Panel>
 
@@ -823,6 +810,8 @@ export default function VideoEditor() {
                   onAspectRatioChange={setAspectRatio}
                   isFullScreenBinding={isFullScreenBinding}
                   onFullScreenBindingChange={setIsFullScreenBinding}
+                  isPlaying={isPlaying}
+                  onTogglePlayPause={togglePlayPause}
                 />
               </div>
             </Panel>

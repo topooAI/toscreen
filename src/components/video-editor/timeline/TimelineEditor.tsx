@@ -20,6 +20,8 @@ import {
 import { type AspectRatio, getAspectRatioLabel } from "../../../utils/aspectRatioUtils";
 import { formatShortcut } from "../../../utils/platformUtils";
 
+import PlaybackControls from "../PlaybackControls";
+
 const ZOOM_ROW_ID = "row-zoom";
 const TRIM_ROW_ID = "row-trim";
 const ANNOTATION_ROW_ID = "row-annotation";
@@ -54,6 +56,8 @@ interface TimelineEditorProps {
   onAspectRatioChange: (aspectRatio: AspectRatio) => void;
   isFullScreenBinding: boolean;
   onFullScreenBindingChange: (enabled: boolean) => void;
+  isPlaying: boolean;
+  onTogglePlayPause: () => void;
 }
 
 interface TimelineScaleConfig {
@@ -249,11 +253,9 @@ function PlaybackCursor({
 const TimelineAxis = memo(({
   intervalMs,
   videoDurationMs,
-  currentTimeMs,
 }: {
   intervalMs: number;
   videoDurationMs: number;
-  currentTimeMs: number;
 }) => {
   const { sidebarWidth, direction, range, valueToPixels } = useTimelineContext();
   const sideProperty = direction === "rtl" ? "right" : "left";
@@ -427,7 +429,7 @@ function Timeline({
       onClick={handleTimelineClick}
     >
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px)] bg-[length:20px_100%] pointer-events-none" />
-      <TimelineAxis intervalMs={intervalMs} videoDurationMs={videoDurationMs} currentTimeMs={currentTimeMs} />
+      <TimelineAxis intervalMs={intervalMs} videoDurationMs={videoDurationMs} />
       <PlaybackCursor 
         currentTimeMs={currentTimeMs} 
         videoDurationMs={videoDurationMs} 
@@ -521,6 +523,8 @@ export default function TimelineEditor({
   onAspectRatioChange,
   isFullScreenBinding,
   onFullScreenBindingChange,
+  isPlaying,
+  onTogglePlayPause,
 }: TimelineEditorProps) {
   const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
   const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
@@ -956,7 +960,15 @@ export default function TimelineEditor({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="flex-1" />
+        <div className="flex-1 flex justify-center max-w-md mx-auto">
+          <PlaybackControls
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            duration={videoDuration}
+            onTogglePlayPause={onTogglePlayPause}
+            onSeek={onSeek || (() => {})}
+          />
+        </div>
         <div className="flex items-center gap-4 text-[10px] text-slate-500 font-medium">
           <span className="flex items-center gap-1.5">
             <kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#34B27B] font-sans">{shortcuts.pan}</kbd>
