@@ -229,9 +229,9 @@ function PlaybackCursor({
       }}
     >
       <div
-        className="absolute top-0 bottom-0 w-[2px] bg-[#FF00FF] shadow-[0_0_10px_rgba(255,0,255,0.5)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_15px_rgba(255,0,255,0.7)] transition-shadow"
+        className="absolute top-0 bottom-0 w-[1px] bg-[#FF00B7] shadow-[0_0_10px_rgba(255,0,183,0.5)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_15px_rgba(255,0,183,0.7)] transition-shadow"
         style={{
-          [sideProperty]: `${sidebarWidth + offset - 1}px`,
+          [sideProperty]: `${sidebarWidth + offset - 0.5}px`,
         }}
         onMouseDown={(e) => {
           e.stopPropagation(); // Prevent timeline click
@@ -242,9 +242,9 @@ function PlaybackCursor({
           className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing drop-shadow-md"
         >
           {/* 上半部方块 */}
-          <div className="w-3.5 h-2.5 bg-[#FF00FF] rounded-t-sm shadow-sm" />
+          <div className="w-2.5 h-2 bg-[#FF00B7] rounded-t-[1px] shadow-sm" />
           {/* 下半部尖角 */}
-          <div className="w-0 h-0 border-l-[7px] border-r-[7px] border-t-[6px] border-l-transparent border-r-transparent border-t-[#FF00FF]" />
+          <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-[#FF00B7]" />
         </div>
       </div>
     </div>
