@@ -239,10 +239,12 @@ function PlaybackCursor({
         }}
       >
         <div
-          className="absolute -top-1 left-1/2 -translate-x-1/2 hover:scale-125 transition-transform"
-          style={{ width: '16px', height: '16px' }}
+          className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing drop-shadow-md"
         >
-          <div className="w-3 h-3 mx-auto mt-[2px] bg-[#34B27B] rotate-45 rounded-sm shadow-lg border border-white/20" />
+          {/* 上半部方块 */}
+          <div className="w-3.5 h-2.5 bg-[#34B27B] rounded-t-sm shadow-sm" />
+          {/* 下半部尖角 */}
+          <div className="w-0 h-0 border-l-[7px] border-r-[7px] border-t-[6px] border-l-transparent border-r-transparent border-t-[#34B27B]" />
         </div>
       </div>
     </div>
