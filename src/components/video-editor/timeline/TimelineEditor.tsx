@@ -428,7 +428,7 @@ function Timeline({
     <div
       ref={setRefs}
       style={style}
-      className="select-none bg-[#09090b] min-h-[140px] relative cursor-pointer group"
+      className="select-none bg-[#09090b] min-h-[140px] h-full relative cursor-pointer group"
       onClick={handleTimelineClick}
     >
       {/* 虚拟的 Sidebar 测量节点：真实宽度140 + 16px呼吸留白 = 156 */}
