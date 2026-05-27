@@ -223,16 +223,15 @@ function PlaybackCursor({
 
   return (
     <div
-      className="absolute top-0 bottom-0 z-50 group/cursor"
+      className="absolute top-0 bottom-0 z-50 group/cursor inset-x-0"
       style={{
-        [sideProperty === "right" ? "marginRight" : "marginLeft"]: `${sidebarWidth - 1}px`,
         pointerEvents: 'none', // Allow clicks to pass through to timeline, but we'll enable pointer events on the handle
       }}
     >
       <div
         className="absolute top-0 bottom-0 w-[2px] bg-[#34B27B] shadow-[0_0_10px_rgba(52,178,123,0.5)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_15px_rgba(52,178,123,0.7)] transition-shadow"
         style={{
-          [sideProperty]: `${offset}px`,
+          [sideProperty]: `${sidebarWidth + offset - 1}px`,
         }}
         onMouseDown={(e) => {
           e.stopPropagation(); // Prevent timeline click
@@ -315,10 +314,7 @@ const TimelineAxis = memo(({
 
   return (
     <div
-      className="h-8 bg-[#09090b] border-b border-white/5 relative overflow-hidden select-none"
-      style={{
-        [sideProperty === "right" ? "marginRight" : "marginLeft"]: `${sidebarWidth}px`,
-      }}
+      className="h-8 bg-[#09090b] border-b border-white/5 relative overflow-hidden select-none w-full"
     >
       {markers.minorTicks.map((time) => {
         const offset = valueToPixels(time - range.start);
@@ -326,7 +322,7 @@ const TimelineAxis = memo(({
           <div
             key={`minor-${time}`}
             className="absolute bottom-0 h-1 w-[1px] bg-white/5"
-            style={{ [sideProperty]: `${offset}px` }}
+            style={{ [sideProperty]: `${sidebarWidth + offset}px` }}
           />
         );
       })}
@@ -338,7 +334,7 @@ const TimelineAxis = memo(({
             key={marker.time} 
             className="absolute bottom-0 h-full flex flex-col justify-end items-center"
             style={{
-              [sideProperty]: `${offset}px`,
+              [sideProperty]: `${sidebarWidth + offset}px`,
               transform: 'translateX(-50%)',
             }}
           >
@@ -433,10 +429,10 @@ function Timeline({
       className="select-none bg-[#09090b] min-h-[140px] relative cursor-pointer group"
       onClick={handleTimelineClick}
     >
-      {/* 虚拟 Sidebar 测量节点：彻底解决各行间重复挂载产生的死循环，将侧栏宽度告知上下文 */}
+      {/* 虚拟的 Sidebar 测量节点：真实宽度140 + 16px呼吸留白 = 156 */}
       <div 
         ref={setSidebarRef} 
-        style={{ position: 'absolute', width: 140, height: 1, opacity: 0, pointerEvents: 'none' }} 
+        style={{ position: 'absolute', width: 156, height: 1, opacity: 0, pointerEvents: 'none' }} 
       />
 
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px)] bg-[length:20px_100%] pointer-events-none" />

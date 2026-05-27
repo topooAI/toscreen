@@ -54,7 +54,7 @@ export default function Row({ id, children, onAddClick }: RowProps) {
       {/* Row Timeline Items Area */}
       <div 
         ref={setNodeRef} 
-        style={{ ...rowStyle, position: 'relative', flex: 1, height: '100%' }}
+        style={{ ...rowStyle, position: 'relative', flex: 1, height: '100%', marginLeft: 16 }}
       >
         {children}
       </div>
