@@ -1,6 +1,5 @@
 import { Button } from "../ui/button";
-import { Play, Pause } from "lucide-react";
-import { cn } from "../../lib/utils";
+import { Play, Pause, SkipBack, SkipForward } from "lucide-react";
 
 interface PlaybackControlsProps {
   isPlaying: boolean;
@@ -24,67 +23,63 @@ export default function PlaybackControls({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
-  function handleSeekChange(e: React.ChangeEvent<HTMLInputElement>) {
-    onSeek(parseFloat(e.target.value));
-  }
+  const handlePrevFrame = () => {
+    onSeek(Math.max(0, currentTime - 0.1));
+  };
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const handleNextFrame = () => {
+    onSeek(Math.min(duration, currentTime + 0.1));
+  };
 
   return (
-    <div className="flex items-center gap-2 px-1 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-xl transition-all duration-300 hover:bg-black/70 hover:border-white/20">
-      <Button
-        onClick={onTogglePlayPause}
-        size="icon"
-        className={cn(
-          "w-8 h-8 rounded-full transition-all duration-200 border border-white/10",
-          isPlaying 
-            ? "bg-white/10 text-white hover:bg-white/20" 
-            : "bg-white text-black hover:bg-white/90 hover:scale-105 shadow-[0_0_15px_rgba(255,255,255,0.3)]"
-        )}
-        aria-label={isPlaying ? 'Pause' : 'Play'}
-      >
-        {isPlaying ? (
-          <Pause className="w-3.5 h-3.5 fill-current" />
-        ) : (
-          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-        )}
-      </Button>
-      
-      <span className="text-[9px] font-medium text-slate-300 tabular-nums w-[30px] text-right">
+    <div className="flex items-center gap-10 bg-transparent select-none">
+      {/* Current Time */}
+      <span className="text-xs font-medium text-slate-500 tabular-nums min-w-[40px] text-right">
         {formatTime(currentTime)}
       </span>
       
-      <div className="flex-1 relative h-6 flex items-center group">
-        {/* Custom Track Background */}
-        <div className="absolute left-0 right-0 h-0.5 bg-white/10 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-[#34B27B] rounded-full"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        
-        {/* Interactive Input */}
-        <input
-          type="range"
-          min="0"
-          max={duration || 100}
-          value={currentTime}
-          onChange={handleSeekChange}
-          step="0.01"
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-        />
-        
-        {/* Custom Thumb (visual only, follows progress) */}
-        <div 
-          className="absolute w-2.5 h-2.5 bg-white rounded-full shadow-lg pointer-events-none group-hover:scale-125 transition-transform duration-100"
-          style={{ 
-            left: `${progress}%`,
-            transform: 'translateX(-50%)'
-          }}
-        />
+      {/* Controls Button Group */}
+      <div className="flex items-center gap-6">
+        {/* Previous Frame / Skip Back */}
+        <Button
+          onClick={handlePrevFrame}
+          variant="ghost"
+          size="icon"
+          className="w-5 h-5 text-slate-400 hover:text-white hover:bg-white/5 active:scale-95 transition-all"
+          aria-label="Previous frame"
+        >
+          <SkipBack className="w-2.5 h-2.5 text-slate-400" />
+        </Button>
+
+        {/* Play/Pause Trigger */}
+        <Button
+          onClick={onTogglePlayPause}
+          variant="ghost"
+          size="icon"
+          className="w-8 h-8 text-white hover:text-white hover:bg-white/5 active:scale-95 transition-all"
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+        >
+          {isPlaying ? (
+            <Pause className="w-4.5 h-4.5 fill-current text-white" />
+          ) : (
+            <Play className="w-4.5 h-4.5 fill-current text-white ml-0.5" />
+          )}
+        </Button>
+
+        {/* Next Frame / Skip Forward */}
+        <Button
+          onClick={handleNextFrame}
+          variant="ghost"
+          size="icon"
+          className="w-5 h-5 text-slate-400 hover:text-white hover:bg-white/5 active:scale-95 transition-all"
+          aria-label="Next frame"
+        >
+          <SkipForward className="w-2.5 h-2.5 text-slate-400" />
+        </Button>
       </div>
       
-      <span className="text-[9px] font-medium text-slate-500 tabular-nums w-[30px]">
+      {/* Total Duration */}
+      <span className="text-xs font-medium text-slate-500 tabular-nums min-w-[40px] text-left">
         {formatTime(duration)}
       </span>
     </div>
