@@ -1,10 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTimelineContext } from "dnd-timeline";
 import { Button } from "../../ui/button";
-import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check, Target, Scan, Eye, EyeOff } from "lucide-react";
+import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check, Target, Scan } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../../lib/utils";
-import { useTimeMap } from "../hooks/useTimeMap";
 import TimelineWrapper from "./TimelineWrapper";
 import Row from "./Row";
 import Item from "./Item";
@@ -449,19 +448,9 @@ function Timeline({
 
       {/* Base Video Track */}
       <Row id={VIDEO_ROW_ID}>
-        {items.filter(item => item.rowId === VIDEO_ROW_ID).map((item) => (
-          <Item
-            id={item.id}
-            key={item.id}
-            rowId={item.rowId}
-            span={item.span}
-            isSelected={false}
-            onSelect={() => {}}
-            variant="zoom"
-          >
-            {item.label}
-          </Item>
-        ))}
+        <div className="absolute inset-x-0 inset-y-1 bg-[#34B27B]/10 border border-[#34B27B]/20 rounded-md flex items-center px-4">
+          <span className="text-[9px] font-bold text-[#34B27B] uppercase tracking-widest opacity-50">Main Clip</span>
+        </div>
       </Row>
       
       <Row id={ZOOM_ROW_ID} onAddClick={onAddZoom}>
@@ -548,20 +537,13 @@ export default function TimelineEditor({
 }: TimelineEditorProps) {
   const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
   const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
-
-  const [isTrimTrackVisible, setIsTrimTrackVisible] = useState(false);
-  const { effectiveDurationMs, mapSourceToEffective, mapEffectiveToSource } = useTimeMap(trimRegions, totalMs);
-  
-  const activeDurationMs = isTrimTrackVisible ? totalMs : effectiveDurationMs;
-  const activeCurrentTimeMs = isTrimTrackVisible ? currentTimeMs : mapSourceToEffective(currentTimeMs);
-
-  const timelineScale = useMemo(() => calculateTimelineScale(activeDurationMs / 1000), [activeDurationMs]);
+  const timelineScale = useMemo(() => calculateTimelineScale(videoDuration), [videoDuration]);
   const safeMinDurationMs = useMemo(
-    () => (activeDurationMs > 0 ? Math.min(timelineScale.minItemDurationMs, activeDurationMs) : timelineScale.minItemDurationMs),
-    [timelineScale.minItemDurationMs, activeDurationMs],
+    () => (totalMs > 0 ? Math.min(timelineScale.minItemDurationMs, totalMs) : timelineScale.minItemDurationMs),
+    [timelineScale.minItemDurationMs, totalMs],
   );
 
-  const [range, setRange] = useState<Range>(() => createInitialRange(activeDurationMs));
+  const [range, setRange] = useState<Range>(() => createInitialRange(totalMs));
   const [keyframes, setKeyframes] = useState<{ id: string; time: number }[]>([]);
   const [selectedKeyframeId, setSelectedKeyframeId] = useState<string | null>(null);
   const [shortcuts, setShortcuts] = useState({
@@ -579,7 +561,7 @@ export default function TimelineEditor({
 
   // Add keyframe at current playhead position
   const addKeyframe = useCallback(() => {
-    if (activeDurationMs === 0) return;
+    if (totalMs === 0) return;
     const time = Math.max(0, Math.min(currentTimeMs, totalMs));
     if (keyframes.some(kf => Math.abs(kf.time - time) < 1)) return;
     setKeyframes(prev => [...prev, { id: uuidv4(), time }]);
@@ -613,7 +595,7 @@ export default function TimelineEditor({
   }, [selectedAnnotationId, onAnnotationDelete, onSelectAnnotation]);
 
   useEffect(() => {
-    setRange(createInitialRange(activeDurationMs));
+    setRange(createInitialRange(totalMs));
   }, [totalMs]);
 
   useEffect(() => {
@@ -682,7 +664,7 @@ export default function TimelineEditor({
   }, [zoomRegions, trimRegions, annotationRegions]);
 
   const handleAddZoom = useCallback(() => {
-    if (!videoDuration || videoDuration === 0 || activeDurationMs === 0) {
+    if (!videoDuration || videoDuration === 0 || totalMs === 0) {
       return;
     }
 
@@ -712,7 +694,7 @@ export default function TimelineEditor({
   }, [videoDuration, totalMs, currentTimeMs, zoomRegions, onZoomAdded]);
 
   const handleAddTrim = useCallback(() => {
-    if (!videoDuration || videoDuration === 0 || activeDurationMs === 0 || !onTrimAdded) {
+    if (!videoDuration || videoDuration === 0 || totalMs === 0 || !onTrimAdded) {
       return;
     }
 
@@ -742,7 +724,7 @@ export default function TimelineEditor({
   }, [videoDuration, totalMs, currentTimeMs, trimRegions, onTrimAdded]);
 
   const handleAddAnnotation = useCallback(() => {
-    if (!videoDuration || videoDuration === 0 || activeDurationMs === 0 || !onAnnotationAdded) {
+    if (!videoDuration || videoDuration === 0 || totalMs === 0 || !onAnnotationAdded) {
       return;
     }
 
@@ -836,7 +818,7 @@ export default function TimelineEditor({
   }, [addKeyframe, handleAddZoom, handleAddTrim, handleAddAnnotation, deleteSelectedKeyframe, deleteSelectedZoom, deleteSelectedTrim, deleteSelectedAnnotation, selectedKeyframeId, selectedZoomId, selectedTrimId, selectedAnnotationId, annotationRegions, currentTime, onSelectAnnotation]);
 
   const clampedRange = useMemo<Range>(() => {
-    if (activeDurationMs === 0) {
+    if (totalMs === 0) {
       return range;
     }
 
@@ -847,24 +829,22 @@ export default function TimelineEditor({
   }, [range, totalMs]);
 
   const timelineItems = useMemo<TimelineRenderItem[]>(() => {
-    const mapTime = (time: number) => isTrimTrackVisible ? time : mapSourceToEffective(time);
-    
     const zooms: TimelineRenderItem[] = zoomRegions.map((region, index) => ({
       id: region.id,
       rowId: ZOOM_ROW_ID,
-      span: { start: mapTime(region.startMs), end: mapTime(region.endMs) },
+      span: { start: region.startMs, end: region.endMs },
       label: `Zoom ${index + 1}`,
       zoomDepth: region.depth,
       variant: 'zoom',
     }));
 
-    const trims: TimelineRenderItem[] = isTrimTrackVisible ? trimRegions.map((region, index) => ({
+    const trims: TimelineRenderItem[] = trimRegions.map((region, index) => ({
       id: region.id,
       rowId: TRIM_ROW_ID,
-      span: { start: mapTime(region.startMs), end: mapTime(region.endMs) },
+      span: { start: region.startMs, end: region.endMs },
       label: `Trim ${index + 1}`,
       variant: 'trim',
-    })) : [];
+    }));
 
     const annotations: TimelineRenderItem[] = annotationRegions.map((region) => {
       let label: string;
@@ -882,64 +862,25 @@ export default function TimelineEditor({
       return {
         id: region.id,
         rowId: ANNOTATION_ROW_ID,
-        span: { start: mapTime(region.startMs), end: mapTime(region.endMs) },
+        span: { start: region.startMs, end: region.endMs },
         label,
         variant: 'annotation',
       };
     });
 
-    const mainClips: TimelineRenderItem[] = [];
-    if (!isTrimTrackVisible) {
-      const sortedTrims = [...trimRegions].sort((a, b) => a.startMs - b.startMs);
-      let currentSourceStart = 0;
-      sortedTrims.forEach((trim, index) => {
-        if (currentSourceStart < trim.startMs) {
-           mainClips.push({
-             id: `main-clip-${index}`,
-             rowId: VIDEO_ROW_ID,
-             span: { start: mapTime(currentSourceStart), end: mapTime(trim.startMs) },
-             label: 'Main Clip',
-             variant: 'zoom'
-           });
-        }
-        currentSourceStart = trim.endMs;
-      });
-      if (currentSourceStart < totalMs) {
-         mainClips.push({
-             id: `main-clip-final`,
-             rowId: VIDEO_ROW_ID,
-             span: { start: mapTime(currentSourceStart), end: mapTime(totalMs) },
-             label: 'Main Clip',
-             variant: 'zoom'
-           });
-      }
-    } else {
-      mainClips.push({
-         id: 'main-clip-full',
-         rowId: VIDEO_ROW_ID,
-         span: { start: 0, end: totalMs },
-         label: 'Main Clip',
-         variant: 'zoom'
-      });
-    }
-
-    return [...zooms, ...trims, ...annotations, ...mainClips];
-  }, [zoomRegions, trimRegions, annotationRegions, isTrimTrackVisible, mapSourceToEffective, totalMs]);
+    return [...zooms, ...trims, ...annotations];
+  }, [zoomRegions, trimRegions, annotationRegions]);
 
   const handleItemSpanChange = useCallback((id: string, span: Span) => {
-    const targetSpan = isTrimTrackVisible 
-      ? span 
-      : { start: mapEffectiveToSource(span.start), end: mapEffectiveToSource(span.end) };
-      
     // Check if it's a zoom or trim item
     if (zoomRegions.some(r => r.id === id)) {
-      onZoomSpanChange(id, targetSpan);
+      onZoomSpanChange(id, span);
     } else if (trimRegions.some(r => r.id === id)) {
-      onTrimSpanChange?.(id, targetSpan);
+      onTrimSpanChange?.(id, span);
     } else if (annotationRegions.some(r => r.id === id)) {
-      onAnnotationSpanChange?.(id, targetSpan);
+      onAnnotationSpanChange?.(id, span);
     }
-  }, [zoomRegions, trimRegions, annotationRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, isTrimTrackVisible, mapEffectiveToSource]);
+  }, [zoomRegions, trimRegions, annotationRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange]);
 
   if (!videoDuration || videoDuration === 0) {
     return (
@@ -976,19 +917,6 @@ export default function TimelineEditor({
             title="Add Trim (T)"
           >
             <Scissors className="w-4 h-4" />
-          </Button>
-          <div className="w-px h-4 bg-white/10 mx-1" />
-          <Button
-            onClick={() => setIsTrimTrackVisible(!isTrimTrackVisible)}
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-7 w-7 transition-all",
-              !isTrimTrackVisible ? "text-[#34B27B] bg-[#34B27B]/10" : "text-slate-400 hover:text-slate-200 hover:bg-white/10"
-            )}
-            title={!isTrimTrackVisible ? "Magnetic Mode On (Trims folded)" : "Source Mode On (Trims visible)"}
-          >
-            {!isTrimTrackVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </Button>
           <Button
             onClick={handleAddAnnotation}
@@ -1067,7 +995,7 @@ export default function TimelineEditor({
       >
         <TimelineWrapper
           range={clampedRange}
-          videoDuration={activeDurationMs / 1000}
+          videoDuration={videoDuration}
           hasOverlap={hasOverlap}
           onRangeChange={setRange}
           minItemDurationMs={timelineScale.minItemDurationMs}
@@ -1082,9 +1010,9 @@ export default function TimelineEditor({
           />
           <Timeline
             items={timelineItems}
-            videoDurationMs={activeDurationMs}
+            videoDurationMs={totalMs}
             intervalMs={timelineScale.intervalMs}
-            currentTimeMs={activeCurrentTimeMs}
+            currentTimeMs={currentTimeMs}
             onSeek={onSeek}
             onSelectZoom={onSelectZoom}
             onSelectTrim={onSelectTrim}
