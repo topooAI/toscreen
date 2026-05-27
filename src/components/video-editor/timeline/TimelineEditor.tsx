@@ -229,7 +229,7 @@ function PlaybackCursor({
       }}
     >
       <div
-        className="absolute top-0 bottom-0 w-[2px] bg-[#34B27B] shadow-[0_0_10px_rgba(52,178,123,0.5)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_15px_rgba(52,178,123,0.7)] transition-shadow"
+        className="absolute top-0 bottom-0 w-[2px] bg-[#FF00FF] shadow-[0_0_10px_rgba(255,0,255,0.5)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_15px_rgba(255,0,255,0.7)] transition-shadow"
         style={{
           [sideProperty]: `${sidebarWidth + offset - 1}px`,
         }}
@@ -242,9 +242,9 @@ function PlaybackCursor({
           className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing drop-shadow-md"
         >
           {/* 上半部方块 */}
-          <div className="w-3.5 h-2.5 bg-[#34B27B] rounded-t-sm shadow-sm" />
+          <div className="w-3.5 h-2.5 bg-[#FF00FF] rounded-t-sm shadow-sm" />
           {/* 下半部尖角 */}
-          <div className="w-0 h-0 border-l-[7px] border-r-[7px] border-t-[6px] border-l-transparent border-r-transparent border-t-[#34B27B]" />
+          <div className="w-0 h-0 border-l-[7px] border-r-[7px] border-t-[6px] border-l-transparent border-r-transparent border-t-[#FF00FF]" />
         </div>
       </div>
     </div>
