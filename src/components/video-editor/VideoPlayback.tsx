@@ -665,12 +665,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
     };
   }, []);
   return (
-    <div className="relative rounded-sm overflow-hidden video-player-viewport" style={{ width: '100%', aspectRatio: formatAspectRatioForCSS(aspectRatio), cursor: 'none' }}>
-      <style dangerouslySetInnerHTML={{__html: `
-        .video-player-viewport, .video-player-viewport * {
-          cursor: none !important;
-        }
-      `}} />
+    <div className="relative rounded-sm overflow-hidden video-player-viewport" style={{ width: '100%', aspectRatio: formatAspectRatioForCSS(aspectRatio) }}>
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
