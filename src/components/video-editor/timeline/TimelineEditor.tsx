@@ -336,14 +336,10 @@ const TimelineAxis = memo(({
         return (
           <div 
             key={marker.time} 
+            className="absolute bottom-0 h-full flex flex-col justify-end items-center"
             style={{
-              position: "absolute",
-              bottom: 0,
-              height: "100%",
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "flex-end",
               [sideProperty]: `${offset}px`,
+              transform: 'translateX(-50%)',
             }}
           >
             <div className="flex flex-col items-center pb-1">
@@ -378,6 +374,9 @@ function Timeline({
   selectedZoomId,
   selectedTrimId,
   selectedAnnotationId,
+  onAddZoom,
+  onAddTrim,
+  onAddAnnotation,
 }: {
   items: TimelineRenderItem[];
   videoDurationMs: number;
@@ -390,6 +389,9 @@ function Timeline({
   selectedZoomId: string | null;
   selectedTrimId?: string | null;
   selectedAnnotationId?: string | null;
+  onAddZoom?: () => void;
+  onAddTrim?: () => void;
+  onAddAnnotation?: () => void;
 }) {
   const { setTimelineRef, style, sidebarWidth, range, pixelsToValue } = useTimelineContext();
   const localTimelineRef = useRef<HTMLDivElement | null>(null);
@@ -447,7 +449,7 @@ function Timeline({
         </div>
       </Row>
       
-      <Row id={ZOOM_ROW_ID}>
+      <Row id={ZOOM_ROW_ID} onAddClick={onAddZoom}>
         {zoomItems.map((item) => (
           <Item
             id={item.id}
@@ -464,7 +466,7 @@ function Timeline({
         ))}
       </Row>
 
-      <Row id={TRIM_ROW_ID}>
+      <Row id={TRIM_ROW_ID} onAddClick={onAddTrim}>
         {trimItems.map((item) => (
           <Item
             id={item.id}
@@ -480,7 +482,7 @@ function Timeline({
         ))}
       </Row>
 
-      <Row id={ANNOTATION_ROW_ID}>
+      <Row id={ANNOTATION_ROW_ID} onAddClick={onAddAnnotation}>
         {annotationItems.map((item) => (
           <Item
             id={item.id}
@@ -1014,6 +1016,9 @@ export default function TimelineEditor({
             selectedZoomId={selectedZoomId}
             selectedTrimId={selectedTrimId}
             selectedAnnotationId={selectedAnnotationId}
+            onAddZoom={handleAddZoom}
+            onAddTrim={handleAddTrim}
+            onAddAnnotation={handleAddAnnotation}
           />
         </TimelineWrapper>
       </div>

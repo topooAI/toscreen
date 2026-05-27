@@ -1,10 +1,11 @@
 import { useRow } from "dnd-timeline";
 import type { RowDefinition } from "dnd-timeline";
-import { Plus, GripVertical } from "lucide-react";
+import { Plus } from "lucide-react";
 import React from "react";
 
 interface RowProps extends RowDefinition {
   children: React.ReactNode;
+  onAddClick?: () => void;
 }
 
 const ROW_METADATA: Record<string, { label: string }> = {
@@ -14,7 +15,7 @@ const ROW_METADATA: Record<string, { label: string }> = {
   "row-annotation": { label: "Text" },
 };
 
-export default function Row({ id, children }: RowProps) {
+export default function Row({ id, children, onAddClick }: RowProps) {
   const { setNodeRef, rowWrapperStyle, rowStyle, setSidebarRef, rowSidebarStyle } = useRow({ id });
 
   const meta = ROW_METADATA[id] || { label: "Track" };
@@ -27,28 +28,35 @@ export default function Row({ id, children }: RowProps) {
       {/* Sidebar Track Control Header */}
       <div 
         ref={setSidebarRef}
-        className="border-r border-white/5 bg-[#0c0c0e] flex items-center justify-between px-2 gap-1 select-none z-10 shrink-0"
+        className="border-r border-white/5 bg-[#0c0c0e] flex items-center justify-between px-3 gap-2 select-none z-10 shrink-0 cursor-grab active:cursor-grabbing hover:bg-white/[0.03] transition-colors"
         style={{ ...rowSidebarStyle, width: 140 }}
+        title="长按拖拽排序"
       >
-        <div className="flex items-center gap-1.5 overflow-hidden flex-1">
-          <div className="cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 transition-colors p-0.5" title="长按拖拽排序">
-            <GripVertical className="w-4 h-4" />
-          </div>
+        <div className="flex items-center overflow-hidden flex-1">
           <span className="text-[12px] font-medium text-slate-300 group-hover/row:text-white transition-colors truncate tracking-wide">
             {meta.label}
           </span>
         </div>
         
-        {/* Add Track Button Placeholder */}
-        <button className="text-slate-500 hover:text-white hover:bg-white/10 p-1 rounded transition-colors" title="添加轨道">
-          <Plus className="w-3.5 h-3.5" />
-        </button>
+        {onAddClick && (
+          <button 
+            className="text-slate-500 hover:text-white hover:bg-white/10 p-1 rounded transition-colors z-20 relative" 
+            title="在播放头位置添加片段"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddClick();
+            }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Row Timeline Items Area */}
       <div 
         ref={setNodeRef} 
         style={rowStyle}
+        className="relative h-full"
       >
         {children}
       </div>
