@@ -52,10 +52,10 @@ function ItemComponent({
     : glassStyles.glassYellow;
     
   const endCapColor = isZoom 
-    ? '#7c3aed' 
+    ? 'rgba(124, 58, 237, 0.4)' 
     : isTrim 
-    ? '#ef4444' 
-    : '#B4A046';
+    ? 'rgba(239, 68, 68, 0.4)' 
+    : 'rgba(180, 160, 70, 0.4)';
 
   return (
     <div
@@ -73,24 +73,34 @@ function ItemComponent({
             "w-full h-full overflow-hidden flex items-center justify-center gap-1.5 cursor-grab active:cursor-grabbing relative",
             isSelected && glassStyles.selected
           )}
-          style={{ height: 40, color: '#fff' }}
+          style={{ height: 36, color: '#fff' }}
           onClick={(event) => {
             event.stopPropagation();
             onSelect?.();
           }}
         >
+          {/* Left Resize Handle (Jitter style circular/rounded bar) */}
           <div
-            className={cn(glassStyles.zoomEndCap, glassStyles.left)}
-            style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 8, opacity: 0.9, background: endCapColor }}
+            className={cn(glassStyles.zoomEndCap, glassStyles.left, "flex items-center justify-center")}
+            style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 10, background: endCapColor }}
             title="Resize left"
-          />
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="w-1 h-3 bg-white/60 rounded-full" />
+          </div>
+
+          {/* Right Resize Handle (Jitter style circular/rounded bar) */}
           <div
-            className={cn(glassStyles.zoomEndCap, glassStyles.right)}
-            style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 8, opacity: 0.9, background: endCapColor }}
+            className={cn(glassStyles.zoomEndCap, glassStyles.right, "flex items-center justify-center")}
+            style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 10, background: endCapColor }}
             title="Resize right"
-          />
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="w-1 h-3 bg-white/60 rounded-full" />
+          </div>
+
           {/* Content */}
-          <div className="relative z-10 flex items-center gap-1.5 text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none">
+          <div className="relative z-10 flex items-center gap-1.5 text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none px-3">
             {isZoom ? (
               <>
                 <ZoomIn className="w-3.5 h-3.5" />
