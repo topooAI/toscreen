@@ -393,7 +393,7 @@ function Timeline({
   onAddTrim?: () => void;
   onAddAnnotation?: () => void;
 }) {
-  const { setTimelineRef, style, sidebarWidth, range, pixelsToValue } = useTimelineContext();
+  const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef } = useTimelineContext();
   const localTimelineRef = useRef<HTMLDivElement | null>(null);
 
   const setRefs = useCallback((node: HTMLDivElement | null) => {

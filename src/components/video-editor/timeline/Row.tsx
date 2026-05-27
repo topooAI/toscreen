@@ -23,7 +23,7 @@ export default function Row({ id, children, onAddClick }: RowProps) {
   return (
     <div
       className="border-b border-white/5 bg-[#09090b] group/row hover:bg-white/[0.01] transition-colors w-full flex items-stretch relative"
-      style={{ minHeight: 48, marginBottom: 4 }}
+      style={{ height: 48, marginBottom: 4 }}
     >
       {/* Sidebar Track Control Header */}
       <div 
@@ -54,8 +54,7 @@ export default function Row({ id, children, onAddClick }: RowProps) {
       {/* Row Timeline Items Area */}
       <div 
         ref={setNodeRef} 
-        style={{ ...rowStyle, position: 'relative', flex: 1 }}
-        className="h-full"
+        style={{ ...rowStyle, position: 'relative', flex: 1, height: '100%' }}
       >
         {children}
       </div>
