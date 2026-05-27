@@ -889,7 +889,7 @@ export default function TimelineEditor({
 
   return (
     <div className="flex-1 flex flex-col bg-[#09090b] overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-[#09090b]">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-[#09090b] relative">
         <div className="flex items-center gap-1">
           <Button
             onClick={handleAddZoom}
@@ -960,7 +960,7 @@ export default function TimelineEditor({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="flex-1 flex justify-center max-w-md mx-auto">
+        <div className="absolute left-1/2 -translate-x-1/2 z-10">
           <PlaybackControls
             isPlaying={isPlaying}
             currentTime={currentTime}
@@ -969,6 +969,7 @@ export default function TimelineEditor({
             onSeek={onSeek || (() => {})}
           />
         </div>
+        <div className="flex-1" />
         <div className="flex items-center gap-4 text-[10px] text-slate-500 font-medium">
           <span className="flex items-center gap-1.5">
             <kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#34B27B] font-sans">{shortcuts.pan}</kbd>

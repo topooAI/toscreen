@@ -45,10 +45,10 @@ export default function PlaybackControls({
           onClick={handlePrevFrame}
           variant="ghost"
           size="icon"
-          className="w-5 h-5 text-slate-400 hover:text-white hover:bg-white/5 active:scale-95 transition-all"
+          className="w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-white/10 active:scale-95 transition-all group"
           aria-label="Previous frame"
         >
-          <SkipBack className="w-2.5 h-2.5 text-slate-400" />
+          <SkipBack className="w-2.5 h-2.5 text-slate-400 group-hover:text-white transition-colors" />
         </Button>
 
         {/* Play/Pause Trigger */}
@@ -56,13 +56,13 @@ export default function PlaybackControls({
           onClick={onTogglePlayPause}
           variant="ghost"
           size="icon"
-          className="w-8 h-8 text-white hover:text-white hover:bg-white/5 active:scale-95 transition-all"
+          className="w-7 h-7 rounded-md text-white hover:bg-white/10 active:scale-95 transition-all group"
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (
-            <Pause className="w-4.5 h-4.5 fill-current text-white" />
+            <Pause className="w-4.5 h-4.5 fill-current text-white scale-90 group-hover:scale-100 transition-transform" />
           ) : (
-            <Play className="w-4.5 h-4.5 fill-current text-white ml-0.5" />
+            <Play className="w-4.5 h-4.5 fill-current text-white ml-0.5 scale-90 group-hover:scale-100 transition-transform" />
           )}
         </Button>
 
@@ -71,10 +71,10 @@ export default function PlaybackControls({
           onClick={handleNextFrame}
           variant="ghost"
           size="icon"
-          className="w-5 h-5 text-slate-400 hover:text-white hover:bg-white/5 active:scale-95 transition-all"
+          className="w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-white/10 active:scale-95 transition-all group"
           aria-label="Next frame"
         >
-          <SkipForward className="w-2.5 h-2.5 text-slate-400" />
+          <SkipForward className="w-2.5 h-2.5 text-slate-400 group-hover:text-white transition-colors" />
         </Button>
       </div>
       
