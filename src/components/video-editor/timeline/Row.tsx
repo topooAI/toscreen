@@ -16,20 +16,19 @@ const ROW_METADATA: Record<string, { label: string }> = {
 };
 
 export default function Row({ id, children, onAddClick }: RowProps) {
-  const { setNodeRef, rowWrapperStyle, rowStyle, setSidebarRef, rowSidebarStyle } = useRow({ id });
+  const { setNodeRef, rowStyle } = useRow({ id });
 
   const meta = ROW_METADATA[id] || { label: "Track" };
 
   return (
     <div
-      className="border-b border-white/5 bg-[#09090b] group/row hover:bg-white/[0.01] transition-colors w-full"
-      style={{ ...rowWrapperStyle, minHeight: 48, marginBottom: 4 }}
+      className="border-b border-white/5 bg-[#09090b] group/row hover:bg-white/[0.01] transition-colors w-full flex items-stretch relative"
+      style={{ minHeight: 48, marginBottom: 4 }}
     >
       {/* Sidebar Track Control Header */}
       <div 
-        ref={setSidebarRef}
-        className="border-r border-white/5 bg-[#0c0c0e] flex items-center justify-between px-3 gap-2 select-none z-10 shrink-0 cursor-grab active:cursor-grabbing hover:bg-white/[0.03] transition-colors"
-        style={{ ...rowSidebarStyle, width: 140 }}
+        className="border-r border-white/5 bg-[#0c0c0e] flex items-center justify-between px-3 gap-2 select-none z-10 shrink-0 cursor-grab active:cursor-grabbing hover:bg-white/[0.03] transition-colors relative"
+        style={{ width: 140 }}
         title="长按拖拽排序"
       >
         <div className="flex items-center overflow-hidden flex-1">
@@ -55,8 +54,8 @@ export default function Row({ id, children, onAddClick }: RowProps) {
       {/* Row Timeline Items Area */}
       <div 
         ref={setNodeRef} 
-        style={rowStyle}
-        className="relative h-full"
+        style={{ ...rowStyle, position: 'relative', flex: 1 }}
+        className="h-full"
       >
         {children}
       </div>

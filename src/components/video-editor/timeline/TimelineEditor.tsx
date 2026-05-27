@@ -433,6 +433,12 @@ function Timeline({
       className="select-none bg-[#09090b] min-h-[140px] relative cursor-pointer group"
       onClick={handleTimelineClick}
     >
+      {/* 虚拟 Sidebar 测量节点：彻底解决各行间重复挂载产生的死循环，将侧栏宽度告知上下文 */}
+      <div 
+        ref={setSidebarRef} 
+        style={{ position: 'absolute', width: 140, height: 1, opacity: 0, pointerEvents: 'none' }} 
+      />
+
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px)] bg-[length:20px_100%] pointer-events-none" />
       <TimelineAxis intervalMs={intervalMs} videoDurationMs={videoDurationMs} sidebarWidth={sidebarWidth} />
       <PlaybackCursor 
