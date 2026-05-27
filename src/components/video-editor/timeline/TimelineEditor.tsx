@@ -253,11 +253,13 @@ function PlaybackCursor({
 const TimelineAxis = memo(({
   intervalMs,
   videoDurationMs,
+  sidebarWidth,
 }: {
   intervalMs: number;
   videoDurationMs: number;
+  sidebarWidth: number;
 }) => {
-  const { sidebarWidth, direction, range, valueToPixels } = useTimelineContext();
+  const { direction, range, valueToPixels } = useTimelineContext();
   const sideProperty = direction === "rtl" ? "right" : "left";
 
   const markers = useMemo(() => {
@@ -356,10 +358,11 @@ const TimelineAxis = memo(({
     </div>
   );
 }, (prev, next) => {
-  // Only re-render axis if scale or duration changes
+  // Only re-render axis if scale, duration, or sidebar width changes
   return (
     prev.intervalMs === next.intervalMs &&
-    prev.videoDurationMs === next.videoDurationMs
+    prev.videoDurationMs === next.videoDurationMs &&
+    prev.sidebarWidth === next.sidebarWidth
   );
 });
 
@@ -429,7 +432,7 @@ function Timeline({
       onClick={handleTimelineClick}
     >
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px)] bg-[length:20px_100%] pointer-events-none" />
-      <TimelineAxis intervalMs={intervalMs} videoDurationMs={videoDurationMs} />
+      <TimelineAxis intervalMs={intervalMs} videoDurationMs={videoDurationMs} sidebarWidth={sidebarWidth} />
       <PlaybackCursor 
         currentTimeMs={currentTimeMs} 
         videoDurationMs={videoDurationMs} 

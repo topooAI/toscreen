@@ -7,6 +7,7 @@ import path from "node:path";
 import fs$1 from "node:fs/promises";
 import * as fs from "fs/promises";
 import { uIOhook } from "uiohook-napi";
+import { createRequire } from "node:module";
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL$1 = process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5173";
@@ -291,6 +292,76 @@ class MouseTracker {
   }
 }
 const mouseTracker = new MouseTracker();
+const require2 = createRequire(import.meta.url);
+let MacRecorder = null;
+let recorderInstance = null;
+try {
+  MacRecorder = require2("node-mac-recorder");
+} catch (e) {
+  console.warn("[NativeRecorder] node-mac-recorder not available on this platform:", e.message);
+}
+let isRecording = false;
+let currentOutputPath = null;
+function isNativeRecordingAvailable() {
+  if (!MacRecorder) return false;
+  if (process.platform !== "darwin") return false;
+  return true;
+}
+async function startNativeRecording(options) {
+  if (!MacRecorder) {
+    return { success: false, error: "node-mac-recorder is not available on this platform" };
+  }
+  if (isRecording) {
+    return { success: false, error: "A recording is already in progress" };
+  }
+  try {
+    const timestamp = Date.now();
+    const fileName = `recording-${timestamp}.mov`;
+    currentOutputPath = path.join(RECORDINGS_DIR, fileName);
+    recorderInstance = new MacRecorder();
+    await recorderInstance.startRecording(currentOutputPath, {
+      captureCursor: (options == null ? void 0 : options.showCursor) === void 0 ? false : options.showCursor,
+      // node-mac-recorder 期望 captureCursor
+      frameRate: (options == null ? void 0 : options.fps) ?? 60,
+      displayId: (options == null ? void 0 : options.displayId) ?? null
+    });
+    isRecording = true;
+    console.log(`[NativeRecorder] Recording started → ${currentOutputPath}`, {
+      captureCursor: (options == null ? void 0 : options.showCursor) ?? false,
+      fps: (options == null ? void 0 : options.fps) ?? 60,
+      displayId: (options == null ? void 0 : options.displayId) ?? null
+    });
+    return { success: true, outputPath: currentOutputPath };
+  } catch (error) {
+    console.error("[NativeRecorder] Failed to start recording:", error);
+    isRecording = false;
+    currentOutputPath = null;
+    return { success: false, error: String(error) };
+  }
+}
+async function stopNativeRecording() {
+  if (!recorderInstance || !isRecording) {
+    return { success: false, error: "No active recording to stop" };
+  }
+  try {
+    const result = await recorderInstance.stopRecording();
+    const outputPath = (result == null ? void 0 : result.outputPath) || currentOutputPath;
+    console.log("[NativeRecorder] Recording stopped:", {
+      outputPath,
+      result
+    });
+    isRecording = false;
+    currentOutputPath = null;
+    recorderInstance = null;
+    return { success: true, outputPath: outputPath || void 0 };
+  } catch (error) {
+    console.error("[NativeRecorder] Failed to stop recording:", error);
+    isRecording = false;
+    currentOutputPath = null;
+    recorderInstance = null;
+    return { success: false, error: String(error) };
+  }
+}
 let selectedSource = null;
 async function getSelectedSourceForMediaRequest() {
   if (!selectedSource) return null;
@@ -390,7 +461,7 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
   ipcMain.handle("get-recorded-video-path", async () => {
     try {
       const files = await fs$1.readdir(RECORDINGS_DIR);
-      const videoFiles = files.filter((file) => file.endsWith(".webm"));
+      const videoFiles = files.filter((file) => file.endsWith(".webm") || file.endsWith(".mov"));
       if (videoFiles.length === 0) {
         return { success: false, message: "No recorded video found" };
       }
@@ -401,6 +472,75 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
       console.error("Failed to get video path:", error);
       return { success: false, message: "Failed to get video path", error: String(error) };
     }
+  });
+  ipcMain.handle("is-native-recording-available", () => {
+    return isNativeRecordingAvailable();
+  });
+  ipcMain.handle("start-native-recording", async () => {
+    const isAvailable = isNativeRecordingAvailable();
+    if (!isAvailable) {
+      return { success: false, error: "Native recording is not available on this platform." };
+    }
+    let recordingBounds = void 0;
+    let displayId = void 0;
+    if (selectedSource && selectedSource.id.startsWith("screen")) {
+      try {
+        const displays = screen.getAllDisplays();
+        const matchedDisplay = displays.find((d) => {
+          var _a;
+          return d.id.toString() === ((_a = selectedSource.display_id) == null ? void 0 : _a.toString());
+        });
+        if (matchedDisplay) {
+          recordingBounds = {
+            x: matchedDisplay.bounds.x,
+            y: matchedDisplay.bounds.y,
+            width: matchedDisplay.bounds.width,
+            height: matchedDisplay.bounds.height
+          };
+          displayId = Number(matchedDisplay.id);
+        }
+      } catch (err) {
+        console.error("[IPC] Failed to resolve recording bounds:", err);
+      }
+    }
+    const result = await startNativeRecording({ showCursor: false, displayId });
+    if (result.success) {
+      mouseTracker.start(recordingBounds);
+      const mainWin = getMainWindow();
+      if (mainWin) {
+        mainWin.minimize();
+      }
+      if (onRecordingStateChange) {
+        const sourceName = (selectedSource == null ? void 0 : selectedSource.name) || "Screen";
+        onRecordingStateChange(true, sourceName);
+      }
+    }
+    return result;
+  });
+  ipcMain.handle("stop-native-recording", async () => {
+    const result = await stopNativeRecording();
+    const { events, bounds } = mouseTracker.stop();
+    if (result.success && result.outputPath) {
+      if (events.length > 0) {
+        try {
+          const clicksPath = result.outputPath + ".clicks.json";
+          await mouseTracker.exportToFile(clicksPath, events, bounds, void 0);
+          console.log("[IPC] Exported clicks to native recording path:", clicksPath);
+        } catch (error) {
+          console.error("[IPC] Failed to export clicks for native recording:", error);
+        }
+      }
+      currentVideoPath = result.outputPath;
+    }
+    const mainWin = getMainWindow();
+    if (mainWin) {
+      mainWin.restore();
+      mainWin.focus();
+    }
+    if (onRecordingStateChange) {
+      onRecordingStateChange(false, (selectedSource == null ? void 0 : selectedSource.name) || "Screen");
+    }
+    return result;
   });
   ipcMain.handle("set-recording-state", async (_, recording, videoStartTime) => {
     const source = selectedSource || { name: "Screen" };

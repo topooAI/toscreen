@@ -69,5 +69,14 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   },
   readClicksJson: (videoPath) => {
     return electron.ipcRenderer.invoke("read-clicks-json", videoPath);
+  },
+  isNativeRecordingAvailable: () => {
+    return electron.ipcRenderer.invoke("is-native-recording-available");
+  },
+  startNativeRecording: () => {
+    return electron.ipcRenderer.invoke("start-native-recording");
+  },
+  stopNativeRecording: () => {
+    return electron.ipcRenderer.invoke("stop-native-recording");
   }
 });
