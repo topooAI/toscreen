@@ -5,6 +5,7 @@ import {
   type TrimRegion, 
   type AnnotationRegion, 
   type CropRegion,
+  type AudioRegion,
 } from "../types";
 import { type AspectRatio } from "../../../utils/aspectRatioUtils";
 import { type ExportProgress, type ExportQuality } from "../../../lib/exporter";
@@ -32,6 +33,8 @@ export function useEditorState() {
   const [selectedTrimId, setSelectedTrimId] = useState<string | null>(null);
   const [annotationRegions, setAnnotationRegions] = useState<AnnotationRegion[]>([]);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [audioRegions, setAudioRegions] = useState<AudioRegion[]>([]);
+  const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -45,6 +48,7 @@ export function useEditorState() {
   const nextTrimIdRef = useRef(1);
   const nextAnnotationIdRef = useRef(1);
   const nextAnnotationZIndexRef = useRef(1);
+  const nextAudioIdRef = useRef(1);
 
   return {
     // Basic Info
@@ -73,6 +77,8 @@ export function useEditorState() {
     selectedTrimId, setSelectedTrimId,
     annotationRegions, setAnnotationRegions,
     selectedAnnotationId, setSelectedAnnotationId,
+    audioRegions, setAudioRegions,
+    selectedAudioId, setSelectedAudioId,
     
     // Export State
     isExporting, setIsExporting,
@@ -86,6 +92,7 @@ export function useEditorState() {
     nextTrimIdRef,
     nextAnnotationIdRef,
     nextAnnotationZIndexRef,
+    nextAudioIdRef,
 
     // Constants
     WALLPAPER_PATHS

@@ -16,7 +16,7 @@ import {
 import { cn } from "../../lib/utils";
 
 export function LaunchWindow() {
-  const { recording, toggleRecording } = useScreenRecorder();
+  const { recording, toggleRecording, isProcessing, processProgress } = useScreenRecorder();
   const [selectedType, setSelectedType] = useState<"Display" | "Window" | "Area" | "Device">("Display");
   const [selectedSource, setSelectedSource] = useState<string>("Screen");
 
@@ -55,8 +55,25 @@ export function LaunchWindow() {
   };
 
   return (
-    <div className="w-full h-screen flex items-center justify-center bg-transparent">
-      <div className={cn(styles.launchBar, styles.electronDrag)}>
+    <div className="w-full h-screen flex items-center justify-center bg-transparent relative">
+      {isProcessing && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-xl">
+          <div className="flex flex-col items-center gap-3 w-64 p-4 rounded-lg bg-zinc-900/90 border border-zinc-800 shadow-2xl">
+            <span className="text-white text-sm font-medium tracking-wide">
+              Generating High-Performance Proxy...
+            </span>
+            <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-blue-500 transition-all duration-300 ease-out"
+                style={{ width: `${processProgress}%` }}
+              />
+            </div>
+            <span className="text-zinc-400 text-xs">{processProgress}%</span>
+          </div>
+        </div>
+      )}
+
+      <div className={cn(styles.launchBar, styles.electronDrag, isProcessing && "opacity-0 pointer-events-none")}>
         {/* Close Button */}
         <button 
           className={cn(styles.hudOverlayButton, styles.electronNoDrag)}

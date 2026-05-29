@@ -1,0 +1,104 @@
+.glassPurple {
+  position: relative;
+  border-radius: 6px;
+  background: rgba(124, 58, 237, 0.22); /* Violet-600 with opacity */
+  border: 1px solid rgba(124, 58, 237, 0.45);
+  box-shadow: 0 1px 6px 0 rgba(124, 58, 237, 0.2) inset, 0 1px 2px 0 rgba(0,0,0,0.2);
+  margin: 3px 0;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glassPurple:hover {
+  background: rgba(124, 58, 237, 0.32);
+  border-color: rgba(124, 58, 237, 0.65);
+}
+
+.glassPurple.selected {
+  background: rgba(124, 58, 237, 0.42);
+  border-color: #a78bfa; /* Violet-400 */
+  box-shadow: 0 0 0 1.5px #a78bfa, 0 2px 10px 0 rgba(124, 58, 237, 0.3) inset;
+  z-index: 10;
+}
+
+.glassRed {
+  position: relative;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  box-shadow: 0 1px 6px 0 rgba(239, 68, 68, 0.15) inset, 0 1px 2px 0 rgba(0,0,0,0.2);
+  margin: 3px 0;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glassRed:hover {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.glassRed.selected {
+  background: rgba(239, 68, 68, 0.38);
+  border-color: #f87171;
+  box-shadow: 0 0 0 1.5px #f87171, 0 2px 10px 0 rgba(239, 68, 68, 0.25) inset;
+  z-index: 10;
+}
+
+.glassYellow {
+  position: relative;
+  border-radius: 6px;
+  background: rgba(180, 160, 70, 0.18);
+  border: 1px solid rgba(180, 160, 70, 0.35);
+  box-shadow: 0 1px 6px 0 rgba(180, 160, 70, 0.15) inset, 0 1px 2px 0 rgba(0,0,0,0.2);
+  margin: 3px 0;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glassYellow:hover {
+  background: rgba(180, 160, 70, 0.28);
+  border-color: rgba(180, 160, 70, 0.55);
+}
+
+.glassYellow.selected {
+  background: rgba(180, 160, 70, 0.38);
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 1.5px #fbbf24, 0 2px 10px 0 rgba(180, 160, 70, 0.25) inset;
+  z-index: 10;
+}
+
+.zoomEndCap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glassPurple:hover .zoomEndCap,
+.glassPurple.selected .zoomEndCap,
+.glassRed:hover .zoomEndCap,
+.glassRed.selected .zoomEndCap,
+.glassYellow:hover .zoomEndCap,
+.glassYellow.selected .zoomEndCap {
+  opacity: 1;
+}
+
+.zoomEndCap.left {
+  left: 0;
+  cursor: ew-resize;
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+
+.zoomEndCap.right {
+  right: 0;
+  cursor: ew-resize;
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+}

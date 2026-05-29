@@ -10,6 +10,7 @@ import { Sidebar } from "./sidebar/Sidebar";
 import { ExportDialog } from "./ExportDialog";
 
 import type { Span } from "dnd-timeline";
+import { useAudioMixer } from "./hooks/useAudioMixer";
 import {
   DEFAULT_ZOOM_DEPTH,
   clampFocusToDepth,
@@ -25,6 +26,7 @@ import {
   type AnnotationRegion,
   type CropRegion,
   type FigureData,
+  type AudioRegion,
 } from "./types";
 import { generateAutoZooms } from "@/lib/autoZoom/generator";
 import { VideoExporter, type ExportProgress, type ExportQuality } from "@/lib/exporter";
@@ -36,6 +38,7 @@ const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wall
 
 export default function VideoEditor() {
   const [videoPath, setVideoPath] = useState<string | null>(null);
+  const [originalVideoPath, setOriginalVideoPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -57,6 +60,8 @@ export default function VideoEditor() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [audioRegions, setAudioRegions] = useState<AudioRegion[]>([]);
+  const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
 
   // Premium Cursor Customization Settings (Screen Studio parity)
   const [cursorSize, setCursorSize] = useState(1.5);
@@ -69,11 +74,15 @@ export default function VideoEditor() {
   const [exportQuality, setExportQuality] = useState<ExportQuality>('good');
   const [isFullScreenBinding, setIsFullScreenBinding] = useState(true);
 
+  // Initialize Audio Mixer for playback
+  useAudioMixer({ audioRegions, isPlaying, currentTime });
+
   const videoPlaybackRef = useRef<VideoPlaybackRef>(null);
   const nextZoomIdRef = useRef(1);
   const nextTrimIdRef = useRef(1);
   const nextAnnotationIdRef = useRef(1);
   const nextAnnotationZIndexRef = useRef(1); // Track z-index for stacking order
+  const nextAudioIdRef = useRef(1);
   const exporterRef = useRef<VideoExporter | null>(null);
 
   // Helper to convert file path to proper file:// URL
@@ -96,8 +105,36 @@ export default function VideoEditor() {
         }
 
         if (result.success && result.path) {
-          setVideoPath(result.path);
+          // If proxy is available, use it for UI playback. Always keep original for export.
+          setVideoPath(result.proxyPath || result.path);
+          setOriginalVideoPath(result.path);
           setError(null);
+          
+          // Try to load auto-saved project
+          const projectResult = await window.electronAPI.loadProject(result.path);
+          if (projectResult.success && projectResult.project) {
+            const p = projectResult.project;
+            if (p.zoomRegions) setZoomRegions(p.zoomRegions);
+            if (p.trimRegions) setTrimRegions(p.trimRegions);
+            if (p.annotationRegions) setAnnotationRegions(p.annotationRegions);
+            if (p.audioRegions) {
+              // Restore sourceUrls for audio regions from saved absolute paths
+              const restoredAudio = p.audioRegions.map((ar: any) => ({
+                ...ar,
+                sourceUrl: ar.path ? `file://${ar.path.replace(/\\/g, '/')}` : ar.sourceUrl
+              }));
+              setAudioRegions(restoredAudio);
+            }
+            if (p.cropRegion) setCropRegion(p.cropRegion);
+            if (p.wallpaper) setWallpaper(p.wallpaper);
+            if (p.shadowIntensity !== undefined) setShadowIntensity(p.shadowIntensity);
+            if (p.showBlur !== undefined) setShowBlur(p.showBlur);
+            if (p.motionBlurEnabled !== undefined) setMotionBlurEnabled(p.motionBlurEnabled);
+            if (p.borderRadius !== undefined) setBorderRadius(p.borderRadius);
+            if (p.padding !== undefined) setPadding(p.padding);
+            if (p.aspectRatio) setAspectRatio(p.aspectRatio);
+            toast.success("工程已自动恢复");
+          }
         } else {
           setError('No recordings found. Please start a new recording to begin editing.');
         }
@@ -128,6 +165,39 @@ export default function VideoEditor() {
     return () => { mounted = false };
   }, []);
 
+  // Auto-save project debounced
+  useEffect(() => {
+    if (!originalVideoPath) return;
+    const timeout = setTimeout(() => {
+      // Create serialized copies (stripping 'file' object from audioRegions)
+      const serializedAudioRegions = audioRegions.map(ar => {
+        const { file, ...rest } = ar;
+        return rest;
+      });
+      const projectData = {
+        zoomRegions,
+        trimRegions,
+        annotationRegions,
+        audioRegions: serializedAudioRegions,
+        cropRegion,
+        wallpaper,
+        shadowIntensity,
+        showBlur,
+        motionBlurEnabled,
+        borderRadius,
+        padding,
+        aspectRatio
+      };
+      window.electronAPI.saveProject(originalVideoPath, projectData).catch(e => {
+        console.error("Auto-save failed", e);
+      });
+    }, 1000); // 1s debounce
+    return () => clearTimeout(timeout);
+  }, [
+    originalVideoPath, zoomRegions, trimRegions, audioRegions, annotationRegions,
+    cropRegion, wallpaper, shadowIntensity, showBlur, motionBlurEnabled,
+    borderRadius, padding, aspectRatio
+  ]);
 
   function togglePlayPause() {
     const playback = videoPlaybackRef.current;
@@ -316,11 +386,24 @@ export default function VideoEditor() {
   }, []);
 
   const handleAnnotationDelete = useCallback((id: string) => {
-    setAnnotationRegions((prev) => prev.filter((region) => region.id !== id));
-    if (selectedAnnotationId === id) {
-      setSelectedAnnotationId(null);
-    }
-  }, [selectedAnnotationId]);
+    setAnnotationRegions(prev => prev.filter(r => r.id !== id));
+    if (selectedAnnotationId === id) setSelectedAnnotationId(null);
+  }, [setAnnotationRegions, selectedAnnotationId, setSelectedAnnotationId]);
+
+  // Audio Handlers
+  const handleAudioAdded = useCallback((region: AudioRegion) => {
+    setAudioRegions(prev => [...prev, region]);
+    setSelectedAudioId(region.id);
+  }, [setAudioRegions, setSelectedAudioId]);
+
+  const handleAudioSpanChange = useCallback((id: string, newSpan: { start: number; end: number }) => {
+    setAudioRegions(prev => prev.map(r => r.id === id ? { ...r, startMs: newSpan.start, endMs: newSpan.end } : r));
+  }, [setAudioRegions]);
+
+  const handleAudioDelete = useCallback((id: string) => {
+    setAudioRegions(prev => prev.filter(r => r.id !== id));
+    if (selectedAudioId === id) setSelectedAudioId(null);
+  }, [setAudioRegions, selectedAudioId, setSelectedAudioId]);
 
   const handleAnnotationContentChange = useCallback((id: string, content: string) => {
     setAnnotationRegions((prev) => {
@@ -459,15 +542,15 @@ export default function VideoEditor() {
 
 
   const handleAutoZoom = useCallback(async () => {
-    if (!videoPath) {
-      toast.error("No video currently loaded.");
+    if (!originalVideoPath) {
+      toast.error("No original video path currently loaded.");
       return;
     }
 
     try {
       setLoading(true);
       // Read the clicks.json associated with this video
-      const result = await window.electronAPI.readClicksJson(videoPath);
+      const result = await window.electronAPI.readClicksJson(originalVideoPath);
       console.log("[AutoZoom] Read clicks result:", result);
 
       if (!result.success || !result.clicks || result.clicks.length === 0) {
@@ -500,7 +583,7 @@ export default function VideoEditor() {
     } finally {
       setLoading(false);
     }
-  }, [videoPath]);
+  }, [originalVideoPath]);
 
   useEffect(() => {
     if (selectedZoomId && !zoomRegions.some((region) => region.id === selectedZoomId)) {
@@ -510,12 +593,12 @@ export default function VideoEditor() {
 
   // Check for available auto-zoom data when video loads
   useEffect(() => {
-    if (!videoPath) return;
+    if (!originalVideoPath) return;
 
     let mounted = true;
     const checkAutoZoomData = async () => {
       try {
-        const result = await window.electronAPI.readClicksJson(videoPath);
+        const result = await window.electronAPI.readClicksJson(originalVideoPath);
         if (mounted && result.success && result.clicks && result.clicks.length > 0) {
           console.log(`[AutoZoom] Found ${result.clicks.length} clicks, applying automatically.`);
           setCursorData(result.clicks); // Save actual cursor coordinates array
@@ -543,7 +626,7 @@ export default function VideoEditor() {
 
     checkAutoZoomData();
     return () => { mounted = false; };
-  }, [videoPath]); 
+  }, [originalVideoPath]); 
 
   const handleExport = useCallback(async () => {
     if (!videoPath) {
@@ -617,7 +700,7 @@ export default function VideoEditor() {
 
 
       const exporter = new VideoExporter({
-        videoUrl: videoPath ? toFileUrl(videoPath) : '',
+        videoUrl: originalVideoPath ? toFileUrl(originalVideoPath) : (videoPath ? toFileUrl(videoPath) : ''),
         width: exportWidth,
         height: exportHeight,
         frameRate: 30, // Optimized for speed
@@ -625,6 +708,8 @@ export default function VideoEditor() {
         wallpaper,
         zoomRegions,
         trimRegions,
+        annotationRegions,
+        audioRegions,
         showShadow: shadowIntensity > 0,
         shadowIntensity,
         showBlur,
@@ -695,7 +780,22 @@ export default function VideoEditor() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen bg-[#09090b] items-center justify-center text-slate-400">
+      <div 
+        className="flex flex-col h-screen w-screen bg-[#111111] overflow-hidden"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          const file = e.dataTransfer.files[0];
+          if (!file) return;
+          const isAudio = file.type.startsWith('audio/') || !!file.name.match(/\.(mp3|m4a|wav|aac|ogg)$/i);
+          const isVideo = file.type.startsWith('video/') && !isAudio;
+          
+          if (isVideo) {
+            setVideoPath(file.path || URL.createObjectURL(file));
+            setError(null);
+          }
+        }}
+      >
         <Loader2 className="w-8 h-8 animate-spin mb-4" />
         <p>Loading your masterpiece...</p>
       </div>
@@ -704,12 +804,76 @@ export default function VideoEditor() {
 
 
   return (
-    <div className="flex flex-col h-screen bg-[#09090b] text-slate-200 overflow-hidden selection:bg-[#34B27B]/30">
+    <div 
+      className="flex flex-col h-screen bg-[#09090b] text-slate-200 overflow-hidden selection:bg-[#34B27B]/30"
+      onDragEnter={(e) => e.preventDefault()}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={async (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        
+        const isAudio = file.type.startsWith('audio/') || !!file.name.match(/\.(mp3|m4a|wav|aac|ogg)$/i);
+        const isVideo = file.type.startsWith('video/') && !isAudio;
+
+        if (!isAudio && !isVideo) {
+          toast.error("未识别的文件格式", {
+            description: `文件名: ${file.name}, 类型: ${file.type || '未知'}`
+          });
+          return;
+        }
+
+        if (isVideo) {
+          // Attempt to extract real file path if available, else blob
+          const path = (file as any).path || URL.createObjectURL(file);
+          setVideoPath(path);
+          setOriginalVideoPath(path); // Also update original path
+          setError(null);
+        } else if (isAudio) {
+          toast.success("成功识别音频", {
+            description: `已加载: ${file.name}`
+          });
+          // Global audio drop support
+          // Check if it's a 0-byte or likely an undownloaded iCloud stub
+          if (file.size === 0 || file.name.endsWith('.icloud')) {
+            toast.error("无法加载该文件", {
+              description: "该音频文件可能位于 iCloud 云端且未下载，请先在访达(Finder)中点击下载后再试。",
+            });
+            return;
+          }
+
+          try {
+            const slice = file.slice(0, 10);
+            await slice.arrayBuffer();
+          } catch (err) {
+            toast.error("无法读取文件", {
+              description: "该文件无法被读取，它似乎仍在 iCloud 中尚未完全下载。请先在访达(Finder)中双击下载它。",
+            });
+            return;
+          }
+          
+          const url = URL.createObjectURL(file);
+          const startPos = Math.max(0, Math.min(currentTime, duration));
+          handleAudioAdded({
+            id: crypto.randomUUID(),
+            startMs: startPos * 1000,
+            endMs: (startPos + 5) * 1000,
+            sourceUrl: url,
+            file: file,
+            path: (file as any).path, // Save path for persistence
+            volume: 1.0,
+            sourceStartMs: 0,
+            sourceEndMs: 5000,
+          });
+        }
+      }}
+    >
       {error && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-[#09090b]/90 backdrop-blur-sm">
-          <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-center max-w-md">
+        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-[#09090b]/90 backdrop-blur-sm">
+          <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-center max-w-md pointer-events-auto">
             <div className="text-red-500 font-bold mb-2">Failed to load video</div>
             <div className="text-red-400/60 text-sm mb-4">{error}</div>
+            <p className="text-slate-300 mb-6 font-medium">Or simply drag & drop any video file here</p>
             <button 
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors"
@@ -760,6 +924,7 @@ export default function VideoEditor() {
                       cropRegion={cropRegion}
                       trimRegions={trimRegions}
                       annotationRegions={annotationRegions}
+                      audioRegions={audioRegions}
                       selectedAnnotationId={selectedAnnotationId}
                       onSelectAnnotation={handleSelectAnnotation}
                       onAnnotationPositionChange={handleAnnotationPositionChange}
@@ -787,6 +952,7 @@ export default function VideoEditor() {
                   videoDuration={duration}
                   currentTime={currentTime}
                   onSeek={handleSeek}
+                  videoPath={videoPath ? toFileUrl(videoPath) : ''}
                   zoomRegions={zoomRegions}
                   onZoomAdded={handleZoomAdded}
                   onZoomSpanChange={handleZoomSpanChange}
@@ -806,6 +972,12 @@ export default function VideoEditor() {
                   onAnnotationDelete={handleAnnotationDelete}
                   selectedAnnotationId={selectedAnnotationId}
                   onSelectAnnotation={handleSelectAnnotation}
+                  audioRegions={audioRegions}
+                  onAudioAdded={handleAudioAdded}
+                  onAudioSpanChange={handleAudioSpanChange}
+                  onAudioDelete={handleAudioDelete}
+                  selectedAudioId={selectedAudioId}
+                  onSelectAudio={setSelectedAudioId}
                   aspectRatio={aspectRatio}
                   onAspectRatioChange={setAspectRatio}
                   isFullScreenBinding={isFullScreenBinding}

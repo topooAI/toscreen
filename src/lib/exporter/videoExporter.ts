@@ -2,7 +2,9 @@ import type { ExportConfig, ExportProgress, ExportResult } from './types';
 import { VideoFileDecoder } from './videoDecoder';
 import { FrameRenderer } from './frameRenderer';
 import { VideoMuxer } from './muxer';
-import type { ZoomRegion, CropRegion, TrimRegion, AnnotationRegion } from '@/components/video-editor/types';
+import { AudioMixerExporter } from './audioMixerExporter';
+import { AudioEncoderWrapper } from './audioEncoder';
+import type { ZoomRegion, CropRegion, TrimRegion, AnnotationRegion, AudioRegion } from '@/components/video-editor/types';
 
 interface VideoExporterConfig extends ExportConfig {
   videoUrl: string;
@@ -18,6 +20,7 @@ interface VideoExporterConfig extends ExportConfig {
   videoPadding?: number;
   cropRegion: CropRegion;
   annotationRegions?: AnnotationRegion[];
+  audioRegions?: AudioRegion[];
   previewWidth?: number;
   previewHeight?: number;
   cursorData?: any[];
@@ -124,12 +127,41 @@ export class VideoExporter {
       // Initialize video encoder
       await this.initializeEncoder();
 
-      // Initialize muxer
-      this.muxer = new VideoMuxer(this.config, false);
-      await this.muxer.initialize();
-
       const totalDuration = videoInfo.duration;
       const effectiveDuration = this.getEffectiveDuration(totalDuration);
+      
+      const onProgress = this.config.onProgress || (() => {});
+
+      // --- NEW: Audio Rendering and Encoding Phase ---
+      let audioBuffer: AudioBuffer | null = null;
+      try {
+        console.log(`[VideoExporter] Starting offline audio mix...`);
+        const mixer = new AudioMixerExporter(this.config, this.config.videoUrl);
+        audioBuffer = await mixer.renderAudio(totalDuration);
+      } catch (err) {
+        console.error("[VideoExporter] Audio mixing failed", err);
+      }
+
+      const hasAudio = !!audioBuffer;
+      console.log(`[VideoExporter] Audio processed. Has audio: ${hasAudio}`);
+
+      let audioEncoder: AudioEncoderWrapper | null = null;
+      let audioCodec = 'opus';
+
+      if (audioBuffer) {
+        console.log(`[VideoExporter] Initializing audio encoder...`);
+        audioEncoder = new AudioEncoderWrapper(audioBuffer, (chunk, meta) => {
+          this.muxingPromises.push(this.muxer!.addAudioChunk(chunk, meta));
+        });
+        await audioEncoder.initialize();
+        audioCodec = audioEncoder.getCodec() === 'mp4a.40.2' ? 'aac' : 'opus';
+      }
+
+      // Initialize muxer with or without audio (now we know the exact audio codec)
+      this.muxer = new VideoMuxer(this.config, hasAudio, audioCodec as any);
+      await this.muxer.initialize();
+      // --- END Audio Setup Phase ---
+
       const frameDuration = 1 / this.config.frameRate;
       const totalFrames = Math.floor(effectiveDuration * this.config.frameRate);
       const startTime = 0;
@@ -138,112 +170,186 @@ export class VideoExporter {
       console.log(`[VideoExporter] Effective duration: ${effectiveDuration.toFixed(3)} s`);
       console.log(`[VideoExporter] Total frames to export: ${totalFrames}`);
 
+      // --- NEW: Pause-and-Play Stepping Pipeline ---
+      // This is a genius compromise: we use the blazing fast native stream decoder via play() 
+      // but we PAUSE it instantly on every frame callback. This freezes the video's internal clock 
+      // while we do heavy PIXI rendering, guaranteeing absolutely zero dropped frames without 
+      // the catastrophic "take hours" overhead of seek().
+      
       const videoElement = this.decoder.getVideoElement();
-      if (!videoElement) throw new Error('Video element not found');
-
-      const onProgress = this.config.onProgress || (() => {});
-
-      // --- PROACTIVE STATE CHECK ---
-      if (!this.encoder || this.encoder.state === 'closed') {
-        throw new Error('Encoder failed to initialize properly.');
+      if (!videoElement) {
+        throw new Error('Video element not found. Please ensure the video is loaded properly.');
       }
 
-      for (let i = 0; i < totalFrames; i++) {
+      videoElement.muted = true;
+      videoElement.playbackRate = 1.0; // Normal speed, we control pacing via pause/play
+
+      const totalExpectedFrames = Math.floor(effectiveDuration * this.config.frameRate);
+      let totalFramesExported = 0;
+      let isExportingFrames = true;
+
+      const processFrame = async (now: DOMHighResTimeStamp, metadata: VideoFrameCallbackMetadata) => {
         if (this.cancelled) {
-          return { success: false, error: 'Export cancelled' };
+          isExportingFrames = false;
+          return;
         }
 
-        const videoTime = (i / this.config.frameRate) + startTime;
-        const timestamp = i * frameDuration * 1_000_000; // in microseconds
-        const sourceTimeMs = (videoTime * 1000);
-           
-        // Seek if needed or wait for first frame to be ready
-        const needsSeek = Math.abs(videoElement.currentTime - videoTime) > 0.001;
+        // 1. INSTANTLY pause to freeze the decoder clock! 
+        // This ensures the video doesn't run ahead while we are busy rendering.
+        videoElement.pause();
 
-        if (needsSeek) {
-          const seekedPromise = new Promise<void>(resolve => {
-            videoElement.addEventListener('seeked', () => resolve(), { once: true });
-          });
-          videoElement.currentTime = videoTime;
-          await seekedPromise;
-        }
-
-        // --- CRITICAL WAIT: Ensure video actually has pixel data ---
-        if (videoElement.readyState < 2) { // 2 = HAVE_CURRENT_DATA
-          await new Promise<void>(resolve => {
-            const onReady = () => {
-              videoElement.removeEventListener('loadeddata', onReady);
-              videoElement.removeEventListener('canplay', onReady);
-              resolve();
-            };
-            videoElement.addEventListener('loadeddata', onReady);
-            videoElement.addEventListener('canplay', onReady);
-          });
-        }
-
-        // For the very first frame, use requestVideoFrameCallback for absolute guarantee
-        // that the frame is painted in the browser's compositor.
-        if (i === 0 && 'requestVideoFrameCallback' in videoElement) {
-          await new Promise<void>(resolve => {
-            videoElement.requestVideoFrameCallback(() => resolve());
-          });
-        }
-
-        // Final check before rendering
-        if (!this.encoder || this.encoder.state === 'closed') {
-          throw new Error(`Encoder died unexpectedly at frame ${i + 1}`);
-        }
-
-        // Capture a static snapshot of the current video frame using ImageBitmap
-        // This completely bypasses PixiJS's unstable VideoResource management during rapid seeking.
-        const sourceBitmap = await createImageBitmap(videoElement);
-
-        // Render the frame with all effects using source timestamp
-        const sourceTimestamp = sourceTimeMs * 1000; // Convert to microseconds
-        await this.renderer!.renderFrame(sourceBitmap, sourceTimestamp);
+        const sourceTimeSec = metadata.mediaTime;
         
-        // Clean up the source bitmap to prevent memory leaks
-        sourceBitmap.close();
+        // 2. Trim Skip Logic
+        const trimRegions = this.config.trimRegions || [];
+        let isTrimmed = false;
+        let nextValidTime = -1;
 
-        const canvas = this.renderer!.getCanvas();
-        
-        // Final sanity check before encoding
-        if (this.encoder.state === 'closed') {
-          throw new Error('Encoder closed before it could process the frame');
+        for (const trim of trimRegions) {
+          const trimStartSec = trim.startMs / 1000;
+          const trimEndSec = trim.endMs / 1000;
+          if (sourceTimeSec >= trimStartSec && sourceTimeSec < trimEndSec) {
+            isTrimmed = true;
+            nextValidTime = trimEndSec;
+            break;
+          }
         }
 
-        // Use ImageBitmap for safer and more stable frame capture (OpenScreen style)
-        const exportBitmap = await createImageBitmap(canvas);
-        const exportFrame = new VideoFrame(exportBitmap, {
-          timestamp: Math.round(timestamp),
-          duration: Math.round(frameDuration * 1_000_000),
-        });
-
-        // FORCE the first real frame to be a keyframe. 
-        // The encoder might have used its natural keyframe interval during the test-drive.
-        this.encoder.encode(exportFrame, { keyFrame: i === 0 });
-        
-        exportFrame.close();
-        exportBitmap.close();
-
-        // Control queue depth to avoid OOM
-        this.encodeQueue++;
-        while (this.encodeQueue >= this.MAX_ENCODE_QUEUE && !this.cancelled) {
-          await new Promise(resolve => setTimeout(resolve, 1));
+        if (isTrimmed) {
+          if (Math.abs(videoElement.currentTime - nextValidTime) > 0.1) {
+             videoElement.currentTime = nextValidTime;
+          }
+          if (!videoElement.ended && isExportingFrames) {
+            videoElement.requestVideoFrameCallback(processFrame);
+            videoElement.play().catch(() => {});
+          }
+          return;
         }
 
-        onProgress({
-          percent: Math.round(((i + 1) / totalFrames) * 100),
-          currentFrame: i + 1,
-          totalFrames,
-          percentage: (i + 1) / totalFrames * 100,
-          estimatedTimeRemaining: 0,
-        });
+        // 3. Throttle and Sync Time
+        const effectiveTimeSec = this.mapSourceToEffectiveTime(sourceTimeSec);
+        const expectedFrameIndex = Math.floor(effectiveTimeSec * this.config.frameRate);
+        
+        if (expectedFrameIndex > totalFramesExported) {
+          if (audioEncoder) {
+            try {
+              await audioEncoder.encodeUpTo(effectiveTimeSec);
+            } catch (e) {
+              console.error("Audio encode step error:", e);
+            }
+          }
+
+          // Backpressure: wait if encoder queue is getting too full
+          if (this.encodeQueue >= this.MAX_ENCODE_QUEUE) {
+            while (this.encodeQueue >= this.MAX_ENCODE_QUEUE && !this.cancelled) {
+              await new Promise(resolve => setTimeout(resolve, 10));
+            }
+          }
+
+          if (this.cancelled || !this.encoder || this.encoder.state === 'closed') {
+            isExportingFrames = false;
+            return;
+          }
+
+          try {
+            // Render the visual frame, potentially multiple times if the stream dropped a frame,
+            // using strictly progressive virtual timestamps to guarantee butter-smooth animations!
+            const sourceBitmap = await createImageBitmap(videoElement);
+            
+            const framesToFill = expectedFrameIndex - totalFramesExported;
+            // Ensure we render at least once
+            const count = Math.max(1, framesToFill);
+            
+            for (let i = 0; i < count; i++) {
+              if (this.cancelled || !this.encoder || this.encoder.state === 'closed') break;
+              
+              const currentExportIndex = totalFramesExported;
+              // Calculate the exact intended time for this specific frame
+              const targetEffectiveTimeSec = currentExportIndex / this.config.frameRate;
+              const virtualTimestampMs = targetEffectiveTimeSec * 1000000;
+              
+              // Re-render PIXI scene with the SAME source image but a PROGRESSED animation timestamp!
+              await this.renderer!.renderFrame(sourceBitmap, virtualTimestampMs);
+              
+              const canvas = this.renderer!.getCanvas();
+              const exportBitmap = await createImageBitmap(canvas);
+              
+              const timestampMicro = currentExportIndex * (1000000 / this.config.frameRate);
+              const durationMicro = 1000000 / this.config.frameRate;
+
+              const exportFrame = new VideoFrame(exportBitmap, {
+                timestamp: Math.round(timestampMicro),
+                duration: Math.round(durationMicro),
+              });
+
+              this.encoder.encode(exportFrame, { keyFrame: currentExportIndex === 0 });
+              exportFrame.close();
+              exportBitmap.close();
+
+              totalFramesExported++;
+              this.encodeQueue++;
+            }
+            
+            sourceBitmap.close();
+
+            // Update UI progress
+            if (totalFramesExported % 5 === 0 && this.config.onProgress) {
+              this.config.onProgress({
+                percent: Math.round((totalFramesExported / totalExpectedFrames) * 100),
+                currentFrame: totalFramesExported,
+                totalFrames: totalExpectedFrames,
+                percentage: (totalFramesExported / totalExpectedFrames) * 100,
+                estimatedTimeRemaining: 0,
+              });
+            }
+          } catch (e) {
+            console.error("Frame processing error:", e);
+          }
+        }
+
+        // 4. Resume decoding and request next frame!
+        if (!videoElement.ended && isExportingFrames && totalFramesExported < totalExpectedFrames) {
+          videoElement.requestVideoFrameCallback(processFrame);
+          videoElement.play().catch(() => {});
+        } else {
+          isExportingFrames = false;
+        }
+      };
+
+      // Kick off the loop
+      videoElement.currentTime = 0;
+      await new Promise<void>((resolve) => {
+        videoElement.addEventListener('seeked', () => resolve(), { once: true });
+      });
+
+      videoElement.requestVideoFrameCallback(processFrame);
+      videoElement.play().catch(console.error);
+
+      // Block until exporting finishes or cancels
+      while (isExportingFrames && !this.cancelled) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (videoElement.ended || totalFramesExported >= totalExpectedFrames) {
+          isExportingFrames = false;
+        }
       }
+
+      videoElement.pause();
+      
+      if (this.cancelled) {
+        return { success: false, error: 'Export cancelled' };
+      }
+
+      // --------------------------------------------------------
 
       // Wait for all frames to be encoded
       await this.encoder.flush();
       
+      if (audioEncoder) {
+        // Encode any remaining audio tail and flush
+        await audioEncoder.encodeUpTo(effectiveDuration);
+        await audioEncoder.flush();
+      }
+
       // Wait for all muxing promises to finish
       await Promise.all(this.muxingPromises);
       
@@ -459,5 +565,23 @@ export class VideoExporter {
       this.renderer = null;
     }
     this.muxer = null;
+  }
+
+  private mapSourceToEffectiveTime(sourceTimeSec: number): number {
+    const trimRegions = this.config.trimRegions || [];
+    let effectiveTime = sourceTimeSec;
+    
+    for (const trim of trimRegions) {
+      const trimStart = trim.startMs / 1000;
+      const trimEnd = trim.endMs / 1000;
+      
+      if (sourceTimeSec > trimEnd) {
+        effectiveTime -= (trimEnd - trimStart);
+      } else if (sourceTimeSec > trimStart) {
+        effectiveTime -= (sourceTimeSec - trimStart);
+      }
+    }
+    
+    return Math.max(0, effectiveTime);
   }
 }

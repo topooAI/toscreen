@@ -8,6 +8,7 @@ import {
   type ZoomRegion, 
   type TrimRegion, 
   type AnnotationRegion, 
+  type AudioRegion,
   type CropRegion 
 } from "../types";
 
@@ -18,6 +19,7 @@ interface UseVideoExportProps {
   zoomRegions: ZoomRegion[];
   trimRegions: TrimRegion[];
   annotationRegions: AnnotationRegion[];
+  audioRegions: AudioRegion[];
   cropRegion: CropRegion;
   aspectRatio: AspectRatio;
   exportQuality: ExportQuality;
@@ -40,6 +42,7 @@ export function useVideoExport({
   zoomRegions,
   trimRegions,
   annotationRegions,
+  audioRegions,
   cropRegion,
   aspectRatio,
   exportQuality,
@@ -144,6 +147,8 @@ export function useVideoExport({
         wallpaper,
         zoomRegions,
         trimRegions,
+        annotationRegions,
+        audioRegions,
         showShadow: shadowIntensity > 0,
         shadowIntensity,
         showBlur,

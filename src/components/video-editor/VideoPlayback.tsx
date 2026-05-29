@@ -166,7 +166,10 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
       return MOCK_CURSOR_DATA;
     }
     return cursorData.map(c => ({
-      timestampMs: c.timestamp,
+      ...c,
+      timestamp: c.timestamp || c.timestampMs,
+      cx: c.cx !== undefined ? c.cx : (c.x > 1 ? c.x / 1920 : c.x),
+      cy: c.cy !== undefined ? c.cy : (c.y > 1 ? c.y / 1080 : c.y),
       x: c.cx !== undefined ? c.cx : (c.x > 1 ? c.x / 1920 : c.x),
       y: c.cy !== undefined ? c.cy : (c.y > 1 ? c.y / 1080 : c.y),
       isClick: c.type === 'click'

@@ -41,13 +41,6 @@ export function useCursorRenderer({
   useEffect(() => { cursorOffsetRef.current = cursorOffset; }, [cursorOffset]);
 
   useEffect(() => {
-    console.log("[useCursorRenderer] HTML Hook Effect Triggered:", {
-      pixiReady,
-      appRefExists: !!appRef.current,
-      videoContainerRefExists: !!videoContainerRef.current,
-      cursorDataLength: cursorData ? cursorData.length : -1
-    });
-
     if (!pixiReady || !appRef.current || !videoRef.current || cursorData.length === 0) return;
 
     const app = appRef.current;
@@ -102,13 +95,6 @@ export function useCursorRenderer({
       rVFCId = (video as any).requestVideoFrameCallback(updateFrameTime);
     }
 
-    console.log("[useCursorRenderer] Mounting HTML cursor renderer. Initial states:", {
-      pixiReady,
-      app: !!app,
-      parent: !!parent,
-      dataPoints: cursorData.length
-    });
-
     // Catmull-Rom Cubic Spline interpolation formula for C1 smooth curves
     const catmullRom = (p0: number, p1: number, p2: number, p3: number, t: number): number => {
       return 0.5 * (
@@ -118,6 +104,8 @@ export function useCursorRenderer({
         (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t
       );
     };
+
+    let lastAppliedFilter = '';
 
     const ticker = (time: Ticker) => {
       const video = videoRef.current;
@@ -144,26 +132,37 @@ export function useCursorRenderer({
       currentTimeMs = currentTimeMs + cursorOffsetRef.current;
 
       // Determine if we are running mock or real recording data
-      const isMock = cursorData.length > 0 && cursorData[0].timestampMs === 0 && cursorData[cursorData.length - 1].timestampMs === 10000;
+      const isMock = cursorData.length > 0 && cursorData[0].timestamp === 0 && cursorData[cursorData.length - 1].timestamp === 10000;
       
-      const minTimeMs = cursorData[0].timestampMs;
-      const maxTimeMs = cursorData[cursorData.length - 1].timestampMs;
+      const minTimeMs = cursorData[0].timestamp;
+      const maxTimeMs = cursorData[cursorData.length - 1].timestamp;
       
       if (isMock) {
         // Loop the mock data every 10 seconds so it never disappears on long videos
-        const mockDurationMs = cursorData[cursorData.length - 1].timestampMs;
+        const mockDurationMs = cursorData[cursorData.length - 1].timestamp;
         currentTimeMs = currentTimeMs % Math.max(1, mockDurationMs);
       } else {
         // For real recorded videos, clamp to the range of available mouse events
         currentTimeMs = Math.max(minTimeMs, Math.min(maxTimeMs, currentTimeMs));
       }
 
-      // Find indices of the boundary points surrounding the current time anchor
+      // O(log N) Binary Search to instantly find the correct time anchor.
+      // This is the absolute key to fixing "end-of-video extreme lag"!
+      // Previously, an O(N) linear scan caused up to 100,000 iterations per frame (60fps) 
+      // towards the end of long videos, completely choking the CPU.
+      let left = 0;
+      let right = cursorData.length - 2;
       let currentIndex = 0;
-      for (let i = 0; i < cursorData.length - 1; i++) {
-        if (cursorData[i].timestampMs <= currentTimeMs && cursorData[i + 1].timestampMs > currentTimeMs) {
-          currentIndex = i;
+      
+      while (left <= right) {
+        const mid = Math.floor((left + right) / 2);
+        if (cursorData[mid].timestamp <= currentTimeMs && cursorData[mid + 1].timestamp > currentTimeMs) {
+          currentIndex = mid;
           break;
+        } else if (cursorData[mid].timestamp > currentTimeMs) {
+          right = mid - 1;
+        } else {
+          left = mid + 1;
         }
       }
 
@@ -179,30 +178,27 @@ export function useCursorRenderer({
       const p3 = cursorData[Math.min(cursorData.length - 1, currentIndex + 2)];
 
       // Calculate time progress between p1 and p2 (safely clamped to [0, 1] to prevent extrapolation glitches)
-      const timeDiff = p2.timestampMs - p1.timestampMs;
-      const progress = timeDiff === 0 ? 0 : Math.max(0, Math.min(1, (currentTimeMs - p1.timestampMs) / timeDiff));
+      const timeDiff = p2.timestamp - p1.timestamp;
+      const progress = timeDiff === 0 ? 0 : Math.max(0, Math.min(1, (currentTimeMs - p1.timestamp) / timeDiff));
 
       let currentX = 0;
       let currentY = 0;
 
       if (cursorSmoothingRef.current) {
         // Apply Catmull-Rom interpolation to smooth out jerky angles/shakiness
-        currentX = catmullRom(p0.x, p1.x, p2.x, p3.x, progress);
-        currentY = catmullRom(p0.y, p1.y, p2.y, p3.y, progress);
+        currentX = catmullRom(p0.cx, p1.cx, p2.cx, p3.cx, progress);
+        currentY = catmullRom(p0.cy, p1.cy, p2.cy, p3.cy, progress);
       } else {
         // Linear interpolation (keeps native raw jerky points)
-        currentX = p1.x + (p2.x - p1.x) * progress;
-        currentY = p1.y + (p2.y - p1.y) * progress;
+        currentX = p1.cx + (p2.cx - p1.cx) * progress;
+        currentY = p1.cy + (p2.cy - p1.cy) * progress;
       }
 
-      // Read player display dimensions
-      const parentWidth = parent.clientWidth;
-      const parentHeight = parent.clientHeight;
-
-      // Check if vector cursor should be visible
-      // Now, even if showVectorCursor is false (user wants Native Cursor look), 
-      // we still show our vector cursor but render it in standard native style.
-      const isVisible = parentWidth > 0 && parentHeight > 0;
+      // PERFORMANCE KILLER FIX: Forced Synchronous Layout (Layout Thrashing)
+      // NEVER read parent.clientWidth/clientHeight inside a 60fps ticker loop!
+      // This causes the browser to recalculate the entire page layout on EVERY FRAME, causing massive stutters!
+      // We assume it's visible by default, or you can rely on CSS for hiding.
+      const isVisible = true;
       cursor.style.display = isVisible ? 'block' : 'none';
 
       // Detect clicks to trigger Jiggle animation (only for Premium Vector Cursor)
@@ -233,18 +229,21 @@ export function useCursorRenderer({
 
       // Dynamically toggle drop shadow filter based on style selection
       if (svgEl) {
-        if (isVectorStyle) {
-          // Premium large style: robust professional soft shadow
-          svgEl.style.filter = 'drop-shadow(0px 3px 5px rgba(0,0,0,0.35))';
-        } else {
-          // Native style: very sharp/subtle standard small cursor shadow
-          svgEl.style.filter = 'drop-shadow(0px 1px 2px rgba(0,0,0,0.45))';
+        const targetFilter = isVectorStyle
+          ? 'drop-shadow(0px 3px 5px rgba(0,0,0,0.35))' // Premium large style
+          : 'drop-shadow(0px 1px 2px rgba(0,0,0,0.45))'; // Native style
+        
+        if (lastAppliedFilter !== targetFilter) {
+          svgEl.style.filter = targetFilter;
+          lastAppliedFilter = targetFilter;
         }
       }
 
       if (isVisible) {
-        let finalX = currentX * parentWidth;
-        let finalY = currentY * parentHeight;
+        // Fallback initialized to 0. 
+        // We rely entirely on PIXI's mathematical affine transform below, eliminating DOM read thrashing!
+        let finalX = 0;
+        let finalY = 0;
 
         // Perfect coordinate transformation via PIXI to account for camera zoom/pan!
         const container = videoContainerRef.current;
@@ -269,27 +268,8 @@ export function useCursorRenderer({
         // Apply transformation GPU-accelerated and distortion-free!
         // No tipOffsetX/tipOffsetY subtracted because the SVG path tip is exactly at (0, 0)
         const totalScale = jiggleScale * displayScale;
+        // Removed performance-killing log
         cursor.style.transform = `translate3d(${finalX}px, ${finalY}px, 0) scale(${totalScale})`;
-
-        if (Math.random() < 0.02) {
-          console.log("[useCursorRenderer] HTML Cursor active position:", {
-            finalX,
-            finalY,
-            parentWidth,
-            parentHeight,
-            totalScale,
-            currentTimeRef: currentTimeRef.current,
-            rawTimeMs,
-            currentTimeMs,
-            currentIndex,
-            currentX,
-            currentY,
-            progress,
-            cursorDataLength: cursorData.length,
-            firstEventTime: cursorData[0].timestampMs,
-            lastEventTime: cursorData[cursorData.length - 1].timestampMs
-          });
-        }
       }
     };
 

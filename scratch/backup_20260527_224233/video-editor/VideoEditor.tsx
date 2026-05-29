@@ -1,0 +1,880 @@
+import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+
+import VideoPlayback, { type VideoPlaybackRef } from "./VideoPlayback";
+import TimelineEditor from "./timeline/TimelineEditor";
+import { Sidebar } from "./sidebar/Sidebar";
+import { ExportDialog } from "./ExportDialog";
+
+import type { Span } from "dnd-timeline";
+import {
+  DEFAULT_ZOOM_DEPTH,
+  clampFocusToDepth,
+  DEFAULT_CROP_REGION,
+  DEFAULT_ANNOTATION_POSITION,
+  DEFAULT_ANNOTATION_SIZE,
+  DEFAULT_ANNOTATION_STYLE,
+  DEFAULT_FIGURE_DATA,
+  type ZoomDepth,
+  type ZoomFocus,
+  type ZoomRegion,
+  type TrimRegion,
+  type AnnotationRegion,
+  type CropRegion,
+  type FigureData,
+} from "./types";
+import { generateAutoZooms } from "@/lib/autoZoom/generator";
+import { VideoExporter, type ExportProgress, type ExportQuality } from "@/lib/exporter";
+import { type AspectRatio, getAspectRatioValue } from "@/utils/aspectRatioUtils";
+import { getAssetPath } from "@/lib/assetPath";
+
+const WALLPAPER_COUNT = 18;
+const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
+
+export default function VideoEditor() {
+  const [videoPath, setVideoPath] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [wallpaper, setWallpaper] = useState<string>(WALLPAPER_PATHS[0]);
+  const [shadowIntensity, setShadowIntensity] = useState(0.6);
+  const [showBlur, setShowBlur] = useState(false);
+  const [motionBlurEnabled, setMotionBlurEnabled] = useState(true);
+  const [borderRadius, setBorderRadius] = useState(20);
+  const [padding, setPadding] = useState(60);
+  const [cropRegion, setCropRegion] = useState<CropRegion>(DEFAULT_CROP_REGION);
+  const [zoomRegions, setZoomRegions] = useState<ZoomRegion[]>([]);
+  const [selectedZoomId, setSelectedZoomId] = useState<string | null>(null);
+  const [trimRegions, setTrimRegions] = useState<TrimRegion[]>([]);
+  const [selectedTrimId, setSelectedTrimId] = useState<string | null>(null);
+  const [annotationRegions, setAnnotationRegions] = useState<AnnotationRegion[]>([]);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  // Premium Cursor Customization Settings (Screen Studio parity)
+  const [cursorSize, setCursorSize] = useState(1.5);
+  const [cursorSmoothing, setCursorSmoothing] = useState(true);
+  const [showVectorCursor, setShowVectorCursor] = useState(true);
+  const [cursorOffset, setCursorOffset] = useState(-180);
+  const [cursorData, setCursorData] = useState<any[]>([]);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
+  const [exportQuality, setExportQuality] = useState<ExportQuality>('good');
+  const [isFullScreenBinding, setIsFullScreenBinding] = useState(true);
+
+  const videoPlaybackRef = useRef<VideoPlaybackRef>(null);
+  const nextZoomIdRef = useRef(1);
+  const nextTrimIdRef = useRef(1);
+  const nextAnnotationIdRef = useRef(1);
+  const nextAnnotationZIndexRef = useRef(1); // Track z-index for stacking order
+  const exporterRef = useRef<VideoExporter | null>(null);
+
+  // Helper to convert file path to proper file:// URL
+  const toFileUrl = (path: string) => {
+    if (!path) return '';
+    const normalized = path.replace(/\\/g, '/');
+    const full = `file://${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+    return encodeURI(full);
+  };
+
+  useEffect(() => {
+    async function loadVideo() {
+      try {
+        // 1. Try to get the "active" video path (e.g. just recorded)
+        let result = await window.electronAPI.getCurrentVideoPath();
+
+        // 2. Fallback to the latest video in the recordings directory
+        if (!result.success || !result.path) {
+          result = await window.electronAPI.getRecordedVideoPath();
+        }
+
+        if (result.success && result.path) {
+          setVideoPath(result.path);
+          setError(null);
+        } else {
+          setError('No recordings found. Please start a new recording to begin editing.');
+        }
+      } catch (err) {
+        setError('Error loading video: ' + String(err));
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadVideo();
+  }, []);
+
+  // Initialize default wallpaper with resolved asset path
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const resolvedPath = await getAssetPath('wallpapers/wallpaper1.jpg');
+        if (mounted) {
+          setWallpaper(resolvedPath);
+        }
+      } catch (err) {
+        // If resolution fails, keep the fallback
+        console.warn('Failed to resolve default wallpaper path:', err);
+      }
+    })();
+
+    return () => { mounted = false };
+  }, []);
+
+
+  function togglePlayPause() {
+    const playback = videoPlaybackRef.current;
+    const video = playback?.video;
+    if (!playback || !video) return;
+
+    if (isPlaying) {
+      playback.pause();
+    } else {
+      playback.play().catch(err => console.error('Video play failed:', err));
+    }
+  }
+
+  function handleSeek(time: number) {
+    const video = videoPlaybackRef.current?.video;
+    if (!video) return;
+    video.currentTime = time;
+  }
+
+  const handleSelectZoom = useCallback((id: string | null) => {
+    setSelectedZoomId(id);
+    if (id) setSelectedTrimId(null);
+  }, []);
+
+  const handleSelectTrim = useCallback((id: string | null) => {
+    setSelectedTrimId(id);
+    if (id) {
+      setSelectedZoomId(null);
+      setSelectedAnnotationId(null);
+    }
+  }, []);
+
+  const handleSelectAnnotation = useCallback((id: string | null) => {
+    setSelectedAnnotationId(id);
+    if (id) {
+      setSelectedZoomId(null);
+      setSelectedTrimId(null);
+    }
+  }, []);
+
+  const handleZoomAdded = useCallback((span: Span) => {
+    const id = `zoom-${nextZoomIdRef.current++}`;
+    const newRegion: ZoomRegion = {
+      id,
+      startMs: Math.round(span.start),
+      endMs: Math.round(span.end),
+      depth: DEFAULT_ZOOM_DEPTH,
+      focus: { cx: 0.5, cy: 0.5 },
+    };
+    setZoomRegions((prev) => [...prev, newRegion]);
+    setSelectedZoomId(id);
+    setSelectedTrimId(null);
+    setSelectedAnnotationId(null);
+  }, []);
+
+  const handleTrimAdded = useCallback((span: Span) => {
+    const id = `trim-${nextTrimIdRef.current++}`;
+    const newRegion: TrimRegion = {
+      id,
+      startMs: Math.round(span.start),
+      endMs: Math.round(span.end),
+    };
+    setTrimRegions((prev) => [...prev, newRegion]);
+    setSelectedTrimId(id);
+    setSelectedZoomId(null);
+    setSelectedAnnotationId(null);
+  }, []);
+
+  const handleZoomSpanChange = useCallback((id: string, span: Span) => {
+    setZoomRegions((prev) =>
+      prev.map((region) =>
+        region.id === id
+          ? {
+            ...region,
+            startMs: Math.round(span.start),
+            endMs: Math.round(span.end),
+          }
+          : region,
+      ),
+    );
+  }, []);
+
+  const handleZoomSplit = useCallback((id: string, splitAtMs: number) => {
+    setZoomRegions((prev) => {
+      const region = prev.find(r => r.id === id);
+      if (!region) return prev;
+
+      const newId = `zoom-${nextZoomIdRef.current++}`;
+      const firstHalf: ZoomRegion = { ...region, endMs: splitAtMs };
+      const secondHalf: ZoomRegion = { ...region, id: newId, startMs: splitAtMs };
+
+      const newRegions = prev.filter(r => r.id !== id);
+      newRegions.push(firstHalf, secondHalf);
+      return newRegions;
+    });
+  }, []);
+
+  const handleTrimSpanChange = useCallback((id: string, span: Span) => {
+    setTrimRegions((prev) =>
+      prev.map((region) =>
+        region.id === id
+          ? {
+            ...region,
+            startMs: Math.round(span.start),
+            endMs: Math.round(span.end),
+          }
+          : region,
+      ),
+    );
+  }, []);
+
+  const handleZoomFocusChange = useCallback((id: string, focus: ZoomFocus) => {
+    setZoomRegions((prev) =>
+      prev.map((region) =>
+        region.id === id
+          ? {
+            ...region,
+            focus: clampFocusToDepth(focus, region.depth),
+          }
+          : region,
+      ),
+    );
+  }, []);
+
+  const handleZoomDepthChange = useCallback((depth: ZoomDepth) => {
+    if (!selectedZoomId) return;
+    setZoomRegions((prev) =>
+      prev.map((region) =>
+        region.id === selectedZoomId
+          ? {
+            ...region,
+            depth,
+            focus: clampFocusToDepth(region.focus, depth),
+          }
+          : region,
+      ),
+    );
+  }, [selectedZoomId]);
+
+  const handleZoomDelete = useCallback((id: string) => {
+    setZoomRegions((prev) => prev.filter((region) => region.id !== id));
+    if (selectedZoomId === id) {
+      setSelectedZoomId(null);
+    }
+  }, [selectedZoomId]);
+
+  const handleTrimDelete = useCallback((id: string) => {
+    setTrimRegions((prev) => prev.filter((region) => region.id !== id));
+    if (selectedTrimId === id) {
+      setSelectedTrimId(null);
+    }
+  }, [selectedTrimId]);
+
+  const handleAnnotationAdded = useCallback((span: Span) => {
+    const id = `annotation-${nextAnnotationIdRef.current++}`;
+    const zIndex = nextAnnotationZIndexRef.current++; // Assign z-index based on creation order
+    const newRegion: AnnotationRegion = {
+      id,
+      startMs: Math.round(span.start),
+      endMs: Math.round(span.end),
+      type: 'text',
+      content: 'Enter text...',
+      position: { ...DEFAULT_ANNOTATION_POSITION },
+      size: { ...DEFAULT_ANNOTATION_SIZE },
+      style: { ...DEFAULT_ANNOTATION_STYLE },
+      zIndex,
+    };
+    setAnnotationRegions((prev) => [...prev, newRegion]);
+    setSelectedAnnotationId(id);
+    setSelectedZoomId(null);
+    setSelectedTrimId(null);
+  }, []);
+
+  const handleAnnotationSpanChange = useCallback((id: string, span: Span) => {
+    setAnnotationRegions((prev) =>
+      prev.map((region) =>
+        region.id === id
+          ? {
+            ...region,
+            startMs: Math.round(span.start),
+            endMs: Math.round(span.end),
+          }
+          : region,
+      ),
+    );
+  }, []);
+
+  const handleAnnotationDelete = useCallback((id: string) => {
+    setAnnotationRegions((prev) => prev.filter((region) => region.id !== id));
+    if (selectedAnnotationId === id) {
+      setSelectedAnnotationId(null);
+    }
+  }, [selectedAnnotationId]);
+
+  const handleAnnotationContentChange = useCallback((id: string, content: string) => {
+    setAnnotationRegions((prev) => {
+      const updated = prev.map((region) => {
+        if (region.id !== id) return region;
+
+        // Store content in type-specific fields
+        if (region.type === 'text') {
+          return { ...region, content, textContent: content };
+        } else if (region.type === 'image') {
+          return { ...region, content, imageContent: content };
+        } else {
+          return { ...region, content };
+        }
+      });
+      return updated;
+    });
+  }, []);;
+
+  const handleAnnotationTypeChange = useCallback((id: string, type: AnnotationRegion['type']) => {
+    setAnnotationRegions((prev) => {
+      const updated = prev.map((region) => {
+        if (region.id !== id) return region;
+
+        const updatedRegion = { ...region, type };
+
+        // Restore content from type-specific storage
+        if (type === 'text') {
+          updatedRegion.content = region.textContent || 'Enter text...';
+        } else if (type === 'image') {
+          updatedRegion.content = region.imageContent || '';
+        } else if (type === 'figure') {
+          updatedRegion.content = '';
+          if (!region.figureData) {
+            updatedRegion.figureData = { ...DEFAULT_FIGURE_DATA };
+          }
+        }
+
+        return updatedRegion;
+      });
+      return updated;
+    });
+  }, []);
+
+  const handleAnnotationStyleChange = useCallback((id: string, style: Partial<AnnotationRegion['style']>) => {
+    setAnnotationRegions((prev) =>
+      prev.map((region) =>
+        region.id === id
+          ? { ...region, style: { ...region.style, ...style } }
+          : region,
+      ),
+    );
+  }, []);
+
+  const handleAnnotationFigureDataChange = useCallback((id: string, figureData: FigureData) => {
+    setAnnotationRegions((prev) =>
+      prev.map((region) =>
+        region.id === id
+          ? { ...region, figureData }
+          : region,
+      ),
+    );
+  }, []);
+
+  const handleAnnotationPositionChange = useCallback((id: string, position: { x: number; y: number }) => {
+    setAnnotationRegions((prev) =>
+      prev.map((region) =>
+        region.id === id
+          ? { ...region, position }
+          : region,
+      ),
+    );
+  }, []);
+
+  const handleAnnotationSizeChange = useCallback((id: string, size: { width: number; height: number }) => {
+    setAnnotationRegions((prev) =>
+      prev.map((region) =>
+        region.id === id
+          ? { ...region, size }
+          : region,
+      ),
+    );
+  }, []);
+
+  // Global Tab prevention
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        // Allow tab only in inputs/textareas
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return;
+        }
+        e.preventDefault();
+      }
+
+      if (e.key === ' ' || e.code === 'Space') {
+        // Allow space only in inputs/textareas
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return;
+        }
+        e.preventDefault();
+
+        const playback = videoPlaybackRef.current;
+        if (playback?.video) {
+          if (playback.video.paused) {
+            playback.play().catch(console.error);
+          } else {
+            playback.pause();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, []);
+
+  useEffect(() => {
+    if (selectedZoomId && !zoomRegions.some((region) => region.id === selectedZoomId)) {
+      setSelectedZoomId(null);
+    }
+  }, [selectedZoomId, zoomRegions]);
+
+  useEffect(() => {
+    if (selectedTrimId && !trimRegions.some((region) => region.id === selectedTrimId)) {
+      setSelectedTrimId(null);
+    }
+  }, [selectedTrimId, trimRegions]);
+
+  useEffect(() => {
+    if (selectedAnnotationId && !annotationRegions.some((region) => region.id === selectedAnnotationId)) {
+      setSelectedAnnotationId(null);
+    }
+  }, [selectedAnnotationId, annotationRegions]);
+
+
+
+  const handleAutoZoom = useCallback(async () => {
+    if (!videoPath) {
+      toast.error("No video currently loaded.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Read the clicks.json associated with this video
+      const result = await window.electronAPI.readClicksJson(videoPath);
+      console.log("[AutoZoom] Read clicks result:", result);
+
+      if (!result.success || !result.clicks || result.clicks.length === 0) {
+        toast.warning("No mouse tracking data found.", {
+          description: "Check if the clicks.json exists next to your video.",
+          duration: 6000,
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Generate zoom regions
+      const newRegions = generateAutoZooms(result.clicks);
+
+      if (newRegions.length === 0) {
+        toast.info("No zoom regions generated.", {
+          description: "Try adjusting the debounce settings or recording more distinct clicks.",
+        });
+      } else {
+        setZoomRegions(newRegions);
+        toast.success(`Generated ${newRegions.length} auto-zoom regions!`, {
+          description: "You can adjust or delete them in the timeline."
+        });
+      }
+    } catch (err) {
+      console.error("Auto-zoom generation failed:", err);
+      toast.error("Failed to generate auto-zooms.", {
+        description: "Check the console for details."
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [videoPath]);
+
+  useEffect(() => {
+    if (selectedZoomId && !zoomRegions.some((region) => region.id === selectedZoomId)) {
+      setSelectedZoomId(null);
+    }
+  }, [selectedZoomId, zoomRegions]);
+
+  // Check for available auto-zoom data when video loads
+  useEffect(() => {
+    if (!videoPath) return;
+
+    let mounted = true;
+    const checkAutoZoomData = async () => {
+      try {
+        const result = await window.electronAPI.readClicksJson(videoPath);
+        if (mounted && result.success && result.clicks && result.clicks.length > 0) {
+          console.log(`[AutoZoom] Found ${result.clicks.length} clicks, applying automatically.`);
+          setCursorData(result.clicks); // Save actual cursor coordinates array
+
+          // Generate regions immediately
+          const newRegions = generateAutoZooms(result.clicks);
+          console.log(`[AutoZoom] Generated ${newRegions.length} regions:`, newRegions);
+
+          if (newRegions.length > 0) {
+            setZoomRegions(newRegions);
+            toast.success("✨ Auto-Zoom Applied", {
+              description: `Automatically created ${newRegions.length} zoom regions based on your clicks.`,
+              duration: 4000,
+            });
+          }
+        } else {
+          if (mounted) {
+            setCursorData([]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check for auto-zoom data:", err);
+      }
+    };
+
+    checkAutoZoomData();
+    return () => { mounted = false; };
+  }, [videoPath]); 
+
+  const handleExport = useCallback(async () => {
+    if (!videoPath) {
+      toast.error('No video loaded');
+      return;
+    }
+
+    const video = videoPlaybackRef.current?.video;
+    if (!video) {
+      toast.error('Video not ready');
+      return;
+    }
+
+    setShowExportDialog(true);
+    setIsExporting(true);
+    setExportProgress(null);
+    setExportError(null);
+
+    try {
+      const wasPlaying = isPlaying;
+      if (wasPlaying) {
+        videoPlaybackRef.current?.pause();
+      }
+
+      // Get actual video dimensions to match recording resolution
+      const video = videoPlaybackRef.current?.video;
+      if (!video) {
+        toast.error('Video not ready');
+        return;
+      }
+
+      const aspectRatioValue = getAspectRatioValue(aspectRatio);
+      const sourceWidth = video.videoWidth || 1920;
+      const sourceHeight = video.videoHeight || 1080;
+
+      let exportWidth: number;
+      let exportHeight: number;
+      let bitrate: number;
+
+      if (exportQuality === 'source') {
+        // Use source resolution
+        exportWidth = sourceWidth;
+        exportHeight = sourceHeight;
+        bitrate = 30_000_000;
+      } else {
+        // Use quality-based target resolution
+        const targetHeight = exportQuality === 'medium' ? 720 : 1080;
+
+        // Calculate dimensions maintaining aspect ratio
+        exportHeight = Math.floor(targetHeight / 2) * 2; // Ensure even
+        exportWidth = Math.floor((exportHeight * aspectRatioValue) / 2) * 2; // Ensure even
+
+        // Adjust bitrate for lower resolutions
+        const totalPixels = exportWidth * exportHeight;
+        if (totalPixels <= 1280 * 720) {
+          bitrate = 10_000_000; // 10 Mbps for 720p
+        } else if (totalPixels <= 1920 * 1080) {
+          bitrate = 20_000_000; // 20 Mbps for 1080p
+        } else {
+          bitrate = 30_000_000;
+        }
+      }
+
+      // Get preview CONTAINER dimensions for scaling
+      // Annotations render in HTML overlay matching container, not PixiJS canvas
+      const playbackRef = videoPlaybackRef.current;
+      const containerElement = playbackRef?.containerRef?.current;
+      const previewWidth = containerElement?.clientWidth || 1920;
+      const previewHeight = containerElement?.clientHeight || 1080;
+
+
+
+      const exporter = new VideoExporter({
+        videoUrl: videoPath ? toFileUrl(videoPath) : '',
+        width: exportWidth,
+        height: exportHeight,
+        frameRate: 30, // Optimized for speed
+        bitrate: Math.min(bitrate, 15_000_000),
+        wallpaper,
+        zoomRegions,
+        trimRegions,
+        showShadow: shadowIntensity > 0,
+        shadowIntensity,
+        showBlur,
+        motionBlurEnabled,
+        borderRadius,
+        padding,
+        cropRegion,
+        annotationRegions,
+        previewWidth,
+        previewHeight,
+        cursorData,
+        cursorSize,
+        cursorSmoothing,
+        showVectorCursor,
+        cursorOffset,
+        onProgress: (progress: ExportProgress) => {
+          setExportProgress(progress);
+        },
+      });
+
+      exporterRef.current = exporter;
+      const result = await exporter.export();
+
+      if (result.success && result.blob) {
+        const arrayBuffer = await result.blob.arrayBuffer();
+        const timestamp = Date.now();
+        const fileName = `export-${timestamp}.mp4`;
+
+        const saveResult = await window.electronAPI.saveExportedVideo(arrayBuffer, fileName);
+
+        if (saveResult.cancelled) {
+          toast.info('Export cancelled');
+        } else if (saveResult.success) {
+          toast.success(`Video exported successfully to ${saveResult.path}`);
+        } else {
+          setExportError(saveResult.message || 'Failed to save video');
+          toast.error(saveResult.message || 'Failed to save video');
+        }
+      } else {
+        setExportError(result.error || 'Export failed');
+        toast.error(result.error || 'Export failed');
+      }
+
+      if (wasPlaying) {
+        videoPlaybackRef.current?.play();
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setExportError(errorMessage);
+      toast.error(`Export failed: ${errorMessage}`);
+    } finally {
+      setIsExporting(false);
+      exporterRef.current = null;
+    }
+  }, [videoPath, wallpaper, zoomRegions, trimRegions, shadowIntensity, showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, annotationRegions, isPlaying, aspectRatio, exportQuality]);
+
+  const handleCancelExport = useCallback(() => {
+    if (exporterRef.current) {
+      exporterRef.current.cancel();
+      toast.info('Export cancelled');
+      setShowExportDialog(false);
+      setIsExporting(false);
+      setExportProgress(null);
+      setExportError(null);
+    }
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-screen bg-[#09090b] items-center justify-center text-slate-400">
+        <Loader2 className="w-8 h-8 animate-spin mb-4" />
+        <p>Loading your masterpiece...</p>
+      </div>
+    );
+  }
+
+
+  return (
+    <div className="flex flex-col h-screen bg-[#09090b] text-slate-200 overflow-hidden selection:bg-[#34B27B]/30">
+      {error && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-[#09090b]/90 backdrop-blur-sm">
+          <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-center max-w-md">
+            <div className="text-red-500 font-bold mb-2">Failed to load video</div>
+            <div className="text-red-400/60 text-sm mb-4">{error}</div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
+      <div
+        className="h-10 flex-shrink-0 bg-[#09090b]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-6 z-50"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <div className="flex-1" />
+      </div>
+
+      <div className="flex-1 p-5 gap-4 flex min-h-0 relative">
+        {/* Left Column - Video & Timeline */}
+        <div className="flex-[7] flex flex-col gap-3 min-w-0 h-full">
+          <PanelGroup direction="vertical" className="gap-3">
+            {/* Top section: video preview and controls */}
+            <Panel defaultSize={70} minSize={40}>
+              <div className="w-full h-full flex flex-col items-center justify-center bg-black/40 rounded-2xl border border-white/5 shadow-2xl overflow-hidden">
+                {/* Video preview */}
+                <div className="w-full flex justify-center items-center" style={{ flex: '1 1 auto', margin: '6px 0 0' }}>
+                  <div className="relative" style={{ width: 'auto', height: '100%', aspectRatio: getAspectRatioValue(aspectRatio), maxWidth: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+                    <VideoPlayback
+                      aspectRatio={aspectRatio}
+                      ref={videoPlaybackRef}
+                      videoPath={videoPath ? toFileUrl(videoPath) : ''}
+                      onDurationChange={setDuration}
+                      onTimeUpdate={setCurrentTime}
+                      currentTime={currentTime}
+                      onPlayStateChange={setIsPlaying}
+                      onError={setError}
+                      wallpaper={wallpaper}
+                      zoomRegions={zoomRegions}
+                      selectedZoomId={selectedZoomId}
+                      onSelectZoom={handleSelectZoom}
+                      onZoomFocusChange={handleZoomFocusChange}
+                      isPlaying={isPlaying}
+                      showShadow={shadowIntensity > 0}
+                      shadowIntensity={shadowIntensity}
+                      showBlur={showBlur}
+                      motionBlurEnabled={motionBlurEnabled}
+                      borderRadius={borderRadius}
+                      padding={padding}
+                      cropRegion={cropRegion}
+                      trimRegions={trimRegions}
+                      annotationRegions={annotationRegions}
+                      selectedAnnotationId={selectedAnnotationId}
+                      onSelectAnnotation={handleSelectAnnotation}
+                      onAnnotationPositionChange={handleAnnotationPositionChange}
+                      onAnnotationSizeChange={handleAnnotationSizeChange}
+                      isFullScreenBinding={isFullScreenBinding}
+                      cursorSize={cursorSize}
+                      cursorSmoothing={cursorSmoothing}
+                      showVectorCursor={showVectorCursor}
+                      cursorData={cursorData}
+                      cursorOffset={cursorOffset}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Panel>
+
+            <PanelResizeHandle className="h-3 bg-[#09090b]/80 hover:bg-[#09090b] transition-colors rounded-full mx-4 flex items-center justify-center">
+              <div className="w-8 h-1 bg-white/20 rounded-full"></div>
+            </PanelResizeHandle>
+
+            {/* Timeline section */}
+            <Panel defaultSize={30} minSize={20}>
+              <div className="h-full bg-[#09090b] rounded-2xl border border-white/5 shadow-lg overflow-hidden flex flex-col">
+                <TimelineEditor
+                  videoDuration={duration}
+                  currentTime={currentTime}
+                  onSeek={handleSeek}
+                  videoPath={videoPath ? toFileUrl(videoPath) : ''}
+                  zoomRegions={zoomRegions}
+                  onZoomAdded={handleZoomAdded}
+                  onZoomSpanChange={handleZoomSpanChange}
+                  onZoomSplit={handleZoomSplit}
+                  onZoomDelete={handleZoomDelete}
+                  selectedZoomId={selectedZoomId}
+                  onSelectZoom={handleSelectZoom}
+                  trimRegions={trimRegions}
+                  onTrimAdded={handleTrimAdded}
+                  onTrimSpanChange={handleTrimSpanChange}
+                  onTrimDelete={handleTrimDelete}
+                  selectedTrimId={selectedTrimId}
+                  onSelectTrim={handleSelectTrim}
+                  annotationRegions={annotationRegions}
+                  onAnnotationAdded={handleAnnotationAdded}
+                  onAnnotationSpanChange={handleAnnotationSpanChange}
+                  onAnnotationDelete={handleAnnotationDelete}
+                  selectedAnnotationId={selectedAnnotationId}
+                  onSelectAnnotation={handleSelectAnnotation}
+                  aspectRatio={aspectRatio}
+                  onAspectRatioChange={setAspectRatio}
+                  isFullScreenBinding={isFullScreenBinding}
+                  onFullScreenBindingChange={setIsFullScreenBinding}
+                  isPlaying={isPlaying}
+                  onTogglePlayPause={togglePlayPause}
+                />
+              </div>
+            </Panel>
+          </PanelGroup>
+        </div>
+
+        {/* Right section: Sidebar */}
+        <Sidebar
+          selected={wallpaper}
+          onWallpaperChange={setWallpaper}
+          selectedZoomDepth={selectedZoomId ? zoomRegions.find(z => z.id === selectedZoomId)?.depth : null}
+          onZoomDepthChange={(depth) => selectedZoomId && handleZoomDepthChange(depth)}
+          selectedZoomId={selectedZoomId}
+          onZoomDelete={handleZoomDelete}
+          selectedTrimId={selectedTrimId}
+          onTrimDelete={handleTrimDelete}
+          shadowIntensity={shadowIntensity}
+          onShadowChange={setShadowIntensity}
+          showBlur={showBlur}
+          onBlurChange={setShowBlur}
+          motionBlurEnabled={motionBlurEnabled}
+          onMotionBlurChange={setMotionBlurEnabled}
+          borderRadius={borderRadius}
+          onBorderRadiusChange={setBorderRadius}
+          padding={padding}
+          onPaddingChange={setPadding}
+          cropRegion={cropRegion}
+          onCropChange={setCropRegion}
+          aspectRatio={aspectRatio}
+          videoElement={videoPlaybackRef.current?.video || null}
+          exportQuality={exportQuality}
+          onExportQualityChange={setExportQuality}
+          onExport={handleExport}
+          selectedAnnotationId={selectedAnnotationId}
+          annotationRegions={annotationRegions}
+          onAnnotationContentChange={handleAnnotationContentChange}
+          onAnnotationTypeChange={handleAnnotationTypeChange}
+          onAnnotationStyleChange={handleAnnotationStyleChange}
+          onAnnotationFigureDataChange={handleAnnotationFigureDataChange}
+          onAnnotationDelete={handleAnnotationDelete}
+          onAutoZoom={handleAutoZoom}
+          cursorSize={cursorSize}
+          onCursorSizeChange={setCursorSize}
+          cursorSmoothing={cursorSmoothing}
+          onCursorSmoothingChange={setCursorSmoothing}
+          showVectorCursor={showVectorCursor}
+          onShowVectorCursorChange={setShowVectorCursor}
+          cursorOffset={cursorOffset}
+          onCursorOffsetChange={setCursorOffset}
+        />
+      </div>
+
+      <Toaster theme="dark" className="pointer-events-auto" />
+
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        progress={exportProgress}
+        isExporting={isExporting}
+        error={exportError}
+        onCancel={handleCancelExport}
+      />
+    </div>
+  );
+}

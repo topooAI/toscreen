@@ -48,8 +48,8 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   openVideoFilePicker: () => {
     return electron.ipcRenderer.invoke("open-video-file-picker");
   },
-  setCurrentVideoPath: (path) => {
-    return electron.ipcRenderer.invoke("set-current-video-path", path);
+  setCurrentVideoPath: (path, proxyPath) => {
+    return electron.ipcRenderer.invoke("set-current-video-path", path, proxyPath);
   },
   getCurrentVideoPath: () => {
     return electron.ipcRenderer.invoke("get-current-video-path");
@@ -78,5 +78,19 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   },
   stopNativeRecording: () => {
     return electron.ipcRenderer.invoke("stop-native-recording");
+  },
+  generateProxyVideo: (inputPath) => {
+    return electron.ipcRenderer.invoke("generate-proxy-video", inputPath);
+  },
+  saveProject: (videoPath, projectData) => {
+    return electron.ipcRenderer.invoke("save-project", videoPath, projectData);
+  },
+  loadProject: (videoPath) => {
+    return electron.ipcRenderer.invoke("load-project", videoPath);
+  },
+  onProxyGenerationProgress: (callback) => {
+    const listener = (_event, percent) => callback(percent);
+    electron.ipcRenderer.on("proxy-generation-progress", listener);
+    return () => electron.ipcRenderer.removeListener("proxy-generation-progress", listener);
   }
 });

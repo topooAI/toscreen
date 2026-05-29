@@ -11,6 +11,8 @@ import {
   stopNativeRecording
 } from '../nativeRecorder'
 
+import { generateProxyVideo } from './proxyGenerator'
+
 let selectedSource: any = null
 
 export async function getSelectedSourceForMediaRequest() {
@@ -387,18 +389,23 @@ export function registerIpcHandlers(
   });
 
   let currentVideoPath: string | null = null;
+  let currentProxyPath: string | null = null;
 
-  ipcMain.handle('set-current-video-path', (_, path: string) => {
+  ipcMain.handle('set-current-video-path', (_, path: string, proxyPath?: string) => {
     currentVideoPath = path;
+    currentProxyPath = proxyPath || null;
     return { success: true };
   });
 
   ipcMain.handle('get-current-video-path', () => {
-    return currentVideoPath ? { success: true, path: currentVideoPath } : { success: false };
+    return currentVideoPath 
+      ? { success: true, path: currentVideoPath, proxyPath: currentProxyPath } 
+      : { success: false };
   });
 
   ipcMain.handle('clear-current-video-path', () => {
     currentVideoPath = null;
+    currentProxyPath = null;
     return { success: true };
   });
 
@@ -447,6 +454,53 @@ export function registerIpcHandlers(
     } catch (error) {
       // It's normal for some videos to not have clicks
       return { success: false, message: 'No clicks file found' };
+    }
+  });
+
+  // Project Auto-Save API
+  ipcMain.handle('save-project', async (_, videoPath: string, projectData: any) => {
+    try {
+      if (!videoPath) return { success: false, message: 'No video path provided' };
+      const normalizedPath = videoPath.replace(/^file:\/\/\//, '/').replace(/^file:\/\//, '');
+      const parsed = path.parse(decodeURIComponent(normalizedPath));
+      const projectPath = path.join(parsed.dir, `${parsed.name}.project.json`);
+      await fs.writeFile(projectPath, JSON.stringify(projectData, null, 2), 'utf8');
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] Failed to save project:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('load-project', async (_, videoPath: string) => {
+    try {
+      if (!videoPath) return { success: false, message: 'No video path provided' };
+      const normalizedPath = videoPath.replace(/^file:\/\/\//, '/').replace(/^file:\/\//, '');
+      const parsed = path.parse(decodeURIComponent(normalizedPath));
+      const projectPath = path.join(parsed.dir, `${parsed.name}.project.json`);
+      const rawData = await fs.readFile(projectPath, 'utf8');
+      return { success: true, project: JSON.parse(rawData) };
+    } catch (error) {
+      // Normal if project doesn't exist yet
+      return { success: false, message: 'No project file found' };
+    }
+  });
+
+  // Proxy Generation API
+  ipcMain.handle('generate-proxy-video', async (event, inputPath: string) => {
+    try {
+      // Decode the URL if it comes from the frontend (file://)
+      let normalizedPath = inputPath.replace(/^file:\/\/\//, '/').replace(/^file:\/\//, '');
+      normalizedPath = decodeURIComponent(normalizedPath);
+
+      // We'll send progress back through a specific IPC event
+      const result = await generateProxyVideo(normalizedPath, (progressPercent) => {
+        event.sender.send('proxy-generation-progress', progressPercent);
+      });
+      return result;
+    } catch (error) {
+      console.error('[IPC] Failed to generate proxy:', error);
+      return { success: false, error: String(error) };
     }
   });
 }

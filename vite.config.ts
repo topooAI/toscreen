@@ -15,7 +15,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['uiohook-napi', 'node-mac-recorder'],
+              external: ['uiohook-napi', 'node-mac-recorder', 'fluent-ffmpeg', '@ffmpeg-installer/ffmpeg'],
             },
           }
         }

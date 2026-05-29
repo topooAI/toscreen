@@ -3,15 +3,19 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 import { ipcMain, screen, BrowserWindow, desktopCapturer, shell, app, dialog, nativeImage, session, Tray, Menu } from "electron";
 import { fileURLToPath } from "node:url";
-import path from "node:path";
-import fs$1 from "node:fs/promises";
+import path$1 from "node:path";
+import fs$2 from "node:fs/promises";
 import * as fs from "fs/promises";
 import { uIOhook } from "uiohook-napi";
 import { createRequire } from "node:module";
-const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
-const APP_ROOT = path.join(__dirname$1, "..");
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import * as path from "path";
+import * as fs$1 from "fs";
+const __dirname$1 = path$1.dirname(fileURLToPath(import.meta.url));
+const APP_ROOT = path$1.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL$1 = process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5173";
-path.join(APP_ROOT, "dist");
+path$1.join(APP_ROOT, "dist");
 let hudOverlayWindow = null;
 ipcMain.on("hud-overlay-hide", () => {
   if (hudOverlayWindow && !hudOverlayWindow.isDestroyed()) {
@@ -41,7 +45,7 @@ function createHudOverlayWindow() {
     skipTaskbar: true,
     hasShadow: false,
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.mjs"),
+      preload: path$1.join(__dirname$1, "preload.mjs"),
       nodeIntegration: false,
       contextIsolation: true,
       backgroundThrottling: false
@@ -79,7 +83,7 @@ function createEditorWindow() {
     title: "toScreen",
     backgroundColor: "#000000",
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.mjs"),
+      preload: path$1.join(__dirname$1, "preload.mjs"),
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false,
@@ -110,7 +114,7 @@ function createSourceSelectorWindow() {
     transparent: true,
     backgroundColor: "#00000000",
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.mjs"),
+      preload: path$1.join(__dirname$1, "preload.mjs"),
       nodeIntegration: false,
       contextIsolation: true
     }
@@ -317,7 +321,7 @@ async function startNativeRecording(options) {
   try {
     const timestamp = Date.now();
     const fileName = `recording-${timestamp}.mov`;
-    currentOutputPath = path.join(RECORDINGS_DIR, fileName);
+    currentOutputPath = path$1.join(RECORDINGS_DIR, fileName);
     recorderInstance = new MacRecorder();
     await recorderInstance.startRecording(currentOutputPath, {
       captureCursor: (options == null ? void 0 : options.showCursor) === void 0 ? false : options.showCursor,
@@ -361,6 +365,53 @@ async function stopNativeRecording() {
     recorderInstance = null;
     return { success: false, error: String(error) };
   }
+}
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+function generateProxyVideo(inputPath, onProgress) {
+  return new Promise((resolve) => {
+    try {
+      const parsedPath = path.parse(inputPath);
+      const outputPath = path.join(parsedPath.dir, `${parsedPath.name}-proxy.mp4`);
+      if (fs$1.existsSync(outputPath)) {
+        console.log(`[ProxyGenerator] Proxy already exists at ${outputPath}`);
+        resolve({ success: true, proxyPath: outputPath });
+        return;
+      }
+      console.log(`[ProxyGenerator] Starting proxy generation for ${inputPath} -> ${outputPath}`);
+      ffmpeg(inputPath).outputOptions([
+        "-c:v libx264",
+        // H264 codec for max web compatibility
+        "-crf 23",
+        // Better quality for editing preview
+        "-preset ultrafast",
+        // Fastest encoding speed
+        "-r 30",
+        // Limit to 30fps for UI performance
+        "-c:a aac",
+        // AAC audio
+        "-b:a 128k",
+        // Basic audio bitrate
+        "-pix_fmt yuv420p"
+        // Standard pixel format for HTML5 video
+      ]).on("progress", (progress) => {
+        if (progress.percent && onProgress) {
+          onProgress(Math.floor(progress.percent));
+        }
+      }).on("end", () => {
+        console.log(`[ProxyGenerator] Successfully generated proxy at ${outputPath}`);
+        resolve({ success: true, proxyPath: outputPath });
+      }).on("error", (err) => {
+        console.error(`[ProxyGenerator] Error generating proxy:`, err);
+        resolve({ success: false, error: err.message });
+      }).save(outputPath);
+    } catch (error) {
+      console.error(`[ProxyGenerator] Exception:`, error);
+      resolve({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
 }
 let selectedSource = null;
 async function getSelectedSourceForMediaRequest() {
@@ -432,14 +483,14 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
   });
   ipcMain.handle("store-recorded-video", async (_, videoData, fileName) => {
     try {
-      const videoPath = path.join(RECORDINGS_DIR, fileName);
-      await fs$1.writeFile(videoPath, Buffer.from(videoData));
+      const videoPath = path$1.join(RECORDINGS_DIR, fileName);
+      await fs$2.writeFile(videoPath, Buffer.from(videoData));
       currentVideoPath = videoPath;
-      const tempClicksPath = path.join(RECORDINGS_DIR, "temp-clicks.json");
+      const tempClicksPath = path$1.join(RECORDINGS_DIR, "temp-clicks.json");
       const clicksPath = videoPath + ".clicks.json";
       try {
-        await fs$1.access(tempClicksPath);
-        await fs$1.rename(tempClicksPath, clicksPath);
+        await fs$2.access(tempClicksPath);
+        await fs$2.rename(tempClicksPath, clicksPath);
         console.log(`[IPC] Associated clicks data with video: ${clicksPath}`);
       } catch (e) {
         console.log("[IPC] No temp clicks file to associate or failed to move");
@@ -460,13 +511,13 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
   });
   ipcMain.handle("get-recorded-video-path", async () => {
     try {
-      const files = await fs$1.readdir(RECORDINGS_DIR);
+      const files = await fs$2.readdir(RECORDINGS_DIR);
       const videoFiles = files.filter((file) => file.endsWith(".webm") || file.endsWith(".mov"));
       if (videoFiles.length === 0) {
         return { success: false, message: "No recorded video found" };
       }
       const latestVideo = videoFiles.sort().reverse()[0];
-      const videoPath = path.join(RECORDINGS_DIR, latestVideo);
+      const videoPath = path$1.join(RECORDINGS_DIR, latestVideo);
       return { success: true, path: videoPath };
     } catch (error) {
       console.error("Failed to get video path:", error);
@@ -577,7 +628,7 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
       console.log(`[IPC] Mouse tracking stopped, captured ${events.length} clicks`);
       if (events.length > 0) {
         try {
-          const clicksFilePath = path.join(RECORDINGS_DIR, "temp-clicks.json");
+          const clicksFilePath = path$1.join(RECORDINGS_DIR, "temp-clicks.json");
           await mouseTracker.exportToFile(clicksFilePath, events, bounds, videoStartTime);
           console.log("[IPC] Clicks exported to temp file", clicksFilePath);
         } catch (error) {
@@ -608,9 +659,9 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
   ipcMain.handle("get-asset-base-path", () => {
     try {
       if (app.isPackaged) {
-        return path.join(process.resourcesPath, "assets");
+        return path$1.join(process.resourcesPath, "assets");
       }
-      return path.join(app.getAppPath(), "public", "assets");
+      return path$1.join(app.getAppPath(), "public", "assets");
     } catch (err) {
       console.error("Failed to resolve asset base path:", err);
       return null;
@@ -620,7 +671,7 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
     try {
       const result = await dialog.showSaveDialog({
         title: "Save Exported Video",
-        defaultPath: path.join(app.getPath("downloads"), fileName),
+        defaultPath: path$1.join(app.getPath("downloads"), fileName),
         filters: [
           { name: "MP4 Video", extensions: ["mp4"] }
         ],
@@ -633,7 +684,7 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
           message: "Export cancelled"
         };
       }
-      await fs$1.writeFile(result.filePath, Buffer.from(videoData));
+      await fs$2.writeFile(result.filePath, Buffer.from(videoData));
       return {
         success: true,
         path: result.filePath,
@@ -676,15 +727,18 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
     }
   });
   let currentVideoPath = null;
-  ipcMain.handle("set-current-video-path", (_, path2) => {
+  let currentProxyPath = null;
+  ipcMain.handle("set-current-video-path", (_, path2, proxyPath) => {
     currentVideoPath = path2;
+    currentProxyPath = proxyPath || null;
     return { success: true };
   });
   ipcMain.handle("get-current-video-path", () => {
-    return currentVideoPath ? { success: true, path: currentVideoPath } : { success: false };
+    return currentVideoPath ? { success: true, path: currentVideoPath, proxyPath: currentProxyPath } : { success: false };
   });
   ipcMain.handle("clear-current-video-path", () => {
     currentVideoPath = null;
+    currentProxyPath = null;
     return { success: true };
   });
   ipcMain.handle("get-platform", () => {
@@ -708,12 +762,50 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
         }
       }).join("/");
       const clicksPath = normalizedPath + ".clicks.json";
-      const content = await fs$1.readFile(clicksPath, "utf-8");
+      const content = await fs$2.readFile(clicksPath, "utf-8");
       const data = JSON.parse(content);
       const clicks = Array.isArray(data) ? data : data.events || [];
       return { success: true, clicks };
     } catch (error) {
       return { success: false, message: "No clicks file found" };
+    }
+  });
+  ipcMain.handle("save-project", async (_, videoPath, projectData) => {
+    try {
+      if (!videoPath) return { success: false, message: "No video path provided" };
+      const normalizedPath = videoPath.replace(/^file:\/\/\//, "/").replace(/^file:\/\//, "");
+      const parsed = path$1.parse(decodeURIComponent(normalizedPath));
+      const projectPath = path$1.join(parsed.dir, `${parsed.name}.project.json`);
+      await fs$2.writeFile(projectPath, JSON.stringify(projectData, null, 2), "utf8");
+      return { success: true };
+    } catch (error) {
+      console.error("[IPC] Failed to save project:", error);
+      return { success: false, error: String(error) };
+    }
+  });
+  ipcMain.handle("load-project", async (_, videoPath) => {
+    try {
+      if (!videoPath) return { success: false, message: "No video path provided" };
+      const normalizedPath = videoPath.replace(/^file:\/\/\//, "/").replace(/^file:\/\//, "");
+      const parsed = path$1.parse(decodeURIComponent(normalizedPath));
+      const projectPath = path$1.join(parsed.dir, `${parsed.name}.project.json`);
+      const rawData = await fs$2.readFile(projectPath, "utf8");
+      return { success: true, project: JSON.parse(rawData) };
+    } catch (error) {
+      return { success: false, message: "No project file found" };
+    }
+  });
+  ipcMain.handle("generate-proxy-video", async (event, inputPath) => {
+    try {
+      let normalizedPath = inputPath.replace(/^file:\/\/\//, "/").replace(/^file:\/\//, "");
+      normalizedPath = decodeURIComponent(normalizedPath);
+      const result = await generateProxyVideo(normalizedPath, (progressPercent) => {
+        event.sender.send("proxy-generation-progress", progressPercent);
+      });
+      return result;
+    } catch (error) {
+      console.error("[IPC] Failed to generate proxy:", error);
+      return { success: false, error: String(error) };
     }
   });
 }
@@ -722,7 +814,7 @@ const handlers = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProp
   getSelectedSourceForMediaRequest,
   registerIpcHandlers
 }, Symbol.toStringTag, { value: "Module" }));
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path$1.dirname(fileURLToPath(import.meta.url));
 const wrapConsole = (method) => {
   const original = console[method];
   console[method] = (...args) => {
@@ -733,21 +825,21 @@ const wrapConsole = (method) => {
   };
 };
 ["log", "error", "warn", "info"].forEach((m) => wrapConsole(m));
-const RECORDINGS_DIR = path.join(app.getPath("userData"), "recordings");
+const RECORDINGS_DIR = path$1.join(app.getPath("userData"), "recordings");
 async function ensureRecordingsDir() {
   try {
-    await fs$1.mkdir(RECORDINGS_DIR, { recursive: true });
+    await fs$2.mkdir(RECORDINGS_DIR, { recursive: true });
     console.log("RECORDINGS_DIR:", RECORDINGS_DIR);
     console.log("User Data Path:", app.getPath("userData"));
   } catch (error) {
     console.error("Failed to create recordings directory:", error);
   }
 }
-process.env.APP_ROOT = path.join(__dirname, "..");
+process.env.APP_ROOT = path$1.join(__dirname, "..");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");
+const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 let mainWindow = null;
 let sourceSelectorWindow = null;
 let tray = null;
@@ -761,7 +853,7 @@ function createTray() {
   tray = new Tray(defaultTrayIcon);
 }
 function getTrayIcon(filename) {
-  return nativeImage.createFromPath(path.join(process.env.VITE_PUBLIC || RENDERER_DIST, filename)).resize({
+  return nativeImage.createFromPath(path$1.join(process.env.VITE_PUBLIC || RENDERER_DIST, filename)).resize({
     width: 24,
     height: 24,
     quality: "best"

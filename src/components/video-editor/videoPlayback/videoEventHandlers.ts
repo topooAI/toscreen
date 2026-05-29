@@ -122,16 +122,18 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
   const handleSeeked = () => {
     isSeekingRef.current = false;
 
+    const now = performance.now();
     const currentTimeMs = video.currentTime * 1000;
     const activeTrimRegion = findActiveTrimRegion(currentTimeMs);
     
     // If we seeked into a trim region while playing, skip to the end
-    if (activeTrimRegion && isPlayingRef.current && !video.paused) {
-      const skipToTime = activeTrimRegion.endMs / 1000;
+    if (activeTrimRegion && isPlayingRef.current && !video.paused && now >= immuneUntilRef.current) {
+      const skipToTime = (activeTrimRegion.endMs + 50) / 1000;
       
       if (skipToTime >= video.duration) {
         video.pause();
       } else {
+        immuneUntilRef.current = now + 1000;
         video.currentTime = skipToTime;
         emitTime(skipToTime);
       }

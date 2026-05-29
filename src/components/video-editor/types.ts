@@ -15,9 +15,12 @@ export interface ZoomRegion {
 }
 
 export interface CursorDataPoint {
-  timestampMs: number;
-  x: number; // Normalized (0-1) horizontally
-  y: number; // Normalized (0-1) vertically
+  timestamp: number;
+  absoluteTime?: number;
+  x: number; 
+  y: number; 
+  cx: number;
+  cy: number;
   isClick?: boolean;
 }
 
@@ -25,6 +28,19 @@ export interface TrimRegion {
   id: string;
   startMs: number;
   endMs: number;
+}
+
+export interface AudioRegion {
+  id: string;
+  startMs: number;
+  endMs: number;
+  sourceUrl: string;    // The original audio file URL (e.g. file://... or blob://...)
+  file?: File;          // The underlying File object to avoid fetch blob CSP issues
+  path?: string;
+  sourceStartMs?: number; // Start offset within the audio file itself (for trimming)
+  sourceEndMs?: number;   // End offset within the audio file itself (for trimming)
+  volume: number;       // Volume multiplier (0.0 to 1.0+)
+  isMuted?: boolean;
 }
 
 export type AnnotationType = 'text' | 'image' | 'figure';

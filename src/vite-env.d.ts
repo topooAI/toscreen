@@ -39,8 +39,12 @@ interface Window {
       cancelled?: boolean
     }>
     openVideoFilePicker: () => Promise<{ success: boolean; path?: string; cancelled?: boolean }>
-    setCurrentVideoPath: (path: string) => Promise<{ success: boolean }>
-    getCurrentVideoPath: () => Promise<{ success: boolean; path?: string }>
+    setCurrentVideoPath: (path: string, proxyPath?: string) => Promise<{ success: boolean }>
+    getCurrentVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string }>
     clearCurrentVideoPath: () => Promise<{ success: boolean }>
+    generateProxyVideo: (inputPath: string) => Promise<{ success: boolean, outputPath?: string, error?: string }>;
+    onProxyGenerationProgress: (callback: (percent: number) => void) => () => void;
+    saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean, error?: string, message?: string }>;
+    loadProject: (videoPath: string) => Promise<{ success: boolean, project?: any, message?: string }>;
   }
 }

@@ -4,10 +4,14 @@ import { fixWebmDuration } from "@fix-webm-duration/fix";
 type UseScreenRecorderReturn = {
   recording: boolean;
   toggleRecording: () => void;
+  isProcessing: boolean;
+  processProgress: number;
 };
 
 export function useScreenRecorder(): UseScreenRecorderReturn {
   const [recording, setRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processProgress, setProcessProgress] = useState(0);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
@@ -52,7 +56,22 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       setRecording(false);
       isNativeRef.current = false;
       if (result.success && result.outputPath) {
-        await window.electronAPI.setCurrentVideoPath(result.outputPath);
+        setIsProcessing(true);
+        setProcessProgress(0);
+        
+        const unsubscribe = window.electronAPI.onProxyGenerationProgress((p) => {
+          setProcessProgress(p);
+        });
+        
+        console.log('[useScreenRecorder] Generating proxy for native recording...');
+        const proxyResult = await window.electronAPI.generateProxyVideo(result.outputPath);
+        unsubscribe();
+        
+        await window.electronAPI.setCurrentVideoPath(
+          result.outputPath, 
+          proxyResult.success ? proxyResult.proxyPath : undefined
+        );
+        setIsProcessing(false);
       }
       await window.electronAPI.switchToEditor();
     } else if (mediaRecorder.current?.state === "recording") {
@@ -185,7 +204,22 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
           }
 
           if (videoResult.path) {
-            await window.electronAPI.setCurrentVideoPath(videoResult.path);
+            setIsProcessing(true);
+            setProcessProgress(0);
+            
+            const unsubscribe = window.electronAPI.onProxyGenerationProgress((p) => {
+              setProcessProgress(p);
+            });
+            
+            console.log('[useScreenRecorder] Generating proxy for WebRTC recording...');
+            const proxyResult = await window.electronAPI.generateProxyVideo(videoResult.path);
+            unsubscribe();
+            
+            await window.electronAPI.setCurrentVideoPath(
+              videoResult.path,
+              proxyResult.success ? proxyResult.proxyPath : undefined
+            );
+            setIsProcessing(false);
           }
 
           await window.electronAPI.switchToEditor();
@@ -212,5 +246,5 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     recording ? stopRecording.current() : startRecording();
   };
 
-  return { recording, toggleRecording };
+  return { recording, toggleRecording, isProcessing, processProgress };
 }

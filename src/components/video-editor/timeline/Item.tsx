@@ -2,18 +2,22 @@ import React, { memo } from 'react';
 import { useItem } from "dnd-timeline";
 import type { Span } from "dnd-timeline";
 import { cn } from "@/lib/utils";
-import { ZoomIn, Scissors, MessageSquare } from "lucide-react";
+import { ZoomIn, Scissors, MessageSquare, Music } from "lucide-react";
 import glassStyles from "./ItemGlass.module.css";
 
 interface ItemProps {
   id: string;
-  span: Span;
   rowId: string;
-  children: React.ReactNode;
-  isSelected?: boolean;
+  span: Span;
+  isSelected: boolean;
   onSelect?: () => void;
+  children?: React.ReactNode;
   zoomDepth?: number;
-  variant?: 'zoom' | 'trim' | 'annotation';
+  variant?: 'zoom' | 'trim' | 'annotation' | 'video' | 'audio';
+  audioPeaks?: number[];
+  sourceStartMs?: number;
+  sourceEndMs?: number;
+  totalDurationMs?: number;
 }
 
 // Map zoom depth to multiplier labels
@@ -31,10 +35,14 @@ function ItemComponent({
   span, 
   rowId, 
   isSelected = false, 
-  onSelect, 
+  onSelect,
+  children,
   zoomDepth = 1,
   variant = 'zoom',
-  children
+  audioPeaks,
+  sourceStartMs = 0,
+  sourceEndMs = 0,
+  totalDurationMs = 0,
 }: ItemProps) {
   const { setNodeRef, attributes, listeners, itemStyle, itemContentStyle } = useItem({
     id,
@@ -44,23 +52,50 @@ function ItemComponent({
 
   const isZoom = variant === 'zoom';
   const isTrim = variant === 'trim';
+  const isVideo = variant === 'video';
   
-  const glassClass = isZoom 
+  const isAudio = variant === 'audio';
+  
+  const glassClass = isAudio
+    ? glassStyles.glassBlue
+    : (isZoom || isVideo)
     ? glassStyles.glassPurple 
     : isTrim 
     ? glassStyles.glassRed 
     : glassStyles.glassYellow;
     
-  const endCapColor = isZoom 
+  const endCapColor = (isZoom || isVideo)
     ? 'rgba(124, 58, 237, 0.4)' 
     : isTrim 
     ? 'rgba(239, 68, 68, 0.4)' 
+    : isAudio
+    ? 'rgba(59, 130, 246, 0.4)'
     : 'rgba(180, 160, 70, 0.4)';
+
+  const widthPercent = totalDurationMs > 0 && sourceEndMs > sourceStartMs 
+    ? (totalDurationMs / (sourceEndMs - sourceStartMs)) * 100 
+    : 100;
+  
+  const leftPercent = totalDurationMs > 0 && sourceEndMs > sourceStartMs 
+    ? -(sourceStartMs / (sourceEndMs - sourceStartMs)) * 100 
+    : 0;
+
+  const buildWaveformPath = (peaks: number[]) => {
+    if (!peaks || peaks.length === 0) return '';
+    const points = peaks.map((p, i) => {
+      const x = (i / (peaks.length - 1)) * 1000;
+      const y = (1 - p) * 100;
+      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+    });
+    // Complete the path at the bottom
+    points.push(`L 1000 100 L 0 100 Z`);
+    return points.join(' ');
+  };
 
   return (
     <div
       ref={setNodeRef}
-      style={itemStyle}
+      style={{ ...itemStyle, minWidth: 24 }}
       {...listeners}
       {...attributes}
       onPointerDownCapture={() => onSelect?.()}
@@ -71,9 +106,9 @@ function ItemComponent({
           className={cn(
             glassClass,
             "w-full h-full overflow-hidden flex items-center justify-center gap-1.5 cursor-grab active:cursor-grabbing relative",
-            isSelected && glassStyles.selected
+            isSelected && "selected"
           )}
-          style={{ height: 36, color: '#fff' }}
+          style={{ height: 'calc(100% - 6px)', margin: '3px 0', color: '#fff' }}
           onClick={(event) => {
             event.stopPropagation();
             onSelect?.();
@@ -84,7 +119,6 @@ function ItemComponent({
             className={cn(glassStyles.zoomEndCap, glassStyles.left, "flex items-center justify-center")}
             style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 10, background: endCapColor }}
             title="Resize left"
-            onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="w-1 h-3 bg-white/60 rounded-full" />
           </div>
@@ -94,25 +128,49 @@ function ItemComponent({
             className={cn(glassStyles.zoomEndCap, glassStyles.right, "flex items-center justify-center")}
             style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 10, background: endCapColor }}
             title="Resize right"
-            onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="w-1 h-3 bg-white/60 rounded-full" />
           </div>
 
           {/* Content */}
-          <div className="relative z-10 flex items-center gap-1.5 text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none px-3">
-            {isZoom ? (
+          <div className="relative z-10 flex items-center gap-1.5 text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none px-3 w-full h-full">
+            {isVideo ? (
+              audioPeaks && audioPeaks.length > 0 && (
+                <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30 mix-blend-screen">
+                  <svg 
+                    preserveAspectRatio="none" 
+                    viewBox={`0 0 1000 100`} 
+                    style={{
+                      position: 'absolute',
+                      left: `${leftPercent}%`,
+                      width: `${widthPercent}%`,
+                      height: '100%',
+                      transformOrigin: 'left',
+                    }}
+                  >
+                    <path d={buildWaveformPath(audioPeaks)} fill="currentColor" opacity="0.6" />
+                  </svg>
+                </div>
+              )
+            ) : isZoom ? (
               <>
                 <ZoomIn className="w-3.5 h-3.5" />
-                <span className="text-[11px] font-semibold tracking-tight">
-                  {ZOOM_LABELS[zoomDepth] || `${zoomDepth}×`}
+                <span className="text-xs font-semibold whitespace-nowrap hidden sm:inline-block">
+                  {zoomDepth ? ZOOM_LABELS[zoomDepth] : children}
                 </span>
               </>
             ) : isTrim ? (
               <>
                 <Scissors className="w-3.5 h-3.5" />
-                <span className="text-[11px] font-semibold tracking-tight">
-                  Trim
+                <span className="text-xs font-medium whitespace-nowrap hidden sm:inline-block truncate">
+                  {children}
+                </span>
+              </>
+            ) : isAudio ? (
+              <>
+                <Music className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium whitespace-nowrap hidden sm:inline-block truncate">
+                  {children}
                 </span>
               </>
             ) : (

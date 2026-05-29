@@ -51,8 +51,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openVideoFilePicker: () => {
     return ipcRenderer.invoke('open-video-file-picker')
   },
-  setCurrentVideoPath: (path: string) => {
-    return ipcRenderer.invoke('set-current-video-path', path)
+  setCurrentVideoPath: (path: string, proxyPath?: string) => {
+    return ipcRenderer.invoke('set-current-video-path', path, proxyPath)
   },
   getCurrentVideoPath: () => {
     return ipcRenderer.invoke('get-current-video-path')
@@ -82,4 +82,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   stopNativeRecording: () => {
     return ipcRenderer.invoke('stop-native-recording')
   },
+  generateProxyVideo: (inputPath: string) => {
+    return ipcRenderer.invoke('generate-proxy-video', inputPath)
+  },
+  saveProject: (videoPath: string, projectData: any) => {
+    return ipcRenderer.invoke('save-project', videoPath, projectData)
+  },
+  loadProject: (videoPath: string) => {
+    return ipcRenderer.invoke('load-project', videoPath)
+  },
+  onProxyGenerationProgress: (callback: (percent: number) => void) => {
+    const listener = (_event: any, percent: number) => callback(percent)
+    ipcRenderer.on('proxy-generation-progress', listener)
+    return () => ipcRenderer.removeListener('proxy-generation-progress', listener)
+  }
 })

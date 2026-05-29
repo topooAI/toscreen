@@ -10,7 +10,7 @@ import Row from "./Row";
 import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
 import type { Range, Span } from "dnd-timeline";
-import type { ZoomRegion, TrimRegion, AnnotationRegion } from "../types";
+import type { ZoomRegion, TrimRegion, AnnotationRegion, AudioRegion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 import {
   DropdownMenu,
@@ -26,6 +26,7 @@ import PlaybackControls from "../PlaybackControls";
 const ZOOM_ROW_ID = "row-zoom";
 const TRIM_ROW_ID = "row-trim";
 const ANNOTATION_ROW_ID = "row-annotation";
+const AUDIO_ROW_ID = "row-audio";
 const VIDEO_ROW_ID = "row-video";
 const FALLBACK_RANGE_MS = 1000;
 const TARGET_MARKER_COUNT = 12;
@@ -53,6 +54,12 @@ interface TimelineEditorProps {
   onAnnotationDelete?: (id: string) => void;
   selectedAnnotationId?: string | null;
   onSelectAnnotation?: (id: string | null) => void;
+  audioRegions?: AudioRegion[];
+  onAudioAdded?: (span: Span) => void;
+  onAudioSpanChange?: (id: string, span: Span) => void;
+  onAudioDelete?: (id: string) => void;
+  selectedAudioId?: string | null;
+  onSelectAudio?: (id: string | null) => void;
   aspectRatio: AspectRatio;
   onAspectRatioChange: (aspectRatio: AspectRatio) => void;
   isFullScreenBinding: boolean;
@@ -75,7 +82,7 @@ interface TimelineRenderItem {
   span: Span;
   label: string;
   zoomDepth?: number;
-  variant: 'zoom' | 'trim' | 'annotation';
+  variant: 'zoom' | 'trim' | 'annotation' | 'audio';
 }
 
 const SCALE_CANDIDATES = [
@@ -230,9 +237,10 @@ function PlaybackCursor({
       }}
     >
       <div
-        className="absolute top-0 bottom-0 w-[1px] bg-[#FF00B7] shadow-[0_0_10px_rgba(255,0,183,0.5)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_15px_rgba(255,0,183,0.7)] transition-shadow"
+        className="absolute top-0 bottom-0 w-[1px] bg-[#FF00B7] shadow-[0_0_10px_rgba(255,0,183,0.5)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_15px_rgba(255,0,183,0.7)]"
         style={{
           [sideProperty]: `${sidebarWidth + offset - 0.5}px`,
+          transition: 'left 0.1s linear, right 0.1s linear' // HARDWARE TWEENING RESTORED
         }}
         onMouseDown={(e) => {
           e.stopPropagation(); // Prevent timeline click
@@ -376,6 +384,8 @@ function Timeline({
   onAddZoom,
   onAddTrim,
   onAddAnnotation,
+  selectedAudioId,
+  onSelectAudio,
 }: {
   items: TimelineRenderItem[];
   videoDurationMs: number;
@@ -391,6 +401,8 @@ function Timeline({
   onAddZoom?: () => void;
   onAddTrim?: () => void;
   onAddAnnotation?: () => void;
+  selectedAudioId?: string | null;
+  onSelectAudio?: (id: string | null) => void;
 }) {
   const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef } = useTimelineContext();
   const localTimelineRef = useRef<HTMLDivElement | null>(null);
@@ -408,6 +420,7 @@ function Timeline({
     onSelectZoom?.(null);
     onSelectTrim?.(null);
     onSelectAnnotation?.(null);
+    onSelectAudio?.(null);
 
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left - sidebarWidth;
@@ -419,11 +432,12 @@ function Timeline({
     const timeInSeconds = absoluteMs / 1000;
     
     onSeek(timeInSeconds);
-  }, [onSeek, onSelectZoom, onSelectTrim, onSelectAnnotation, videoDurationMs, sidebarWidth, range.start, pixelsToValue]);
+  }, [onSeek, onSelectZoom, onSelectTrim, onSelectAnnotation, onSelectAudio, videoDurationMs, sidebarWidth, range.start, pixelsToValue]);
 
   const zoomItems = items.filter(item => item.rowId === ZOOM_ROW_ID);
   const trimItems = items.filter(item => item.rowId === TRIM_ROW_ID);
   const annotationItems = items.filter(item => item.rowId === ANNOTATION_ROW_ID);
+  const audioItems = items.filter(item => item.rowId === AUDIO_ROW_ID);
 
   return (
     <div
@@ -512,6 +526,22 @@ function Timeline({
           </Item>
         ))}
       </Row>
+      
+      <Row id={AUDIO_ROW_ID} onAddClick={() => toast.info('请将音频文件直接拖拽到画面中添加')}>
+        {audioItems.map((item) => (
+          <Item
+            id={item.id}
+            key={item.id}
+            rowId={item.rowId}
+            span={item.span}
+            isSelected={item.id === selectedAudioId}
+            onSelect={() => onSelectAudio?.(item.id)}
+            variant="audio"
+          >
+            {item.label}
+          </Item>
+        ))}
+      </Row>
     </div>
   );
 }
@@ -539,6 +569,11 @@ export default function TimelineEditor({
   onAnnotationDelete,
   selectedAnnotationId,
   onSelectAnnotation,
+  audioRegions = [],
+  onAudioSpanChange,
+  onAudioDelete,
+  selectedAudioId,
+  onSelectAudio,
   aspectRatio,
   onAspectRatioChange,
   isFullScreenBinding,
@@ -612,6 +647,12 @@ export default function TimelineEditor({
     onSelectAnnotation(null);
   }, [selectedAnnotationId, onAnnotationDelete, onSelectAnnotation]);
 
+  const deleteSelectedAudio = useCallback(() => {
+    if (!selectedAudioId || !onAudioDelete || !onSelectAudio) return;
+    onAudioDelete(selectedAudioId);
+    onSelectAudio(null);
+  }, [selectedAudioId, onAudioDelete, onSelectAudio]);
+
   useEffect(() => {
     setRange(createInitialRange(activeDurationMs));
   }, [totalMs]);
@@ -651,9 +692,10 @@ export default function TimelineEditor({
     // Determine which row the item belongs to
     const isZoomItem = zoomRegions.some(r => r.id === excludeId);
     const isTrimItem = trimRegions.some(r => r.id === excludeId);
-    const isAnnotationItem = annotationRegions.some(r => r.id === excludeId);
+    const isAnnotationItem = (annotationRegions || []).some(r => r.id === excludeId);
+    const isAudioItem = (audioRegions || []).some(r => r.id === excludeId);
 
-    if (isAnnotationItem) {
+    if (isAnnotationItem || isAudioItem) {
       return false;
     }
 
@@ -679,7 +721,7 @@ export default function TimelineEditor({
     }
 
     return false;
-  }, [zoomRegions, trimRegions, annotationRegions]);
+  }, [zoomRegions, trimRegions, annotationRegions, audioRegions]);
 
   const handleAddZoom = useCallback(() => {
     if (!videoDuration || videoDuration === 0 || activeDurationMs === 0) {
@@ -828,12 +870,14 @@ export default function TimelineEditor({
           deleteSelectedTrim();
         } else if (selectedAnnotationId) {
           deleteSelectedAnnotation();
+        } else if (selectedAudioId) {
+          deleteSelectedAudio();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [addKeyframe, handleAddZoom, handleAddTrim, handleAddAnnotation, deleteSelectedKeyframe, deleteSelectedZoom, deleteSelectedTrim, deleteSelectedAnnotation, selectedKeyframeId, selectedZoomId, selectedTrimId, selectedAnnotationId, annotationRegions, currentTime, onSelectAnnotation]);
+  }, [addKeyframe, handleAddZoom, handleAddTrim, handleAddAnnotation, deleteSelectedKeyframe, deleteSelectedZoom, deleteSelectedTrim, deleteSelectedAnnotation, deleteSelectedAudio, selectedKeyframeId, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, annotationRegions, currentTime, onSelectAnnotation]);
 
   const clampedRange = useMemo<Range>(() => {
     if (activeDurationMs === 0) {
@@ -866,7 +910,7 @@ export default function TimelineEditor({
       variant: 'trim',
     })) : [];
 
-    const annotations: TimelineRenderItem[] = annotationRegions.map((region) => {
+    const annotations: TimelineRenderItem[] = (annotationRegions || []).map((region) => {
       let label: string;
       
       if (region.type === 'text') {
@@ -887,6 +931,14 @@ export default function TimelineEditor({
         variant: 'annotation',
       };
     });
+
+    const audios: TimelineRenderItem[] = (audioRegions || []).map((region) => ({
+      id: region.id,
+      rowId: AUDIO_ROW_ID,
+      span: { start: mapTime(region.startMs), end: mapTime(region.endMs) },
+      label: 'Audio Track',
+      variant: 'audio',
+    }));
 
     const mainClips: TimelineRenderItem[] = [];
     if (!isTrimTrackVisible) {
@@ -923,8 +975,8 @@ export default function TimelineEditor({
       });
     }
 
-    return [...zooms, ...trims, ...annotations, ...mainClips];
-  }, [zoomRegions, trimRegions, annotationRegions, isTrimTrackVisible, mapSourceToEffective, totalMs]);
+    return [...zooms, ...trims, ...annotations, ...audios, ...mainClips];
+  }, [zoomRegions, trimRegions, annotationRegions, audioRegions, isTrimTrackVisible, mapSourceToEffective, totalMs]);
 
   const handleItemSpanChange = useCallback((id: string, span: Span) => {
     const targetSpan = isTrimTrackVisible 
@@ -936,10 +988,12 @@ export default function TimelineEditor({
       onZoomSpanChange(id, targetSpan);
     } else if (trimRegions.some(r => r.id === id)) {
       onTrimSpanChange?.(id, targetSpan);
-    } else if (annotationRegions.some(r => r.id === id)) {
+    } else if ((annotationRegions || []).some(r => r.id === id)) {
       onAnnotationSpanChange?.(id, targetSpan);
+    } else if ((audioRegions || []).some(r => r.id === id)) {
+      onAudioSpanChange?.(id, targetSpan);
     }
-  }, [zoomRegions, trimRegions, annotationRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, isTrimTrackVisible, mapEffectiveToSource]);
+  }, [zoomRegions, trimRegions, annotationRegions, audioRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, onAudioSpanChange, isTrimTrackVisible, mapEffectiveToSource]);
 
   if (!videoDuration || videoDuration === 0) {
     return (
@@ -1092,6 +1146,8 @@ export default function TimelineEditor({
             selectedZoomId={selectedZoomId}
             selectedTrimId={selectedTrimId}
             selectedAnnotationId={selectedAnnotationId}
+            selectedAudioId={selectedAudioId}
+            onSelectAudio={onSelectAudio}
             onAddZoom={handleAddZoom}
             onAddTrim={handleAddTrim}
             onAddAnnotation={handleAddAnnotation}

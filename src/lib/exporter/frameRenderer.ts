@@ -105,7 +105,7 @@ export class FrameRenderer {
 
     // Setup blur filter for video container
     this.blurFilter = new BlurFilter();
-    this.blurFilter.quality = 3;
+    this.blurFilter.quality = 1; // PERFORMANCE OVERRIDE: Prevent 3-pass FBO pipeline slowdowns
     this.blurFilter.resolution = this.app.renderer.resolution;
     this.blurFilter.blur = 0;
     this.videoContainer.filters = [this.blurFilter];
