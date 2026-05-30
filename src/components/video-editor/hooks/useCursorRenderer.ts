@@ -63,11 +63,12 @@ export function useCursorRenderer({
     cursor.style.zIndex = "9999";
     cursor.style.willChange = "transform";
     
-    // Inject a pixel-perfect, crisp, standard macOS vector cursor SVG with professional physical drop shadow
-    // The path is translated so that the cursor tip is mathematically positioned at local (0, 0)
+    // High-DPI vector cursor: 56x56 base for Retina-crisp rendering at all scale levels
+    cursor.style.width = "56px";
+    cursor.style.height = "56px";
     cursor.innerHTML = `
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.35)); display: block; overflow: visible;">
-        <path d="M0 0V20L5.7 14.3L10.7 24.3L14.3 22.1L9.3 12.1L18 12.1L0 0Z" fill="black" stroke="white" stroke-width="2.2" stroke-linejoin="round"/>
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.35)); display: block; overflow: visible;">
+        <path d="M0 0V40L11.4 28.6L21.4 48.6L28.6 44.2L18.6 24.2L36 24.2L0 0Z" fill="black" stroke="white" stroke-width="3" stroke-linejoin="round"/>
       </svg>
     `;
 
@@ -210,8 +211,9 @@ export function useCursorRenderer({
 
       // Jiggle Physics Animation (Scale down and spring back) - only for premium large cursor
       const currentSize = cursorSizeRef.current;
-      // When showVectorCursor is false, force 0.6x base size to match macOS native cursor size perfectly
-      const displayScale = isVectorStyle ? currentSize * 1.6 : 0.62; 
+      // When showVectorCursor is false, force small size to match macOS native cursor size
+      // Note: SVG base is 56px (2x), so divide by 2 to get equivalent visual size
+      const displayScale = isVectorStyle ? currentSize * 0.8 : 0.31; 
 
       let jiggleScale = 1.0;
       if (isVectorStyle && clickAnimationStateRef.current.isAnimating) {

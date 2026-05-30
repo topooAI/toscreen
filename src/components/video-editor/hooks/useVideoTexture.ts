@@ -101,6 +101,9 @@ export function useVideoTexture({
     if (videoTexture.source) {
       (videoTexture.source as any).autoPlay = false;
       (videoTexture.source as any).autoUpdate = true;
+      // Ensure high-quality downscaling (anti-aliasing when video is shrunk to fit preview)
+      (videoTexture.source as any).antialias = true;
+      videoTexture.source.scaleMode = 'linear';
     }
     
     const videoSprite = new Sprite(videoTexture);
