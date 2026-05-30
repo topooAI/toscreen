@@ -51,8 +51,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openVideoFilePicker: () => {
     return ipcRenderer.invoke('open-video-file-picker')
   },
-  setCurrentVideoPath: (path: string, proxyPath?: string) => {
-    return ipcRenderer.invoke('set-current-video-path', path, proxyPath)
+  setCurrentVideoPath: (path: string, proxyPath?: string, audioPath?: string) => {
+    return ipcRenderer.invoke('set-current-video-path', path, proxyPath, audioPath)
   },
   getCurrentVideoPath: () => {
     return ipcRenderer.invoke('get-current-video-path')

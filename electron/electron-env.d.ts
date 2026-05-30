@@ -36,8 +36,8 @@ interface Window {
     openExternalUrl: (url: string) => Promise<{ success: boolean; error?: string }>
     saveExportedVideo: (videoData: ArrayBuffer, fileName: string) => Promise<{ success: boolean; path?: string; message?: string; cancelled?: boolean }>
     openVideoFilePicker: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; message?: string }>
-    setCurrentVideoPath: (path: string) => Promise<{ success: boolean }>
-    getCurrentVideoPath: () => Promise<{ success: boolean; path?: string }>
+    setCurrentVideoPath: (path: string, proxyPath?: string, audioPath?: string) => Promise<{ success: boolean }>
+    getCurrentVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string }>
     clearCurrentVideoPath: () => Promise<{ success: boolean }>
     getPlatform: () => Promise<string>
     // Mouse Tracker APIs
@@ -49,6 +49,10 @@ interface Window {
     stopNativeRecording: () => Promise<{ success: boolean; outputPath?: string; error?: string }>;
     hudOverlayHide: () => void;
     hudOverlayClose: () => void;
+    generateProxyVideo: (inputPath: string) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+    onProxyGenerationProgress: (callback: (percent: number) => void) => () => void;
+    saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean; error?: string; message?: string }>;
+    loadProject: (videoPath: string) => Promise<{ success: boolean; project?: any; message?: string }>;
   }
 }
 

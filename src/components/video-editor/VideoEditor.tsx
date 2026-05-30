@@ -61,19 +61,7 @@ export default function VideoEditor() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [audioRegions, setAudioRegions] = useState<AudioRegion[]>([
-    {
-      id: "mock-audio-id-1",
-      startMs: 2000,
-      endMs: 7000,
-      sourceUrl: "test_audio.wav",
-      volume: 1.0,
-      name: "Mock Audio File.wav",
-      totalDurationMs: 10000,
-      sourceStartMs: 0,
-      sourceEndMs: 5000,
-    }
-  ]);
+  const [audioRegions, setAudioRegions] = useState<AudioRegion[]>([]);
 
   // HEALER: Automatically fix corrupted audio regions trapped in memory
   useEffect(() => {
@@ -148,6 +136,16 @@ export default function VideoEditor() {
         }
 
         if (result.success && result.path) {
+          // Reset all regions and selection states to prevent stale state leak from previous sessions
+          setZoomRegions([]);
+          setTrimRegions([]);
+          setAnnotationRegions([]);
+          setAudioRegions([]);
+          setSelectedZoomId(null);
+          setSelectedTrimId(null);
+          setSelectedAnnotationId(null);
+          setSelectedAudioId(null);
+
           // If proxy is available, use it for UI playback. Always keep original for export.
           setVideoPath(result.path);
           setOriginalVideoPath(result.path);
@@ -177,6 +175,32 @@ export default function VideoEditor() {
             if (p.padding !== undefined) setPadding(p.padding);
             if (p.aspectRatio) setAspectRatio(p.aspectRatio);
             toast.success("工程已自动恢复");
+          } else {
+            // New recording project! Auto-load the companion recorded audio track if available
+            if ((result as any).audioPath) {
+              const audioUrl = `file://${(result as any).audioPath.replace(/\\/g, '/')}`;
+              const tempAudio = new Audio(audioUrl);
+              tempAudio.addEventListener('loadedmetadata', () => {
+                const durationMs = Math.round(tempAudio.duration * 1000);
+                const audioName = (result as any).audioPath.split(/[/\\]/).pop() || "Recorded Audio";
+                
+                const newAudioRegion = {
+                  id: crypto.randomUUID(),
+                  startMs: 0,
+                  endMs: durationMs,
+                  sourceUrl: audioUrl,
+                  volume: 1.0,
+                  name: audioName,
+                  path: (result as any).audioPath,
+                  totalDurationMs: durationMs,
+                  sourceStartMs: 0,
+                  sourceEndMs: durationMs,
+                };
+                
+                setAudioRegions([newAudioRegion]);
+                console.log("[Auto-Load] Successfully loaded and attached recorded system audio track:", newAudioRegion);
+              });
+            }
           }
         } else {
           setError('No recordings found. Please start a new recording to begin editing.');
@@ -995,11 +1019,37 @@ export default function VideoEditor() {
         }
 
         if (isVideo) {
+          // Reset all regions and selection states on dropping new video
+          setZoomRegions([]);
+          setTrimRegions([]);
+          setAnnotationRegions([]);
+          setAudioRegions([]);
+          setSelectedZoomId(null);
+          setSelectedTrimId(null);
+          setSelectedAnnotationId(null);
+          setSelectedAudioId(null);
+
           // Attempt to extract real file path if available, else blob
           const path = (file as any).path || URL.createObjectURL(file);
           setVideoPath(path);
           setOriginalVideoPath(path); // Also update original path
           setError(null);
+          
+          // Try to load auto-saved project if any
+          const projectResult = await window.electronAPI.loadProject(path);
+          if (projectResult.success && projectResult.project) {
+            const p = projectResult.project;
+            if (p.zoomRegions) setZoomRegions(p.zoomRegions);
+            if (p.trimRegions) setTrimRegions(p.trimRegions);
+            if (p.annotationRegions) setAnnotationRegions(p.annotationRegions);
+            if (p.audioRegions) {
+              const restoredAudio = p.audioRegions.map((ar: any) => ({
+                ...ar,
+                sourceUrl: ar.path ? `file://${ar.path.replace(/\\/g, '/')}` : ar.sourceUrl
+              }));
+              setAudioRegions(restoredAudio);
+            }
+          }
         } else if (isAudio) {
           toast.success("成功识别音频", {
             description: `已加载: ${file.name}`

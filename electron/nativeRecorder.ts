@@ -56,6 +56,8 @@ export async function startNativeRecording(options?: {
       captureCursor: options?.showCursor === undefined ? false : options.showCursor, // node-mac-recorder 期望 captureCursor
       frameRate: options?.fps ?? 60,
       displayId: options?.displayId ?? null,
+      includeMicrophone: true,
+      includeSystemAudio: true,
     })
 
     isRecording = true
@@ -103,7 +105,11 @@ export async function stopNativeRecording(): Promise<{
     currentOutputPath = null
     recorderInstance = null
 
-    return { success: true, outputPath: outputPath || undefined }
+    return { 
+      success: true, 
+      outputPath: outputPath || undefined,
+      audioOutputPath: result?.audioOutputPath || undefined
+    }
   } catch (error) {
     console.error('[NativeRecorder] Failed to stop recording:', error)
     isRecording = false

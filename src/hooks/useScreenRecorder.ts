@@ -69,7 +69,8 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         
         await window.electronAPI.setCurrentVideoPath(
           result.outputPath, 
-          proxyResult.success ? proxyResult.proxyPath : undefined
+          proxyResult.success ? proxyResult.proxyPath : undefined,
+          (result as any).audioOutputPath || undefined
         );
         setIsProcessing(false);
       }

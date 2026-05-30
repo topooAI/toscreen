@@ -327,7 +327,9 @@ async function startNativeRecording(options) {
       captureCursor: (options == null ? void 0 : options.showCursor) === void 0 ? false : options.showCursor,
       // node-mac-recorder 期望 captureCursor
       frameRate: (options == null ? void 0 : options.fps) ?? 60,
-      displayId: (options == null ? void 0 : options.displayId) ?? null
+      displayId: (options == null ? void 0 : options.displayId) ?? null,
+      includeMicrophone: true,
+      includeSystemAudio: true
     });
     isRecording = true;
     console.log(`[NativeRecorder] Recording started → ${currentOutputPath}`, {
@@ -357,7 +359,11 @@ async function stopNativeRecording() {
     isRecording = false;
     currentOutputPath = null;
     recorderInstance = null;
-    return { success: true, outputPath: outputPath || void 0 };
+    return {
+      success: true,
+      outputPath: outputPath || void 0,
+      audioOutputPath: (result == null ? void 0 : result.audioOutputPath) || void 0
+    };
   } catch (error) {
     console.error("[NativeRecorder] Failed to stop recording:", error);
     isRecording = false;
@@ -582,6 +588,7 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
         }
       }
       currentVideoPath = result.outputPath;
+      currentAudioPath = result.audioOutputPath || null;
     }
     const mainWin = getMainWindow();
     if (mainWin) {
@@ -728,17 +735,20 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
   });
   let currentVideoPath = null;
   let currentProxyPath = null;
-  ipcMain.handle("set-current-video-path", (_, path2, proxyPath) => {
+  let currentAudioPath = null;
+  ipcMain.handle("set-current-video-path", (_, path2, proxyPath, audioPath) => {
     currentVideoPath = path2;
     currentProxyPath = proxyPath || null;
+    currentAudioPath = audioPath || null;
     return { success: true };
   });
   ipcMain.handle("get-current-video-path", () => {
-    return currentVideoPath ? { success: true, path: currentVideoPath, proxyPath: currentProxyPath } : { success: false };
+    return currentVideoPath ? { success: true, path: currentVideoPath, proxyPath: currentProxyPath, audioPath: currentAudioPath } : { success: false };
   });
   ipcMain.handle("clear-current-video-path", () => {
     currentVideoPath = null;
     currentProxyPath = null;
+    currentAudioPath = null;
     return { success: true };
   });
   ipcMain.handle("get-platform", () => {

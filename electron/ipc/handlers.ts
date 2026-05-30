@@ -219,6 +219,7 @@ export function registerIpcHandlers(
       }
 
       currentVideoPath = result.outputPath
+      currentAudioPath = (result as any).audioOutputPath || null
     }
 
     // Restore the HUD after recording ends
@@ -390,22 +391,25 @@ export function registerIpcHandlers(
 
   let currentVideoPath: string | null = null;
   let currentProxyPath: string | null = null;
+  let currentAudioPath: string | null = null;
 
-  ipcMain.handle('set-current-video-path', (_, path: string, proxyPath?: string) => {
+  ipcMain.handle('set-current-video-path', (_, path: string, proxyPath?: string, audioPath?: string) => {
     currentVideoPath = path;
     currentProxyPath = proxyPath || null;
+    currentAudioPath = audioPath || null;
     return { success: true };
   });
 
   ipcMain.handle('get-current-video-path', () => {
     return currentVideoPath 
-      ? { success: true, path: currentVideoPath, proxyPath: currentProxyPath } 
+      ? { success: true, path: currentVideoPath, proxyPath: currentProxyPath, audioPath: currentAudioPath } 
       : { success: false };
   });
 
   ipcMain.handle('clear-current-video-path', () => {
     currentVideoPath = null;
     currentProxyPath = null;
+    currentAudioPath = null;
     return { success: true };
   });
 
