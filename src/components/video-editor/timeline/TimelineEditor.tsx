@@ -496,6 +496,7 @@ function Timeline({
             isSelected={item.id === selectedZoomId}
             onSelect={() => onSelectZoom?.(item.id)}
             variant="zoom"
+            zoomDepth={item.zoomDepth}
           >
             {item.label}
           </Item>
