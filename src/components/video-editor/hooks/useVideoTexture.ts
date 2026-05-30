@@ -49,6 +49,7 @@ export function useVideoTexture({
   const allowPlaybackRef = useRef(false);
   const currentTimeRef = useRef(0);
   const isSkippingRef = useRef(false);
+  const immuneUntilRef = useRef(0);
   const timeUpdateAnimationRef = useRef<number | null>(null);
 
   // Reset video state only if path REALLY changes
@@ -134,6 +135,7 @@ export function useVideoTexture({
       onTimeUpdate: (t) => callbacksRef.current.onTimeUpdate(t),
       trimRegionsRef,
       isSkippingRef,
+      immuneUntilRef,
     });
     
     video.addEventListener('play', handlePlay);

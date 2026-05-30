@@ -30,6 +30,12 @@ export interface TrimRegion {
   endMs: number;
 }
 
+export interface VolumeKeyframe {
+  id: string;
+  timeRatio: number; // 0.0 to 1.0 (relative to clip duration)
+  volume: number;    // 0.0 to 2.0 (200%)
+}
+
 export interface AudioRegion {
   id: string;
   startMs: number;
@@ -39,8 +45,11 @@ export interface AudioRegion {
   path?: string;
   sourceStartMs?: number; // Start offset within the audio file itself (for trimming)
   sourceEndMs?: number;   // End offset within the audio file itself (for trimming)
+  totalDurationMs?: number; // Total duration of the audio file
   volume: number;       // Volume multiplier (0.0 to 1.0+)
   isMuted?: boolean;
+  name?: string;        // Added file name
+  volumeKeyframes?: VolumeKeyframe[]; // Volume envelope keyframes
 }
 
 export type AnnotationType = 'text' | 'image' | 'figure';

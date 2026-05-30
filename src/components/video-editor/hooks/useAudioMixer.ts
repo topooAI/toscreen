@@ -81,9 +81,10 @@ export function useAudioMixer({ audioRegions, isPlaying, currentTime }: UseAudio
     if (!ctx) return;
 
     audioRegions.forEach(region => {
-      if (!decodedBuffersRef.current.has(region.id)) {
+      const cacheKey = region.sourceUrl || region.id;
+      if (!decodedBuffersRef.current.has(cacheKey)) {
         // Optimistically mark as loading
-        decodedBuffersRef.current.set(region.id, null as any);
+        decodedBuffersRef.current.set(cacheKey, null as any);
         
         const dataPromise = region.file 
           ? region.file.arrayBuffer() 
@@ -92,11 +93,11 @@ export function useAudioMixer({ audioRegions, isPlaying, currentTime }: UseAudio
         dataPromise
           .then(data => ctx.decodeAudioData(data))
           .then(buffer => {
-            decodedBuffersRef.current.set(region.id, buffer);
+            decodedBuffersRef.current.set(cacheKey, buffer);
           })
           .catch(err => {
             console.error("Failed to decode audio", region.sourceUrl, err);
-            decodedBuffersRef.current.delete(region.id);
+            decodedBuffersRef.current.delete(cacheKey);
           });
       }
     });
@@ -134,18 +135,36 @@ export function useAudioMixer({ audioRegions, isPlaying, currentTime }: UseAudio
           
           if (isWithinRegion && !isCurrentlyPlaying) {
             // Needs to start playing
-            const buffer = decodedBuffersRef.current.get(region.id);
+            const buffer = decodedBuffersRef.current.get(region.sourceUrl || region.id);
             if (buffer) {
               const source = ctx.createBufferSource();
               source.buffer = buffer;
               
               const gainNode = ctx.createGain();
-              gainNode.gain.value = region.volume ?? 1.0;
+              
+              const offsetSeconds = (region.sourceStartMs || 0) / 1000 + (currentTimeMs - region.startMs) / 1000;
+              
+              // Helper to calculate envelope volume
+              const getInterpVol = () => {
+                if (!region.volumeKeyframes || region.volumeKeyframes.length === 0) return region.volume ?? 1.0;
+                const ratio = (currentTimeMs - region.startMs) / (region.endMs - region.startMs);
+                const kfs = region.volumeKeyframes;
+                if (ratio <= kfs[0].timeRatio) return kfs[0].volume;
+                if (ratio >= kfs[kfs.length - 1].timeRatio) return kfs[kfs.length - 1].volume;
+                for (let i = 0; i < kfs.length - 1; i++) {
+                  if (ratio >= kfs[i].timeRatio && ratio <= kfs[i+1].timeRatio) {
+                    const t = (ratio - kfs[i].timeRatio) / (kfs[i+1].timeRatio - kfs[i].timeRatio);
+                    return kfs[i].volume + t * (kfs[i+1].volume - kfs[i].volume);
+                  }
+                }
+                return region.volume ?? 1.0;
+              };
+
+              gainNode.gain.value = getInterpVol();
               
               source.connect(gainNode);
               gainNode.connect(ctx.destination);
               
-              const offsetSeconds = (region.sourceStartMs || 0) / 1000 + (currentTimeMs - region.startMs) / 1000;
               source.start(0, offsetSeconds);
               
               audioSourcesRef.current.set(region.id, { source, gain: gainNode });
@@ -161,7 +180,21 @@ export function useAudioMixer({ audioRegions, isPlaying, currentTime }: UseAudio
             // Update volume if needed
             const activeNodes = audioSourcesRef.current.get(region.id);
             if (activeNodes) {
-              activeNodes.gain.gain.value = region.volume ?? 1.0;
+              const getInterpVol = () => {
+                if (!region.volumeKeyframes || region.volumeKeyframes.length === 0) return region.volume ?? 1.0;
+                const ratio = (currentTimeMs - region.startMs) / (region.endMs - region.startMs);
+                const kfs = region.volumeKeyframes;
+                if (ratio <= kfs[0].timeRatio) return kfs[0].volume;
+                if (ratio >= kfs[kfs.length - 1].timeRatio) return kfs[kfs.length - 1].volume;
+                for (let i = 0; i < kfs.length - 1; i++) {
+                  if (ratio >= kfs[i].timeRatio && ratio <= kfs[i+1].timeRatio) {
+                    const t = (ratio - kfs[i].timeRatio) / (kfs[i+1].timeRatio - kfs[i].timeRatio);
+                    return kfs[i].volume + t * (kfs[i+1].volume - kfs[i].volume);
+                  }
+                }
+                return region.volume ?? 1.0;
+              };
+              activeNodes.gain.gain.value = getInterpVol();
             }
           }
         });

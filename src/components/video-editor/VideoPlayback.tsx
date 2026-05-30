@@ -425,7 +425,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
     };
 
     const ticker = () => {
-      const { strength, focus, depth } = findInterpolatedTarget(zoomRegionsRef.current, currentTimeRef.current);
+      const { strength, focus, depth } = findInterpolatedTarget(zoomRegionsRef.current, (videoRef.current?.currentTime || 0) * 1000);
       
       const defaultFocus = DEFAULT_FOCUS;
       let targetScaleFactor = 1;

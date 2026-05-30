@@ -36,7 +36,6 @@ interface TimelineEditorProps {
   videoDuration: number;
   currentTime: number;
   onSeek?: (time: number) => void;
-  videoRef?: React.RefObject<HTMLVideoElement | null>;
   zoomRegions: ZoomRegion[];
   onZoomAdded: (span: Span) => void;
   onZoomSpanChange: (id: string, span: Span) => void;
@@ -184,73 +183,19 @@ function formatTimeLabel(milliseconds: number, intervalMs: number) {
 }
 
 function PlaybackCursor({ 
-  currentTimeMs: _currentTimeMs, 
+  currentTimeMs, 
   videoDurationMs,
   onSeek,
   timelineRef,
-  videoRef,
-  mapSourceToEffective,
-  isTrimTrackVisible,
 }: { 
   currentTimeMs: number; 
   videoDurationMs: number;
   onSeek?: (time: number) => void;
   timelineRef: React.RefObject<HTMLDivElement>;
-  videoRef?: React.RefObject<HTMLVideoElement | null>;
-  mapSourceToEffective?: (ms: number) => number;
-  isTrimTrackVisible?: boolean;
 }) {
   const { sidebarWidth, direction, range, valueToPixels, pixelsToValue } = useTimelineContext();
   const sideProperty = direction === "rtl" ? "right" : "left";
   const [isDragging, setIsDragging] = useState(false);
-  const cursorLineRef = useRef<HTMLDivElement>(null);
-  const cursorContainerRef = useRef<HTMLDivElement>(null);
-
-  // High-frequency DOM update via rAF — bypasses React render entirely
-  useEffect(() => {
-    if (!videoRef?.current) return;
-    
-    let rafId: number;
-    const tick = () => {
-      const line = cursorLineRef.current;
-      const container = cursorContainerRef.current;
-      if (!line || !container) {
-        rafId = requestAnimationFrame(tick);
-        return;
-      }
-      
-      const video = videoRef.current;
-      if (!video) {
-        rafId = requestAnimationFrame(tick);
-        return;
-      }
-      
-      const rawTimeMs = video.currentTime * 1000;
-      const timeMs = (isTrimTrackVisible || !mapSourceToEffective) 
-        ? rawTimeMs 
-        : mapSourceToEffective(rawTimeMs);
-      
-      if (videoDurationMs <= 0 || timeMs < 0) {
-        container.style.display = 'none';
-        rafId = requestAnimationFrame(tick);
-        return;
-      }
-      
-      const clampedTime = Math.min(timeMs, videoDurationMs);
-      if (clampedTime < range.start || clampedTime > range.end) {
-        container.style.display = 'none';
-      } else {
-        container.style.display = '';
-        const offset = valueToPixels(clampedTime - range.start);
-        line.style[sideProperty as any] = `${sidebarWidth + offset - 0.5}px`;
-      }
-      
-      rafId = requestAnimationFrame(tick);
-    };
-    
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [videoRef, videoDurationMs, range.start, range.end, sidebarWidth, sideProperty, valueToPixels, mapSourceToEffective, isTrimTrackVisible]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -284,19 +229,33 @@ function PlaybackCursor({
     };
   }, [isDragging, onSeek, timelineRef, sidebarWidth, range.start, videoDurationMs, pixelsToValue]);
 
+  if (videoDurationMs <= 0 || currentTimeMs < 0) {
+    return null;
+  }
+
+  const clampedTime = Math.min(currentTimeMs, videoDurationMs);
+  
+  if (clampedTime < range.start || clampedTime > range.end) {
+    return null;
+  }
+
+  const offset = valueToPixels(clampedTime - range.start);
+
   return (
     <div
-      ref={cursorContainerRef}
       className="absolute top-0 bottom-0 z-50 group/cursor inset-x-0"
       style={{
-        pointerEvents: 'none',
+        pointerEvents: 'none', // Allow clicks to pass through to timeline, but we'll enable pointer events on the handle
       }}
     >
       <div
-        ref={cursorLineRef}
         className="absolute top-0 bottom-0 w-[1px] bg-[#FF00B7] shadow-[0_0_10px_rgba(255,0,183,0.5)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_15px_rgba(255,0,183,0.7)]"
+        style={{
+          [sideProperty]: `${sidebarWidth + offset - 0.5}px`,
+          transition: 'left 0.1s linear, right 0.1s linear' // HARDWARE TWEENING RESTORED
+        }}
         onMouseDown={(e) => {
-          e.stopPropagation();
+          e.stopPropagation(); // Prevent timeline click
           setIsDragging(true);
         }}
       >
@@ -441,9 +400,6 @@ function Timeline({
   onSelectAudio,
   waveformCache,
   onAudioVolumeKeyframesChange,
-  videoRef,
-  mapSourceToEffective,
-  isTrimTrackVisible,
 }: {
   items: TimelineRenderItem[];
   videoDurationMs: number;
@@ -463,9 +419,6 @@ function Timeline({
   onSelectAudio?: (id: string | null) => void;
   waveformCache?: any;
   onAudioVolumeKeyframesChange?: (id: string, keyframes: any[]) => void;
-  videoRef?: React.RefObject<HTMLVideoElement | null>;
-  mapSourceToEffective?: (ms: number) => number;
-  isTrimTrackVisible?: boolean;
 }) {
   
   const trackRenderer = useMemo(() => (
@@ -615,9 +568,6 @@ const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef
         videoDurationMs={videoDurationMs} 
         onSeek={onSeek}
         timelineRef={localTimelineRef}
-        videoRef={videoRef}
-        mapSourceToEffective={mapSourceToEffective}
-        isTrimTrackVisible={isTrimTrackVisible}
       />
 
       {trackRenderer}
@@ -662,7 +612,6 @@ export default function TimelineEditor({
   onFullScreenBindingChange,
   isPlaying,
   onTogglePlayPause,
-  videoRef,
 }: TimelineEditorProps) {
   const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
   const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
@@ -1280,9 +1229,6 @@ export default function TimelineEditor({
             onAddZoom={handleAddZoom}
             onAddTrim={handleAddTrim}
             onAddAnnotation={handleAddAnnotation}
-            videoRef={videoRef}
-            mapSourceToEffective={mapSourceToEffective}
-            isTrimTrackVisible={isTrimTrackVisible}
           />
         </TimelineWrapper>
       </div>

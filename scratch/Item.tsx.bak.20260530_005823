@@ -4,8 +4,10 @@ import type { Span } from "dnd-timeline";
 import { cn } from "@/lib/utils";
 import { ZoomIn, Scissors, MessageSquare, Music } from "lucide-react";
 import glassStyles from "./ItemGlass.module.css";
+import { useAudioWaveform } from "../hooks/useAudioWaveform";
 
-function WaveformOverlay({ id, url, isReal, sourceStartMs, effTotalDuration, svgOffset = 0, peaks }: { id: string; url: string; isReal: boolean; sourceStartMs: number; effTotalDuration: number; svgOffset?: number; peaks?: number[] }) {
+function WaveformOverlay({ id, url, isReal, sourceStartMs, effTotalDuration, svgOffset = 0 }: { id: string; url: string; isReal: boolean; sourceStartMs: number; effTotalDuration: number; svgOffset?: number }) {
+  const { peaks } = useAudioWaveform(url, isReal, 1000);
   const { valueToPixels } = useTimelineContext();
   
 
@@ -102,7 +104,7 @@ function ItemComponent({
   children,
   zoomDepth = 1,
   variant = 'zoom',
-  audioPeaks,
+  // audioPeaks,
   sourceStartMs = 0,
   sourceEndMs = 0,
   totalDurationMs = 0,
@@ -137,7 +139,8 @@ function ItemComponent({
   const svgOffset = isResizingLeft.current ? -dragDeltaX : 0;
 
   const baseWidthPx = (span.end - span.start) * pxPerMs;
-    const effTotalDuration = totalDurationMs || Math.max(1, sourceEndMs - sourceStartMs);
+  const { durationMs: loadedDurationMs } = useAudioWaveform(sourceUrl || "", variant === 'audio', 1000);
+  const effTotalDuration = totalDurationMs || loadedDurationMs || Math.max(1, sourceEndMs - sourceStartMs);
 
   // 使用 MutationObserver 在 dnd-timeline 内部不触发 React 渲染的拖拽过程中，实时修正波形的物理偏移并设置拖拽物理墙
   React.useEffect(() => {
@@ -247,10 +250,10 @@ function ItemComponent({
           {/* Content */}
           <div className={cn("relative z-10 flex gap-1.5 text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none px-3 w-full h-full", isAudio ? "items-start pt-1.5" : "items-center")}>
             {isVideo && sourceUrl && (
-              <WaveformOverlay id={id} url={sourceUrl} isReal={false} sourceStartMs={sourceStartMs} effTotalDuration={effTotalDuration} svgOffset={svgOffset} peaks={[]} />
+              <WaveformOverlay id={id} url={sourceUrl} isReal={false} sourceStartMs={sourceStartMs} effTotalDuration={effTotalDuration} svgOffset={svgOffset} />
             )}
             {isAudio && sourceUrl && (
-              <WaveformOverlay id={id} url={sourceUrl} isReal={true} sourceStartMs={sourceStartMs} effTotalDuration={effTotalDuration} svgOffset={svgOffset} peaks={audioPeaks} />
+              <WaveformOverlay id={id} url={sourceUrl} isReal={true} sourceStartMs={sourceStartMs} effTotalDuration={effTotalDuration} svgOffset={svgOffset} />
             )}
             
             {isVideo ? null : isZoom ? (
@@ -297,21 +300,27 @@ function ItemComponent({
   );
 }
 
-export default React.memo(ItemComponent, (prev, next) => {
+const Item = memo(ItemComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.span.start === nextProps.span.start &&
+    prevProps.span.end === nextProps.span.end &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.zoomDepth === nextProps.zoomDepth &&
+    prevProps.variant === nextProps.variant &&
+    prevProps.children === nextProps.children
+  );
+});
+
+export default React.memo(Item, (prev, next) => {
   return (
     prev.id === next.id &&
     prev.span.start === next.span.start &&
     prev.span.end === next.span.end &&
     prev.isSelected === next.isSelected &&
-    prev.zoomDepth === next.zoomDepth &&
-    prev.variant === next.variant &&
-    prev.children === next.children &&
     prev.sourceStartMs === next.sourceStartMs &&
     prev.sourceEndMs === next.sourceEndMs &&
-    prev.totalDurationMs === next.totalDurationMs &&
-    prev.sourceUrl === next.sourceUrl &&
     prev.volume === next.volume &&
-    prev.volumeKeyframes === next.volumeKeyframes &&
-    prev.audioPeaks === next.audioPeaks
+    prev.volumeKeyframes === next.volumeKeyframes
   );
 });

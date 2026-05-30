@@ -107,8 +107,6 @@ export default function VideoEditor() {
   });
 
   const videoPlaybackRef = useRef<VideoPlaybackRef>(null);
-  // Stable ref to the underlying <video> element for direct DOM reads (perf: bypasses React state)
-  const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const nextZoomIdRef = useRef(1);
   const nextTrimIdRef = useRef(1);
   const nextAnnotationIdRef = useRef(1);
@@ -231,14 +229,6 @@ export default function VideoEditor() {
     cropRegion, wallpaper, shadowIntensity, showBlur, motionBlurEnabled,
     borderRadius, padding, aspectRatio
   ]);
-
-  const handleDurationChange = useCallback((dur: number) => {
-    setDuration(dur);
-    // Sync videoElementRef when duration is first reported (video element is definitely ready)
-    if (videoPlaybackRef.current?.video) {
-      videoElementRef.current = videoPlaybackRef.current.video;
-    }
-  }, []);
 
   function togglePlayPause() {
     const playback = videoPlaybackRef.current;
@@ -1049,7 +1039,7 @@ export default function VideoEditor() {
                       aspectRatio={aspectRatio}
                       ref={videoPlaybackRef}
                       videoPath={videoPath ? toFileUrl(videoPath) : ''}
-                      onDurationChange={handleDurationChange}
+                      onDurationChange={setDuration}
                       onTimeUpdate={setCurrentTime}
                       currentTime={currentTime}
                       onPlayStateChange={setIsPlaying}
@@ -1096,7 +1086,6 @@ export default function VideoEditor() {
                   videoDuration={duration}
                   currentTime={currentTime}
                   onSeek={handleSeek}
-                  videoRef={videoElementRef}
                   zoomRegions={zoomRegions}
                   onZoomAdded={handleZoomAdded}
                   onZoomSpanChange={handleZoomSpanChange}

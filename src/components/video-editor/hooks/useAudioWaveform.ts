@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 
-export function useAudioWaveform(videoUrl: string | null, samples = 1000) {
+export function useAudioWaveform(url: string | null, isRealDecode = false, samples = 1000) {
   const [peaks, setPeaks] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
+  const [durationMs, setDurationMs] = useState<number>(0);
 
   useEffect(() => {
-    if (!videoUrl) {
+    if (!url) {
       setPeaks([]);
       return;
     }
@@ -27,9 +28,32 @@ export function useAudioWaveform(videoUrl: string | null, samples = 1000) {
 
         if (!isMounted) return;
 
-        // Generate clean mock waveform data instantly
-        const mockPeaks = Array.from({ length: samples }, (_, i) => Math.abs(Math.sin(i * 0.05)) * 0.8 + 0.1);
-        setPeaks(mockPeaks);
+        if (isRealDecode) {
+          // Decode real audio file (safe for short audio tracks)
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await ac.decodeAudioData(arrayBuffer);
+          if (isMounted) setDurationMs(audioBuffer.duration * 1000);
+          const channelData = audioBuffer.getChannelData(0); // Use first channel
+          const blockSize = Math.floor(channelData.length / samples);
+          const newPeaks = [];
+          
+          for (let i = 0; i < samples; i++) {
+            let max = 0;
+            const start = i * blockSize;
+            const end = Math.min(start + blockSize, channelData.length);
+            for (let j = start; j < end; j++) {
+              const val = Math.abs(channelData[j]);
+              if (val > max) max = val;
+            }
+            newPeaks.push(max);
+          }
+          if (isMounted) setPeaks(newPeaks);
+        } else {
+          // Generate clean mock waveform data instantly for massive video files
+          const mockPeaks = Array.from({ length: samples }, (_, i) => Math.abs(Math.sin(i * 0.05)) * 0.8 + 0.1);
+          if (isMounted) setPeaks(mockPeaks);
+        }
 
       } catch (err) {
         console.error("Audio waveform mock failed:", err);
@@ -46,7 +70,7 @@ export function useAudioWaveform(videoUrl: string | null, samples = 1000) {
       isMounted = false;
       ac.close();
     };
-  }, [videoUrl, samples]);
+  }, [url, isRealDecode, samples]);
 
-  return { peaks, loading };
+  return { peaks, loading, durationMs };
 }

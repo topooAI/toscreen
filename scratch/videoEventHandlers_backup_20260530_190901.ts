@@ -30,14 +30,8 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
     immuneUntilRef,
   } = params;
 
-  // Fast path: always update the ref at 60fps for PIXI/audio
-  const updateRef = (timeValue: number) => {
-    currentTimeRef.current = timeValue * 1000;
-  };
-
-  // Slow path: update React state at ~5fps for UI text displays only
   const emitTime = (timeValue: number) => {
-    updateRef(timeValue);
+    currentTimeRef.current = timeValue * 1000;
     onTimeUpdate(timeValue);
   };
 
@@ -75,7 +69,7 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
           emitTime(video.currentTime);
         };
 
-        if (typeof (video as any).requestVideoFrameCallback === 'function') {
+        if ('requestVideoFrameCallback' in video) {
           (video as any).requestVideoFrameCallback(resumePlayback);
         } else {
           video.addEventListener('seeked', function onSeeked() {
@@ -85,14 +79,10 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
         }
       }
     } else if (!isSkippingRef.current) {
-      // ALWAYS update the ref at full 60fps for PIXI rendering
-      updateRef(video.currentTime);
-      
-      // Only push React state updates at ~5fps (200ms) to avoid
-      // re-rendering the entire VideoEditor component tree every frame.
-      // Paused/ended states always emit immediately for responsiveness.
-      if (now - lastEmitTimestamp >= 200 || video.paused || video.ended) {
-        onTimeUpdate(video.currentTime);
+      // Throttle UI updates to ~30fps (every 32ms) to reduce React render pressure
+      // while PixiJS continues to render at 60fps in its own ticker.
+      if (now - lastEmitTimestamp >= 32 || video.paused || video.ended) {
+        emitTime(video.currentTime);
         lastEmitTimestamp = now;
       }
     }
