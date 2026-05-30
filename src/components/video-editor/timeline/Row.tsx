@@ -13,6 +13,7 @@ const ROW_METADATA: Record<string, { label: string }> = {
   "row-zoom": { label: "Focus" },
   "row-trim": { label: "Trim" },
   "row-annotation": { label: "Text" },
+  "row-audio": { label: "Audio" },
 };
 
 export default function Row({ id, children, onAddClick }: RowProps) {

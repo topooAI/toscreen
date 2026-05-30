@@ -14,28 +14,33 @@ function getAudioContext() {
   return sharedAudioContext;
 }
 
-export function useWaveformCache(audioItems: { id: string; sourceUrl?: string; }[]) {
+export function useWaveformCache(audioItems: { id: string; sourceUrl?: string; file?: File; }[]) {
   const [cache, setCache] = useState<Map<string, WaveformCacheEntry>>(new Map());
   const fetchingUrls = useRef<Set<string>>(new Set());
+  const failedUrls = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    // Collect all unique URLs
-    const uniqueUrls = new Set<string>();
-    audioItems.forEach(item => {
-      if (item.sourceUrl) uniqueUrls.add(item.sourceUrl);
-    });
-
     const ac = getAudioContext();
     
-    uniqueUrls.forEach(url => {
-      // If already cached or currently fetching, skip
-      if (cache.has(url) || fetchingUrls.current.has(url)) return;
+    audioItems.forEach(item => {
+      const url = item.sourceUrl;
+      if (!url) return;
       
-      fetchingUrls.current.add(url);
+      const cacheKey = url;
       
-      // Decode
-      fetch(url)
-        .then(res => res.arrayBuffer())
+      // If already cached, currently fetching, or failed, skip
+      if (cache.has(cacheKey) || fetchingUrls.current.has(cacheKey) || failedUrls.current.has(cacheKey)) {
+        return;
+      }
+      
+      fetchingUrls.current.add(cacheKey);
+      
+      // Prioritize file arrayBuffer decoding to bypass CSP fetch limitations
+      const dataPromise = item.file 
+        ? item.file.arrayBuffer()
+        : fetch(url).then(res => res.arrayBuffer());
+        
+      dataPromise
         .then(ab => ac.decodeAudioData(ab))
         .then(audioBuffer => {
           const channelData = audioBuffer.getChannelData(0);
@@ -54,13 +59,15 @@ export function useWaveformCache(audioItems: { id: string; sourceUrl?: string; }
           }
           setCache(c => {
             const next = new Map(c);
-            next.set(url, { peaks: newPeaks, durationMs: audioBuffer.duration * 1000 });
+            next.set(cacheKey, { peaks: newPeaks, durationMs: audioBuffer.duration * 1000 });
             return next;
           });
+          fetchingUrls.current.delete(cacheKey);
         })
         .catch(e => {
             console.error("Cache decode failed for", url, e);
-            fetchingUrls.current.delete(url); // Allow retry
+            fetchingUrls.current.delete(cacheKey);
+            failedUrls.current.add(cacheKey); // Mark as failed to avoid infinite retries
         });
     });
 

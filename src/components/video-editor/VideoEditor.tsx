@@ -61,7 +61,19 @@ export default function VideoEditor() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [audioRegions, setAudioRegions] = useState<AudioRegion[]>([]);
+  const [audioRegions, setAudioRegions] = useState<AudioRegion[]>([
+    {
+      id: "mock-audio-id-1",
+      startMs: 2000,
+      endMs: 7000,
+      sourceUrl: "test_audio.wav",
+      volume: 1.0,
+      name: "Mock Audio File.wav",
+      totalDurationMs: 10000,
+      sourceStartMs: 0,
+      sourceEndMs: 5000,
+    }
+  ]);
 
   // HEALER: Automatically fix corrupted audio regions trapped in memory
   useEffect(() => {
@@ -260,7 +272,11 @@ export default function VideoEditor() {
 
   const handleSelectZoom = useCallback((id: string | null) => {
     setSelectedZoomId(id);
-    if (id) setSelectedTrimId(null);
+    if (id) {
+      setSelectedTrimId(null);
+      setSelectedAnnotationId(null);
+      setSelectedAudioId(null);
+    }
   }, []);
 
   const handleSelectTrim = useCallback((id: string | null) => {
@@ -268,6 +284,7 @@ export default function VideoEditor() {
     if (id) {
       setSelectedZoomId(null);
       setSelectedAnnotationId(null);
+      setSelectedAudioId(null);
     }
   }, []);
 
@@ -276,6 +293,16 @@ export default function VideoEditor() {
     if (id) {
       setSelectedZoomId(null);
       setSelectedTrimId(null);
+      setSelectedAudioId(null);
+    }
+  }, []);
+
+  const handleSelectAudio = useCallback((id: string | null) => {
+    setSelectedAudioId(id);
+    if (id) {
+      setSelectedZoomId(null);
+      setSelectedTrimId(null);
+      setSelectedAnnotationId(null);
     }
   }, []);
 
@@ -1122,7 +1149,7 @@ export default function VideoEditor() {
                   onAudioVolumeKeyframesChange={handleAudioVolumeKeyframesChange}
                   onAudioDelete={handleAudioDelete}
                   selectedAudioId={selectedAudioId}
-                  onSelectAudio={setSelectedAudioId}
+                  onSelectAudio={handleSelectAudio}
                   audioRegions={audioRegions}
                   aspectRatio={aspectRatio}
                   onAspectRatioChange={setAspectRatio}
