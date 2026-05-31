@@ -42,6 +42,8 @@ export interface AudioRegion {
   endMs: number;
   sourceUrl: string;    // The original audio file URL (e.g. file://... or blob://...)
   file?: File;          // The underlying File object to avoid fetch blob CSP issues
+  audioPeaks?: number[];
+  audioPeaksDurationMs?: number;
   path?: string;
   sourceStartMs?: number; // Start offset within the audio file itself (for trimming)
   sourceEndMs?: number;   // End offset within the audio file itself (for trimming)
@@ -50,6 +52,8 @@ export interface AudioRegion {
   isMuted?: boolean;
   name?: string;        // Added file name
   volumeKeyframes?: VolumeKeyframe[]; // Volume envelope keyframes
+  isOriginal?: boolean; // True if this is the original recorded companion audio
+  isDetached?: boolean; // True if separated from video into independent track
 }
 
 export type AnnotationType = 'text' | 'image' | 'figure';

@@ -46,7 +46,7 @@ interface Window {
     readClicksJson: (videoPath: string) => Promise<{ success: boolean; clicks?: any[] }>;
     isNativeRecordingAvailable: () => Promise<boolean>;
     startNativeRecording: () => Promise<{ success: boolean; outputPath?: string; error?: string }>;
-    stopNativeRecording: () => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+    stopNativeRecording: () => Promise<{ success: boolean; outputPath?: string; audioOutputPath?: string; error?: string }>;
     hudOverlayHide: () => void;
     hudOverlayClose: () => void;
     generateProxyVideo: (inputPath: string) => Promise<{ success: boolean; outputPath?: string; error?: string }>;

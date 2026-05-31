@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseWavFile } from './wavParser';
 
 export function useAudioWaveform(url: string | null, isRealDecode = false, samples = 1000) {
   const [peaks, setPeaks] = useState<number[]>([]);
@@ -30,28 +31,70 @@ export function useAudioWaveform(url: string | null, isRealDecode = false, sampl
 
         if (isRealDecode) {
           // Decode real audio file (safe for short audio tracks)
-          const response = await fetch(url);
+          let fetchUrl = url;
+          if (fetchUrl.startsWith('file://')) {
+            fetchUrl = fetchUrl.replace('file://', 'toscreen://');
+          }
+          if (!fetchUrl) return;
+          const response = await fetch(fetchUrl + '?t=' + Date.now(), { cache: 'no-store' });
           const arrayBuffer = await response.arrayBuffer();
-          const audioBuffer = await ac.decodeAudioData(arrayBuffer);
-          if (isMounted) setDurationMs(audioBuffer.duration * 1000);
-          const channelData = audioBuffer.getChannelData(0); // Use first channel
-          const blockSize = Math.floor(channelData.length / samples);
-          const newPeaks = [];
           
-          for (let i = 0; i < samples; i++) {
+          // Try manual WAV parse first to bypass browser padding bugs
+          const parsed = parseWavFile(arrayBuffer.slice(0));
+          if (parsed) {
+             if (isMounted) {
+               setDurationMs(parsed.durationMs);
+               setPeaks(parsed.peaks);
+             }
+             return;
+          }
+
+          const audioBuffer = await ac.decodeAudioData(arrayBuffer);
+          const durationSec = audioBuffer.duration;
+          // Dynamic density
+          const dynamicSamples = Math.max(32000, Math.floor(durationSec * 400));
+          const numChannels = audioBuffer.numberOfChannels;
+          const length = audioBuffer.length;
+          const blockSize = Math.floor(length / dynamicSamples);
+          const newPeaks: number[] = new Array(dynamicSamples);
+          
+          for (let i = 0; i < dynamicSamples; i++) {
             let max = 0;
             const start = i * blockSize;
-            const end = Math.min(start + blockSize, channelData.length);
+            const end = Math.min(start + blockSize, length);
             for (let j = start; j < end; j++) {
-              const val = Math.abs(channelData[j]);
-              if (val > max) max = val;
+              for (let c = 0; c < numChannels; c++) {
+                const val = Math.abs(audioBuffer.getChannelData(c)[j]);
+                if (val > max) max = val;
+              }
             }
-            newPeaks.push(max);
+            newPeaks[i] = max;
           }
+          
+          // Normalize peaks
+          let globalMax = 0;
+          for (let i = 0; i < dynamicSamples; i++) {
+            if (newPeaks[i] > globalMax) globalMax = newPeaks[i];
+          }
+          if (globalMax > 0 && globalMax < 0.95) {
+            const scale = 1.0 / globalMax;
+            for (let i = 0; i < dynamicSamples; i++) {
+              newPeaks[i] = newPeaks[i] * scale;
+            }
+          }
+          
           if (isMounted) setPeaks(newPeaks);
         } else {
-          // Generate clean mock waveform data instantly for massive video files
-          const mockPeaks = Array.from({ length: samples }, (_, i) => Math.abs(Math.sin(i * 0.05)) * 0.8 + 0.1);
+          // Generate realistic jagged mock waveform data (chaotic, uneven audio) instead of smooth round sine waves
+          const mockDurationSec = 600; // Assume 10 minute mock video track
+          const mockSamples = Math.max(32000, Math.floor(mockDurationSec * 400));
+          const mockPeaks = Array.from({ length: mockSamples }, (_, i) => {
+            // Base modulation to create "phrases" of talking
+            const envelope = Math.abs(Math.sin(i * 0.05)) * 0.6 + 0.1;
+            // High frequency jagged noise for realistic audio sampling
+            const jaggedNoise = Math.random() * 0.4;
+            return Math.max(0.05, Math.min(1.0, envelope + jaggedNoise));
+          });
           if (isMounted) setPeaks(mockPeaks);
         }
 

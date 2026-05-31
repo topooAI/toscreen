@@ -57,6 +57,22 @@ export class AudioMixerExporter {
         let currentSourceTime = 0;
         let currentOutputTime = 0;
 
+        const applyCrossfade = (source: AudioBufferSourceNode, tStart: number, duration: number) => {
+          const tEnd = tStart + duration;
+          const gainNode = offlineCtx.createGain();
+          
+          // 5ms crossfade. Clamp transition time to not exceed half of segment duration.
+          const fadeTime = Math.min(0.005, duration / 2); 
+
+          gainNode.gain.setValueAtTime(0, tStart);
+          gainNode.gain.linearRampToValueAtTime(1.0, tStart + fadeTime);
+          gainNode.gain.setValueAtTime(1.0, tEnd - fadeTime);
+          gainNode.gain.linearRampToValueAtTime(0, tEnd);
+
+          source.connect(gainNode);
+          gainNode.connect(offlineCtx.destination);
+        };
+
         for (const trim of sortedTrims) {
           const trimStartSec = trim.startMs / 1000;
           if (trimStartSec > currentSourceTime) {
@@ -65,7 +81,8 @@ export class AudioMixerExporter {
             
             const source = offlineCtx.createBufferSource();
             source.buffer = mainAudioBuffer;
-            source.connect(offlineCtx.destination);
+            
+            applyCrossfade(source, currentOutputTime, keepDuration);
             source.start(currentOutputTime, currentSourceTime, keepDuration);
 
             currentOutputTime += keepDuration;
@@ -79,7 +96,8 @@ export class AudioMixerExporter {
           const keepDuration = mainAudioBuffer.duration - currentSourceTime;
           const source = offlineCtx.createBufferSource();
           source.buffer = mainAudioBuffer;
-          source.connect(offlineCtx.destination);
+          
+          applyCrossfade(source, currentOutputTime, keepDuration);
           source.start(currentOutputTime, currentSourceTime, keepDuration);
         }
       }
@@ -107,15 +125,23 @@ export class AudioMixerExporter {
           source.buffer = regionBuffer;
 
           const gainNode = offlineCtx.createGain();
-          gainNode.gain.value = region.volume ?? 1.0;
-
-          source.connect(gainNode);
-          gainNode.connect(offlineCtx.destination);
+          const targetVol = region.volume ?? 1.0;
 
           // region.startMs is on the EFFECTIVE timeline. 
           const outputStartTime = region.startMs / 1000;
           const outputDuration = (region.endMs - region.startMs) / 1000;
-          
+          const outputEndTime = outputStartTime + outputDuration;
+          const fadeTime = Math.min(0.005, outputDuration / 2);
+
+          // Apply micro-fade in/out to avoid pops on cut starts/ends
+          gainNode.gain.setValueAtTime(0, outputStartTime);
+          gainNode.gain.linearRampToValueAtTime(targetVol, outputStartTime + fadeTime);
+          gainNode.gain.setValueAtTime(targetVol, outputEndTime - fadeTime);
+          gainNode.gain.linearRampToValueAtTime(0, outputEndTime);
+
+          source.connect(gainNode);
+          gainNode.connect(offlineCtx.destination);
+
           // if it was cropped from the left, we'd start playback from sourceStartMs
           const sourceOffset = (region.sourceStartMs || 0) / 1000;
 

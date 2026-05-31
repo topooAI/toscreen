@@ -71,6 +71,8 @@ interface TimelineEditorProps {
   onFullScreenBindingChange: (enabled: boolean) => void;
   isPlaying: boolean;
   onTogglePlayPause: () => void;
+  selectedVideoId: string | null;
+  onSelectVideo: (id: string | null) => void;
 }
 
 interface TimelineScaleConfig {
@@ -96,6 +98,8 @@ interface TimelineRenderItem {
   volume?: number;
   volumeKeyframes?: any[];
   audioPeaks?: number[];
+  audioPeaksDurationMs?: number;
+  associatedAudio?: AudioRegion;
 }
 
 const SCALE_CANDIDATES = [
@@ -444,6 +448,8 @@ function Timeline({
   videoRef,
   mapSourceToEffective,
   isTrimTrackVisible,
+  selectedVideoId,
+  onSelectVideo,
 }: {
   items: TimelineRenderItem[];
   videoDurationMs: number;
@@ -466,20 +472,50 @@ function Timeline({
   videoRef?: React.RefObject<HTMLVideoElement | null>;
   mapSourceToEffective?: (ms: number) => number;
   isTrimTrackVisible?: boolean;
+  selectedVideoId: string | null;
+  onSelectVideo: (id: string | null) => void;
 }) {
   
-  const trackRenderer = useMemo(() => (
-    <>
-      {/* Base Video Track */}
-      <Row id={VIDEO_ROW_ID}>
+  const trackRenderer = useMemo(() => {
+    const hasAssociatedAudio = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio);
+    const isAssociatedAudioSelected = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio?.id === selectedAudioId);
+    const videoRowHeight = isAssociatedAudioSelected ? 102 : (hasAssociatedAudio ? 84 : 48);
+
+    return (
+       <>
+        {/* Base Video Track */}
+        <Row id={VIDEO_ROW_ID} height={videoRowHeight}>
         {items.filter(item => item.rowId === VIDEO_ROW_ID).map((item) => (
           <Item
             id={item.id}
             key={item.id}
             rowId={item.rowId}
             span={item.span}
-            isSelected={false}
+            isSelected={selectedVideoId === item.id}
+            onSelect={() => {
+              onSelectVideo?.(item.id);
+              onSelectZoom?.(null);
+              onSelectTrim?.(null);
+              onSelectAnnotation?.(null);
+              onSelectAudio?.(null);
+            }}
             variant="video"
+            associatedAudio={item.associatedAudio}
+            isAudioSelected={selectedAudioId === item.associatedAudio?.id}
+            onSelectAudio={() => {
+              if (item.associatedAudio) {
+                onSelectAudio?.(item.associatedAudio.id);
+                onSelectVideo?.(null);
+                onSelectZoom?.(null);
+                onSelectTrim?.(null);
+                onSelectAnnotation?.(null);
+              }
+            }}
+            audioPeaks={item.associatedAudio?.sourceUrl ? waveformCache.get(item.associatedAudio.sourceUrl)?.peaks : undefined}
+            onVolumeKeyframesChange={(keyframes) => onAudioVolumeKeyframesChange?.(item.associatedAudio!.id, keyframes)}
+            sourceStartMs={item.associatedAudio?.sourceStartMs}
+            sourceEndMs={item.associatedAudio?.sourceEndMs}
+            totalDurationMs={item.associatedAudio?.totalDurationMs}
           >
             {item.label}
           </Item>
@@ -519,47 +555,67 @@ function Timeline({
         ))}
       </Row>
 
-      <Row id={ANNOTATION_ROW_ID} onAddClick={onAddAnnotation}>
-        {items.filter(item => item.rowId === ANNOTATION_ROW_ID).map((item) => (
-          <Item
-            id={item.id}
-            key={item.id}
-            rowId={item.rowId}
-            span={item.span}
-            isSelected={item.id === selectedAnnotationId}
-            onSelect={() => onSelectAnnotation?.(item.id)}
-            variant="annotation"
-          >
-            {item.label}
-          </Item>
-        ))}
-      </Row>
+      {(() => {
+        const annotationRowIds = Array.from(new Set(
+          items.filter(item => item.rowId.startsWith("row-annotation-")).map(item => item.rowId)
+        )).sort();
+        const finalAnnotationRowIds = annotationRowIds.length > 0 ? annotationRowIds : ["row-annotation-0"];
+        
+        return finalAnnotationRowIds.map((rowId) => (
+          <Row id={rowId} key={rowId} onAddClick={onAddAnnotation}>
+            {items.filter(item => item.rowId === rowId).map((item) => (
+              <Item
+                id={item.id}
+                key={item.id}
+                rowId={item.rowId}
+                span={item.span}
+                isSelected={item.id === selectedAnnotationId}
+                onSelect={() => onSelectAnnotation?.(item.id)}
+                variant="annotation"
+              >
+                {item.label}
+              </Item>
+            ))}
+          </Row>
+        ));
+      })()}
       
-      <Row id={AUDIO_ROW_ID} onAddClick={() => toast.info('请将音频文件直接拖拽到画面中添加')}>
-        {items.filter(item => item.rowId === AUDIO_ROW_ID).map((item) => (
-          <Item
-            id={item.id}
-            key={item.id}
-            rowId={item.rowId}
-            span={item.span}
-            isSelected={item.id === selectedAudioId}
-            onSelect={() => onSelectAudio?.(item.id)}
-            variant="audio"
-            sourceStartMs={item.sourceStartMs}
-            sourceEndMs={item.sourceEndMs}
-            totalDurationMs={item.totalDurationMs}
-            sourceUrl={item.sourceUrl}
-            audioPeaks={item.audioPeaks}
-            volume={item.volume}
-            volumeKeyframes={item.volumeKeyframes}
-            onVolumeKeyframesChange={(keyframes) => onAudioVolumeKeyframesChange?.(item.id, keyframes)}
-          >
-            {item.label}
-          </Item>
-        ))}
-      </Row>
+      {(() => {
+        const audioRowIds = Array.from(new Set(
+          items.filter(item => item.rowId.startsWith("row-audio-")).map(item => item.rowId)
+        )).sort();
+        const finalAudioRowIds = audioRowIds.length > 0 ? audioRowIds : ["row-audio-0"];
+
+        return finalAudioRowIds.map((rowId) => (
+          <Row id={rowId} key={rowId} height={48} onAddClick={() => toast.info('请将音频文件直接拖拽到画面中添加')}>
+            {items.filter(item => item.rowId === rowId).map((item) => (
+              <Item
+                id={item.id}
+                key={item.id}
+                rowId={item.rowId}
+                span={item.span}
+                isSelected={item.id === selectedAudioId}
+                onSelect={() => onSelectAudio?.(item.id)}
+                variant="audio"
+                sourceStartMs={item.sourceStartMs}
+                sourceEndMs={item.sourceEndMs}
+                totalDurationMs={item.totalDurationMs}
+                sourceUrl={item.sourceUrl}
+                audioPeaks={item.audioPeaks}
+                audioPeaksDurationMs={item.audioPeaksDurationMs}
+                volume={item.volume}
+                volumeKeyframes={item.volumeKeyframes}
+                onVolumeKeyframesChange={(keyframes) => onAudioVolumeKeyframesChange?.(item.id, keyframes)}
+              >
+                {item.label}
+              </Item>
+            ))}
+          </Row>
+        ));
+      })()}
     </>
-  ), [items, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache]);
+  );
+}, [items, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange]);
 
 const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef } = useTimelineContext();
   const localTimelineRef = useRef<HTMLDivElement | null>(null);
@@ -664,6 +720,8 @@ export default function TimelineEditor({
   isPlaying,
   onTogglePlayPause,
   videoRef,
+  selectedVideoId,
+  onSelectVideo,
 }: TimelineEditorProps) {
   const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
   const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
@@ -980,12 +1038,19 @@ export default function TimelineEditor({
   const timelineItems = useMemo<TimelineRenderItem[]>(() => {
     const mapTime = (time: number) => isTrimTrackVisible ? time : mapSourceToEffective(time);
 
+    const originalAudio = audioRegions.find(r => r.isOriginal && !r.isDetached);
+
     const videos: TimelineRenderItem[] = [{
       id: 'video-track',
       rowId: VIDEO_ROW_ID,
       span: { start: 0, end: mapTime(totalMs) },
       label: 'Main Track',
-      variant: 'video'
+      variant: 'video',
+      associatedAudio: originalAudio ? {
+        ...originalAudio,
+        sourceStartMs: 0,
+        sourceEndMs: totalMs,
+      } : undefined,
     }];
     
     const zooms: TimelineRenderItem[] = zoomRegions.map((region, index) => ({
@@ -1005,7 +1070,32 @@ export default function TimelineEditor({
       variant: 'trim',
     })) : [];
 
-    const annotations: TimelineRenderItem[] = (annotationRegions || []).map((region) => {
+    const partitionIntoTracks = <T extends { startMs: number; endMs: number }>(regions: T[]) => {
+      const sorted = [...regions].sort((a, b) => a.startMs - b.startMs);
+      const tracks: number[][] = []; // store endMs of items in each track
+      const result: { item: T; trackIndex: number }[] = [];
+      
+      for (const item of sorted) {
+        let assignedTrack = -1;
+        for (let i = 0; i < tracks.length; i++) {
+          const lastEnd = tracks[i][tracks[i].length - 1];
+          if (item.startMs >= lastEnd) {
+            assignedTrack = i;
+            tracks[i].push(item.endMs);
+            break;
+          }
+        }
+        if (assignedTrack === -1) {
+          assignedTrack = tracks.length;
+          tracks.push([item.endMs]);
+        }
+        result.push({ item, trackIndex: assignedTrack });
+      }
+      return result;
+    };
+
+    const partitionedAnnotations = partitionIntoTracks(annotationRegions || []);
+    const annotations: TimelineRenderItem[] = partitionedAnnotations.map(({ item: region, trackIndex }) => {
       let label: string;
       
       if (region.type === 'text') {
@@ -1019,20 +1109,23 @@ export default function TimelineEditor({
       
       return {
         id: region.id,
-        rowId: ANNOTATION_ROW_ID,
+        rowId: `row-annotation-${trackIndex}`,
         span: { start: mapTime(region.startMs), end: mapTime(region.endMs) },
         label,
         variant: 'annotation',
       };
     });
 
-    const audios: TimelineRenderItem[] = (audioRegions || []).map((region) => ({
+    const filteredAudios = (audioRegions || []).filter(region => !region.isOriginal || region.isDetached);
+    const partitionedAudios = partitionIntoTracks(filteredAudios);
+    const audios: TimelineRenderItem[] = partitionedAudios.map(({ item: region, trackIndex }) => ({
       id: region.id,
-      rowId: AUDIO_ROW_ID,
+      rowId: `row-audio-${trackIndex}`,
       span: { start: mapTime(region.startMs), end: mapTime(region.endMs) },
-      label: 'Audio Track',
+      label: region.name || 'Audio Track',
       variant: 'audio',
       audioPeaks: region.sourceUrl ? waveformCache.get(region.sourceUrl)?.peaks : undefined,
+      audioPeaksDurationMs: region.sourceUrl ? waveformCache.get(region.sourceUrl)?.durationMs : undefined,
       sourceUrl: region.sourceUrl,
       sourceStartMs: region.sourceStartMs,
       sourceEndMs: region.sourceEndMs,
@@ -1053,7 +1146,12 @@ export default function TimelineEditor({
              rowId: VIDEO_ROW_ID,
              span: { start: mapTime(currentSourceStart), end: mapTime(trim.startMs) },
              label: 'Main Clip',
-             variant: 'zoom'
+             variant: 'video',
+             associatedAudio: originalAudio ? {
+              ...originalAudio,
+              sourceStartMs: currentSourceStart,
+              sourceEndMs: trim.startMs,
+            } : undefined,
            });
         }
         currentSourceStart = trim.endMs;
@@ -1064,7 +1162,12 @@ export default function TimelineEditor({
              rowId: VIDEO_ROW_ID,
              span: { start: mapTime(currentSourceStart), end: mapTime(totalMs) },
              label: 'Main Clip',
-             variant: 'zoom'
+             variant: 'video',
+             associatedAudio: originalAudio ? {
+               ...originalAudio,
+               sourceStartMs: currentSourceStart,
+               sourceEndMs: totalMs,
+             } : undefined,
          });
       }
     }
@@ -1284,6 +1387,8 @@ export default function TimelineEditor({
             videoRef={videoRef}
             mapSourceToEffective={mapSourceToEffective}
             isTrimTrackVisible={isTrimTrackVisible}
+            selectedVideoId={selectedVideoId}
+            onSelectVideo={onSelectVideo}
           />
         </TimelineWrapper>
       </div>

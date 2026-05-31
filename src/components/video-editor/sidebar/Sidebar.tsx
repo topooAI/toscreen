@@ -64,6 +64,13 @@ interface SidebarProps {
     onShowVectorCursorChange?: (show: boolean) => void;
     cursorOffset?: number;
     onCursorOffsetChange?: (offset: number) => void;
+    // Video Clip select & detach
+    selectedVideoId?: string | null;
+    onSelectVideo?: (id: string | null) => void;
+    onSeparateAudio?: () => void;
+    isOriginalAudioSelected?: boolean;
+    onSelectAudio?: (id: string | null) => void;
+    hasOriginalAudio?: boolean;
 }
 
 export function Sidebar(props: SidebarProps) {
@@ -85,6 +92,52 @@ export function Sidebar(props: SidebarProps) {
                     onFigureDataChange={props.onAnnotationFigureDataChange ? (figureData) => props.onAnnotationFigureDataChange!(selectedAnnotation.id, figureData) : undefined}
                     onDelete={() => props.onAnnotationDelete!(selectedAnnotation.id)}
                 />
+            </div>
+        );
+    }
+
+    // 1.5 Handle Video Clip Select & Audio Detachment Panel
+    if ((props.selectedVideoId || props.isOriginalAudioSelected) && props.onSelectVideo) {
+        return (
+            <div className="flex-[2] min-w-0 bg-[#09090b] border border-white/5 rounded-2xl flex flex-col shadow-xl h-full overflow-hidden p-5 space-y-6">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                    <span className="text-sm font-semibold text-white/90">Main Clip 属性</span>
+                    <Button 
+                        onClick={() => {
+                            props.onSelectVideo?.(null);
+                            props.onSelectAudio?.(null);
+                        }}
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-slate-400 hover:text-white"
+                    >
+                        <X className="w-4 h-4" />
+                    </Button>
+                </div>
+                
+                <div className="space-y-4 flex-1">
+                    <div className="space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">片段状态</span>
+                        <p className="text-xs text-slate-300">选中的是视频主轨片段 (Main Track Clip)</p>
+                    </div>
+                    
+                    {props.hasOriginalAudio && props.onSeparateAudio && (
+                        <div className="space-y-3 pt-4 border-t border-white/5 animate-in fade-in duration-200">
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">音频分离</span>
+                            <p className="text-xs text-slate-400 leading-relaxed">
+                                当前原声音频已“手风琴式”挂载在视频片段顶部。您可以点击分离音频，将其解绑并下沉到独立的下方轨道以进行自由的异步剪辑。
+                            </p>
+                            <Button
+                                onClick={props.onSeparateAudio}
+                                variant="outline"
+                                className="w-full gap-2 bg-[#FF00B7]/10 text-[#FF00B7] border-[#FF00B7]/20 hover:bg-[#FF00B7]/20 hover:border-[#FF00B7]/30 transition-all h-10 font-semibold text-xs rounded-xl"
+                            >
+                                <Star className="w-3.5 h-3.5 fill-[#FF00B7]" />
+                                分离音频 (Separate Audio)
+                            </Button>
+                        </div>
+                    )}
+                </div>
             </div>
         );
     }

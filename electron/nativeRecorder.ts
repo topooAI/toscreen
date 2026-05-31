@@ -84,6 +84,7 @@ export async function startNativeRecording(options?: {
 export async function stopNativeRecording(): Promise<{
   success: boolean
   outputPath?: string
+  audioOutputPath?: string
   error?: string
 }> {
   if (!recorderInstance || !isRecording) {

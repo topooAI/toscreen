@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, session } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage, session, protocol } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
@@ -148,6 +148,9 @@ app.on('activate', () => {
 })
 
 
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'toscreen', privileges: { supportFetchAPI: true, bypassCSP: true, secure: true, corsEnabled: true } }
+]);
 
 // Register all IPC handlers when app is ready
 app.whenReady().then(async () => {
@@ -156,6 +159,21 @@ app.whenReady().then(async () => {
   ipcMain.on('hud-overlay-close', () => {
     app.quit();
   });
+
+  // Register custom protocol to bypass fetch API file:// restrictions
+  protocol.registerFileProtocol('toscreen', (request, callback) => {
+    let url = request.url.substring(11); // remove 'toscreen://'
+    const queryIndex = url.indexOf('?');
+    if (queryIndex !== -1) {
+      url = url.substring(0, queryIndex);
+    }
+    try {
+      callback({ path: decodeURIComponent(url) });
+    } catch (error) {
+      callback({ error: -2 }); // net::ERR_FAILED
+    }
+  });
+
   createTray()
   updateTrayMenu()
   // Ensure recordings directory exists

@@ -40,6 +40,7 @@ const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wall
 export default function VideoEditor() {
   const [videoPath, setVideoPath] = useState<string | null>(null);
   const [originalVideoPath, setOriginalVideoPath] = useState<string | null>(null);
+  const [companionAudioPath, setCompanionAudioPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -78,15 +79,124 @@ export default function VideoEditor() {
           newR.endMs = newR.startMs + 5000;
           needsFix = true;
         }
+        
+        // Dynamically fix isOriginal: original companion audio has path matching companionAudioPath or recorded pattern
+        const isActuallyOriginal = companionAudioPath 
+          ? (newR.path === companionAudioPath)
+          : (newR.isOriginal === true && (newR.name?.startsWith('temp_audio_') || newR.name === 'Recorded Audio'));
+
+        if (newR.isOriginal !== isActuallyOriginal) {
+          newR.isOriginal = isActuallyOriginal;
+          needsFix = true;
+        }
+
+        if (newR.isDetached === undefined) {
+          newR.isDetached = false;
+          needsFix = true;
+        }
+        
+        // Rescue clips that are entirely outside the visible timeline
+        if (duration > 0 && newR.startMs >= duration * 1000) {
+          newR.startMs = Math.max(0, (duration * 1000) - 5000);
+          newR.endMs = newR.startMs + 5000;
+          needsFix = true;
+        }
+        
         return newR;
       });
+
       if (needsFix) {
         setAudioRegions(fixedRegions);
       }
     }
-  }, [audioRegions]);
+  }, [audioRegions, companionAudioPath, duration]);
 
   const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
+
+  const handleSeparateAudio = useCallback(() => {
+    const originalAudio = audioRegions.find(r => r.isOriginal && !r.isDetached);
+    if (!originalAudio) {
+      toast.error("没有可分离的原声轨");
+      return;
+    }
+
+    const totalMs = Math.max(0, Math.round(duration * 1000));
+    if (totalMs <= 0) return;
+
+    // Helper: Map source time to effective timeline
+    const mapSourceToEffective = (sourceMs: number) => {
+      const sorted = [...trimRegions].sort((a, b) => a.startMs - b.startMs);
+      let activeTrimMs = 0;
+      for (const trim of sorted) {
+        if (sourceMs <= trim.startMs) break;
+        if (sourceMs >= trim.endMs) {
+          activeTrimMs += (trim.endMs - trim.startMs);
+        } else {
+          activeTrimMs += (sourceMs - trim.startMs);
+        }
+      }
+      return Math.max(0, sourceMs - activeTrimMs);
+    };
+
+    // Calculate active clips based on trimRegions (like mainClips in TimelineEditor)
+    const sortedTrims = [...trimRegions].sort((a, b) => a.startMs - b.startMs);
+    const clips: { start: number; end: number }[] = [];
+    let currentSourceStart = 0;
+
+    sortedTrims.forEach((trim) => {
+      if (currentSourceStart < trim.startMs) {
+        clips.push({ start: currentSourceStart, end: trim.startMs });
+      }
+      currentSourceStart = trim.endMs;
+    });
+
+    if (currentSourceStart < totalMs) {
+      clips.push({ start: currentSourceStart, end: totalMs });
+    }
+
+    // Generate detached clips
+    const newDetachedClips: AudioRegion[] = clips.map((clip, index) => {
+      const clipDuration = clip.end - clip.start;
+      
+      // Filter keyframes that fall within this clip's time range, and re-offset/scale them to new ratio
+      const clipKeyframes = (originalAudio.volumeKeyframes || [])
+        .map(kf => {
+          const absoluteTimeMs = kf.timeRatio * (originalAudio.totalDurationMs || totalMs);
+          return { kf, absoluteTimeMs };
+        })
+        .filter(({ absoluteTimeMs }) => absoluteTimeMs >= clip.start && absoluteTimeMs <= clip.end)
+        .map(({ kf, absoluteTimeMs }) => ({
+          ...kf,
+          timeRatio: clipDuration > 0 ? (absoluteTimeMs - clip.start) / clipDuration : 0
+        }));
+
+      return {
+        id: crypto.randomUUID(),
+        startMs: mapSourceToEffective(clip.start),
+        endMs: mapSourceToEffective(clip.end),
+        sourceStartMs: clip.start,
+        sourceEndMs: clip.end,
+        totalDurationMs: originalAudio.totalDurationMs || totalMs,
+        sourceUrl: originalAudio.sourceUrl,
+        volume: originalAudio.volume,
+        volumeKeyframes: clipKeyframes,
+        name: clips.length > 1 ? `原声片段 ${index + 1}` : "分离原声",
+        path: originalAudio.path,
+        isOriginal: true,
+        isDetached: true,
+      };
+    });
+
+    // Replace the old original audio with new detached clips
+    setAudioRegions(prev => [
+      ...prev.filter(r => !(r.isOriginal && !r.isDetached)),
+      ...newDetachedClips
+    ]);
+
+    toast.success(clips.length > 1 ? `原声成功裂变分离为 ${clips.length} 个片段并下沉` : "原声音频已成功分离并下沉至独立音轨");
+    setSelectedVideoId(null);
+  }, [audioRegions, duration, trimRegions]);
 
   // Premium Cursor Customization Settings (Screen Studio parity)
   const [cursorSize, setCursorSize] = useState(1.5);
@@ -145,6 +255,12 @@ export default function VideoEditor() {
           setSelectedTrimId(null);
           setSelectedAnnotationId(null);
           setSelectedAudioId(null);
+          
+          if ((result as any).audioPath) {
+            setCompanionAudioPath((result as any).audioPath);
+          } else {
+            setCompanionAudioPath(null);
+          }
 
           // If proxy is available, use it for UI playback. Always keep original for export.
           setVideoPath(result.path);
@@ -162,7 +278,9 @@ export default function VideoEditor() {
               // Restore sourceUrls for audio regions from saved absolute paths
               const restoredAudio = p.audioRegions.map((ar: any) => ({
                 ...ar,
-                sourceUrl: ar.path ? `file://${ar.path.replace(/\\/g, '/')}` : ar.sourceUrl
+                sourceUrl: ar.path ? `file://${ar.path.replace(/\\/g, '/')}` : ar.sourceUrl,
+                isOriginal: ar.isOriginal !== undefined ? ar.isOriginal : true,
+                isDetached: ar.isDetached !== undefined ? ar.isDetached : false,
               }));
               setAudioRegions(restoredAudio);
             }
@@ -195,6 +313,8 @@ export default function VideoEditor() {
                   totalDurationMs: durationMs,
                   sourceStartMs: 0,
                   sourceEndMs: durationMs,
+                  isOriginal: true,
+                  isDetached: false,
                 };
                 
                 setAudioRegions([newAudioRegion]);
@@ -300,6 +420,7 @@ export default function VideoEditor() {
       setSelectedTrimId(null);
       setSelectedAnnotationId(null);
       setSelectedAudioId(null);
+      setSelectedVideoId(null);
     }
   }, []);
 
@@ -309,6 +430,7 @@ export default function VideoEditor() {
       setSelectedZoomId(null);
       setSelectedAnnotationId(null);
       setSelectedAudioId(null);
+      setSelectedVideoId(null);
     }
   }, []);
 
@@ -318,6 +440,7 @@ export default function VideoEditor() {
       setSelectedZoomId(null);
       setSelectedTrimId(null);
       setSelectedAudioId(null);
+      setSelectedVideoId(null);
     }
   }, []);
 
@@ -327,6 +450,7 @@ export default function VideoEditor() {
       setSelectedZoomId(null);
       setSelectedTrimId(null);
       setSelectedAnnotationId(null);
+      setSelectedVideoId(null);
     }
   }, []);
 
@@ -488,10 +612,21 @@ export default function VideoEditor() {
     const audio = new Audio(region.sourceUrl);
     audio.addEventListener('loadedmetadata', () => {
       const durationMs = Math.round(audio.duration * 1000);
-      setAudioRegions(prev => prev.map(r => r.id === region.id ? { ...r, totalDurationMs: durationMs } : r));
+      setAudioRegions(prev => prev.map(r => r.id === region.id ? { 
+        ...r, 
+        totalDurationMs: durationMs,
+        endMs: r.startMs + durationMs,
+        sourceEndMs: durationMs
+      } : r));
     });
     
-    setAudioRegions(prev => [...prev, region]);
+    const newRegion = {
+      isOriginal: false,
+      isDetached: false,
+      ...region
+    };
+    
+    setAudioRegions(prev => [...prev, newRegion]);
     setSelectedAudioId(region.id);
   }, [setAudioRegions, setSelectedAudioId]);
 
@@ -956,16 +1091,22 @@ export default function VideoEditor() {
             onShowVectorCursorChange={setShowVectorCursor}
             cursorOffset={cursorOffset}
             onCursorOffsetChange={setCursorOffset}
+            selectedVideoId={selectedVideoId}
+            onSelectVideo={setSelectedVideoId}
+            isOriginalAudioSelected={audioRegions.some(r => r.id === selectedAudioId && r.isOriginal && !r.isDetached)}
+            onSelectAudio={handleSelectAudio}
+            onSeparateAudio={handleSeparateAudio}
+            hasOriginalAudio={audioRegions.some(r => r.isOriginal && !r.isDetached)}
           />
         ), [
           wallpaper, zoomRegions, selectedZoomId, selectedTrimId, shadowIntensity,
           showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, aspectRatio,
           exportQuality, selectedAnnotationId, annotationRegions, cursorSize,
-          cursorSmoothing, showVectorCursor, cursorOffset,
+          cursorSmoothing, showVectorCursor, cursorOffset, selectedVideoId, selectedAudioId, audioRegions,
           handleZoomDepthChange, handleZoomDelete, handleTrimDelete,
           handleExport, handleAnnotationContentChange, handleAnnotationTypeChange,
           handleAnnotationStyleChange, handleAnnotationFigureDataChange, handleAnnotationDelete,
-          handleAutoZoom, videoPlaybackRef.current?.video
+          handleAutoZoom, videoPlaybackRef.current?.video, handleSeparateAudio, handleSelectAudio
         ]);
 
   if (loading) {
@@ -1028,6 +1169,7 @@ export default function VideoEditor() {
           setSelectedTrimId(null);
           setSelectedAnnotationId(null);
           setSelectedAudioId(null);
+          setCompanionAudioPath(null);
 
           // Attempt to extract real file path if available, else blob
           const path = (file as any).path || URL.createObjectURL(file);
@@ -1074,7 +1216,13 @@ export default function VideoEditor() {
           }
           
           const url = URL.createObjectURL(file);
-          const startPos = Math.max(0, Math.min(currentTime, duration));
+          
+          // Ensure it drops visibly even if playhead is at the very end
+          let startPos = Math.max(0, Math.min(currentTime, duration));
+          if (duration - startPos < 1) {
+            startPos = Math.max(0, duration - 5);
+          }
+          
           handleAudioAdded({
             id: crypto.randomUUID(),
             startMs: startPos * 1000,
@@ -1207,6 +1355,8 @@ export default function VideoEditor() {
                   onFullScreenBindingChange={setIsFullScreenBinding}
                   isPlaying={isPlaying}
                   onTogglePlayPause={togglePlayPause}
+                  selectedVideoId={selectedVideoId}
+                  onSelectVideo={setSelectedVideoId}
                 />
               </div>
             </Panel>
