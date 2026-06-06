@@ -59,6 +59,7 @@ interface TimelineEditorProps {
   audioRegions?: AudioRegion[];
   onAudioAdded?: (span: Span) => void;
   onAudioSpanChange?: (id: string, span: Span) => void;
+  onAudioTrackChange?: (id: string, trackIndex: number) => void;
   onAudioDelete?: (id: string) => void;
   selectedAudioId?: string | null;
   onSelectAudio?: (id: string | null) => void;
@@ -73,6 +74,7 @@ interface TimelineEditorProps {
   onTogglePlayPause: () => void;
   selectedVideoId: string | null;
   onSelectVideo: (id: string | null) => void;
+  videoPath?: string;
 }
 
 interface TimelineScaleConfig {
@@ -210,10 +212,13 @@ function PlaybackCursor({
   const cursorLineRef = useRef<HTMLDivElement>(null);
   const cursorContainerRef = useRef<HTMLDivElement>(null);
 
+  const currentTimeMsRef = useRef(_currentTimeMs);
+  useEffect(() => {
+    currentTimeMsRef.current = _currentTimeMs;
+  }, [_currentTimeMs]);
+
   // High-frequency DOM update via rAF — bypasses React render entirely
   useEffect(() => {
-    if (!videoRef?.current) return;
-    
     let rafId: number;
     const tick = () => {
       const line = cursorLineRef.current;
@@ -223,30 +228,43 @@ function PlaybackCursor({
         return;
       }
       
-      const video = videoRef.current;
-      if (!video) {
-        rafId = requestAnimationFrame(tick);
-        return;
-      }
-      
-      const rawTimeMs = video.currentTime * 1000;
+      const video = videoRef?.current;
+      const rawTimeMs = video ? video.currentTime * 1000 : currentTimeMsRef.current;
       const timeMs = (isTrimTrackVisible || !mapSourceToEffective) 
         ? rawTimeMs 
         : mapSourceToEffective(rawTimeMs);
-      
-      if (videoDurationMs <= 0 || timeMs < 0) {
+
+      // --- 关键防守与解绑逻辑 ---
+      // 1. 防御 NaN 或 Infinity，避免 valueToPixels 崩溃导致游标飞到 0px
+      if (!Number.isFinite(timeMs) || !Number.isFinite(videoDurationMs) || videoDurationMs <= 0) {
+        container.style.display = 'none';
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+
+      let finalTimeMs = timeMs;
+      // 2. 只有在视频真正播放时，才跟随底层真实的 currentTime
+      // 当暂停或拖拽时，或者拿不到 video 实例时，完全信任 React 传递下来的 _currentTimeMs（精准落点，无视底层帧吸附）
+      if (video && !video.paused && !Number.isNaN(video.currentTime)) {
+        finalTimeMs = timeMs;
+      } else {
+        finalTimeMs = currentTimeMsRef.current;
+      }
+
+      if (finalTimeMs < 0) {
         container.style.display = 'none';
         rafId = requestAnimationFrame(tick);
         return;
       }
       
-      const clampedTime = Math.min(timeMs, videoDurationMs);
+      const clampedTime = Math.min(finalTimeMs, videoDurationMs);
       if (clampedTime < range.start || clampedTime > range.end) {
         container.style.display = 'none';
       } else {
         container.style.display = '';
         const offset = valueToPixels(clampedTime - range.start);
-        line.style[sideProperty as any] = `${sidebarWidth + offset - 0.5}px`;
+        const effectiveSidebarWidth = typeof sidebarWidth === 'number' && !Number.isNaN(sidebarWidth) ? sidebarWidth : 156;
+        line.style[sideProperty as any] = `${effectiveSidebarWidth + offset - 0.5}px`;
       }
       
       rafId = requestAnimationFrame(tick);
@@ -265,7 +283,6 @@ function PlaybackCursor({
       const rect = timelineRef.current.getBoundingClientRect();
       const clickX = e.clientX - rect.left - sidebarWidth;
       
-      // Allow dragging outside to 0 or max, but clamp the value
       const relativeMs = pixelsToValue(clickX);
       const absoluteMs = Math.max(0, Math.min(range.start + relativeMs, videoDurationMs));
       
@@ -298,12 +315,13 @@ function PlaybackCursor({
     >
       <div
         ref={cursorLineRef}
-        className="absolute top-0 bottom-0 w-[1px] bg-[#FF00B7] shadow-[0_0_10px_rgba(255,0,183,0.5)] cursor-ew-resize pointer-events-auto hover:shadow-[0_0_15px_rgba(255,0,183,0.7)]"
+        className="absolute top-0 bottom-0 w-[16px] -ml-[8px] cursor-ew-resize pointer-events-auto flex justify-center group/line"
         onMouseDown={(e) => {
           e.stopPropagation();
           setIsDragging(true);
         }}
       >
+        <div className="w-[1px] h-full bg-[#FF00B7] shadow-[0_0_10px_rgba(255,0,183,0.5)] group-hover/line:shadow-[0_0_15px_rgba(255,0,183,0.7)]" />
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing drop-shadow-md"
         >
@@ -479,7 +497,7 @@ function Timeline({
   const trackRenderer = useMemo(() => {
     const hasAssociatedAudio = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio);
     const isAssociatedAudioSelected = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio?.id === selectedAudioId);
-    const videoRowHeight = isAssociatedAudioSelected ? 102 : (hasAssociatedAudio ? 84 : 48);
+    const videoRowHeight = isAssociatedAudioSelected ? 102 : (hasAssociatedAudio ? 84 : 64);
 
     return (
        <>
@@ -500,6 +518,8 @@ function Timeline({
               onSelectAudio?.(null);
             }}
             variant="video"
+            sourceUrl={item.sourceUrl}
+            sourceStartMs={0}
             associatedAudio={item.associatedAudio}
             isAudioSelected={selectedAudioId === item.associatedAudio?.id}
             onSelectAudio={() => {
@@ -513,9 +533,22 @@ function Timeline({
             }}
             audioPeaks={item.associatedAudio?.sourceUrl ? waveformCache.get(item.associatedAudio.sourceUrl)?.peaks : undefined}
             onVolumeKeyframesChange={(keyframes) => onAudioVolumeKeyframesChange?.(item.associatedAudio!.id, keyframes)}
-            sourceStartMs={item.associatedAudio?.sourceStartMs}
-            sourceEndMs={item.associatedAudio?.sourceEndMs}
-            totalDurationMs={item.associatedAudio?.totalDurationMs}
+          >
+            {item.label}
+          </Item>
+        ))}
+
+        {/* 物理 Trim 轨道废除，直接渲染在 VIDEO_ROW 内，使其贴底绝对定位 */}
+        {items.filter(item => item.rowId === TRIM_ROW_ID).map((item) => (
+          <Item
+            id={item.id}
+            key={item.id}
+            rowId={VIDEO_ROW_ID} // 强行挂载在主轨中
+            span={item.span}
+            isSelected={item.id === selectedTrimId}
+            onSelect={() => onSelectTrim?.(item.id)}
+            variant="trim"
+            isNestedTrim={true}
           >
             {item.label}
           </Item>
@@ -533,22 +566,6 @@ function Timeline({
             onSelect={() => onSelectZoom?.(item.id)}
             variant="zoom"
             zoomDepth={item.zoomDepth}
-          >
-            {item.label}
-          </Item>
-        ))}
-      </Row>
-
-      <Row id={TRIM_ROW_ID} onAddClick={onAddTrim}>
-        {items.filter(item => item.rowId === TRIM_ROW_ID).map((item) => (
-          <Item
-            id={item.id}
-            key={item.id}
-            rowId={item.rowId}
-            span={item.span}
-            isSelected={item.id === selectedTrimId}
-            onSelect={() => onSelectTrim?.(item.id)}
-            variant="trim"
           >
             {item.label}
           </Item>
@@ -628,29 +645,30 @@ const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef
   const handleTimelineClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!onSeek || videoDurationMs <= 0) return;
     
-    // Only clear selection if clicking on empty space (not on items)
-    // This is handled by event propagation - items stop propagation
     onSelectZoom?.(null);
     onSelectTrim?.(null);
     onSelectAnnotation?.(null);
     onSelectAudio?.(null);
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left - sidebarWidth;
+    const rawClickX = e.clientX - rect.left;
     
-    if (clickX < 0) return;
+    // 如果点击在侧边栏以内 ( < 140 )，不响应
+    if (rawClickX < 140) return;
+    
+    // 如果点击在 16px 的呼吸留白区 (140 <= x <= 156)，触发秒复位到 0:00
+    if (rawClickX <= 156) {
+      onSeek(0);
+      return;
+    }
+    
+    // 其他情况，计算相对于时间轴起点的 clickX
+    const clickX = rawClickX - sidebarWidth;
     
     const relativeMs = pixelsToValue(clickX);
     const absoluteMs = Math.max(0, Math.min(range.start + relativeMs, videoDurationMs));
-    const timeInSeconds = absoluteMs / 1000;
-    
-    onSeek(timeInSeconds);
-  }, [onSeek, onSelectZoom, onSelectTrim, onSelectAnnotation, onSelectAudio, videoDurationMs, sidebarWidth, range.start, pixelsToValue]);
-
-  const zoomItems = items.filter(item => item.rowId === ZOOM_ROW_ID);
-  const trimItems = items.filter(item => item.rowId === TRIM_ROW_ID);
-  const annotationItems = items.filter(item => item.rowId === ANNOTATION_ROW_ID);
-  const audioItems = items.filter(item => item.rowId === AUDIO_ROW_ID);
+    onSeek(absoluteMs / 1000);
+  }, [sidebarWidth, range.start, pixelsToValue, onSeek, videoDurationMs, onSelectZoom, onSelectTrim, onSelectAnnotation, onSelectAudio]);
 
   return (
     <div
@@ -667,6 +685,8 @@ const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef
 
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px)] bg-[length:20px_100%] pointer-events-none" />
       <TimelineAxis intervalMs={intervalMs} videoDurationMs={videoDurationMs} sidebarWidth={sidebarWidth} />
+      {trackRenderer}
+
       <PlaybackCursor 
         currentTimeMs={currentTimeMs} 
         videoDurationMs={videoDurationMs} 
@@ -676,8 +696,6 @@ const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef
         mapSourceToEffective={mapSourceToEffective}
         isTrimTrackVisible={isTrimTrackVisible}
       />
-
-      {trackRenderer}
     </div>
   );
 }
@@ -710,8 +728,6 @@ export default function TimelineEditor({
   onAudioDelete,
   selectedAudioId,
   onSelectAudio,
-  onAudioAdded,
-  onAudioVolumeChange,
   onAudioVolumeKeyframesChange,
   aspectRatio,
   onAspectRatioChange,
@@ -722,6 +738,8 @@ export default function TimelineEditor({
   videoRef,
   selectedVideoId,
   onSelectVideo,
+  onAudioTrackChange,
+  videoPath,
 }: TimelineEditorProps) {
   const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
   const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
@@ -830,27 +848,46 @@ export default function TimelineEditor({
     });
   }, [zoomRegions, trimRegions, annotationRegions, totalMs, safeMinDurationMs, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange]);
 
-  const hasOverlap = useCallback((newSpan: Span, excludeId?: string): boolean => {
-    // Determine which row the item belongs to
+  const hasOverlap = useCallback((newSpan: Span, excludeId?: string, targetRowId?: string): boolean => {
+    const mapTime = (time: number) => (isTrimTrackVisible || !mapSourceToEffective) ? time : mapSourceToEffective(time);
+    const baseExcludeId = excludeId?.split('-part-')[0];
     const isZoomItem = zoomRegions.some(r => r.id === excludeId);
     const isTrimItem = trimRegions.some(r => r.id === excludeId);
     const isAnnotationItem = (annotationRegions || []).some(r => r.id === excludeId);
-    const isAudioItem = (audioRegions || []).some(r => r.id === excludeId);
+    const isAudioItem = (audioRegions || []).some(r => r.id === baseExcludeId);
 
-    if (isAnnotationItem || isAudioItem) {
+    if (isAnnotationItem) {
       return false;
+    }
+
+    if (isAudioItem) {
+      const selfAudio = (audioRegions || []).find(r => r.id === baseExcludeId);
+      const selfTrackIndex = selfAudio ? (selfAudio.trackIndex ?? 0) : 0;
+      
+      let targetTrackIndex = selfTrackIndex;
+      if (targetRowId !== undefined) {
+        if (!targetRowId.startsWith('row-audio-')) return true;
+        targetTrackIndex = parseInt(targetRowId.replace('row-audio-', ''), 10);
+      }
+
+      const otherAudios = (audioRegions || []).filter(r => 
+        r.id !== baseExcludeId && 
+        (r.trackIndex ?? 0) === targetTrackIndex && 
+        (!r.isOriginal || r.isDetached)
+      );
+      
+      return otherAudios.some((region) => {
+        const regionStart = mapTime(region.startMs);
+        const regionEnd = mapTime(region.endMs);
+        return !(newSpan.end - regionStart <= 1.5 || regionEnd - newSpan.start <= 1.5);
+      });
     }
 
     // Helper to check overlap against a specific set of regions
     const checkOverlap = (regions: (ZoomRegion | TrimRegion)[]) => {
       return regions.some((region) => {
         if (region.id === excludeId) return false;
-        const gapBefore = newSpan.start - region.endMs;
-        const gapAfter = region.startMs - newSpan.end;
-        // Snap if gap is 2ms or less
-        if (gapBefore > 0 && gapBefore <= 2) return true;
-        if (gapAfter > 0 && gapAfter <= 2) return true;
-        return !(newSpan.end <= region.startMs || newSpan.start >= region.endMs);
+        return !(newSpan.end - region.startMs <= 1.5 || region.endMs - newSpan.start <= 1.5);
       });
     };
 
@@ -863,7 +900,146 @@ export default function TimelineEditor({
     }
 
     return false;
-  }, [zoomRegions, trimRegions, annotationRegions, audioRegions]);
+  }, [zoomRegions, trimRegions, annotationRegions, audioRegions, mapSourceToEffective, isTrimTrackVisible]);
+
+  const getNonOverlappingSpan = useCallback((
+    newSpan: Span, 
+    excludeId?: string, 
+    targetRowId?: string
+  ): Span => {
+    const mapTime = (time: number) => (isTrimTrackVisible || !mapSourceToEffective) ? time : mapSourceToEffective(time);
+    const baseExcludeId = excludeId?.split('-part-')[0];
+    const isZoomItem = zoomRegions.some(r => r.id === excludeId);
+    const isTrimItem = trimRegions.some(r => r.id === excludeId);
+    const isAnnotationItem = (annotationRegions || []).some(r => r.id === excludeId);
+    const isAudioItem = (audioRegions || []).some(r => r.id === baseExcludeId);
+
+    // 对于注解，允许自由重叠覆盖
+    if (isAnnotationItem) {
+      return newSpan;
+    }
+
+    // 1. 处理音频轨道的碰撞贴边
+    if (isAudioItem) {
+      const selfAudio = (audioRegions || []).find(r => r.id === baseExcludeId);
+      const selfTrackIndex = selfAudio ? (selfAudio.trackIndex ?? 0) : 0;
+      
+      let targetTrackIndex = selfTrackIndex;
+      if (targetRowId !== undefined) {
+        if (!targetRowId.startsWith('row-audio-')) return newSpan;
+        targetTrackIndex = parseInt(targetRowId.replace('row-audio-', ''), 10);
+      }
+
+      const otherAudios = (audioRegions || []).filter(r => 
+        r.id !== baseExcludeId && 
+        (r.trackIndex ?? 0) === targetTrackIndex && 
+        (!r.isOriginal || r.isDetached)
+      );
+
+      // 寻找与 newSpan 产生交叠的所有其他音频（加入 1.5ms 容差）
+      const overlapping = otherAudios.filter((region) => {
+        const regionStart = mapTime(region.startMs);
+        const regionEnd = mapTime(region.endMs);
+        return !(newSpan.end - regionStart <= 1.5 || regionEnd - newSpan.start <= 1.5);
+      });
+
+      if (overlapping.length === 0) {
+        return newSpan;
+      }
+
+      // 如果有重叠，对 newSpan 进行贴边修正
+      const duration = newSpan.end - newSpan.start;
+      
+      // 判断是在拉伸还是拖拽
+      const oldStart = selfAudio ? mapTime(selfAudio.startMs) : newSpan.start;
+      const oldEnd = selfAudio ? mapTime(selfAudio.endMs) : newSpan.end;
+      
+      const isResizing = targetRowId === undefined; // targetRowId 为 undefined 说明在 onResizeEnd
+      
+      if (isResizing && selfAudio) {
+        const isResizingRight = Math.abs(newSpan.start - oldStart) < 2; // 左边缘没变，说明是右边缘拉伸
+        const isResizingLeft = Math.abs(newSpan.end - oldEnd) < 2;   // 右边缘没变，说明是左边缘拉伸
+        
+        if (isResizingRight) {
+          const starts = overlapping.map(r => mapTime(r.startMs));
+          const minStart = Math.min(...starts);
+          return { start: newSpan.start, end: Math.max(newSpan.start + 10, minStart) };
+        } else if (isResizingLeft) {
+          const ends = overlapping.map(r => mapTime(r.endMs));
+          const maxEnd = Math.max(...ends);
+          return { start: Math.min(newSpan.end - 10, maxEnd), end: newSpan.end };
+        }
+      }
+
+      // 拖拽避让碰撞：偏向哪侧就贴在另外一个音频的哪一侧
+      const targetRegion = overlapping[0];
+      const targetStart = mapTime(targetRegion.startMs);
+      const targetEnd = mapTime(targetRegion.endMs);
+      
+      const midA = (newSpan.start + newSpan.end) / 2;
+      const midB = (targetStart + targetEnd) / 2;
+      
+      if (midA < midB) {
+        const start = targetStart - duration;
+        return { start: Math.max(0, start), end: Math.max(duration, targetStart) };
+      } else {
+        return { start: targetEnd, end: targetEnd + duration };
+      }
+    }
+
+    // 2. 处理 Zoom / Trim 的碰撞贴边
+    const checkOverlapAndResolve = (regions: (ZoomRegion | TrimRegion)[]) => {
+      const overlapping = regions.filter((region) => {
+        if (region.id === excludeId) return false;
+        return !(newSpan.end - region.startMs <= 1.5 || region.endMs - newSpan.start <= 1.5);
+      });
+
+      if (overlapping.length === 0) {
+        return newSpan;
+      }
+
+      const selfRegion = regions.find(r => r.id === excludeId);
+      const oldStart = selfRegion ? selfRegion.startMs : newSpan.start;
+      const oldEnd = selfRegion ? selfRegion.endMs : newSpan.end;
+      const duration = newSpan.end - newSpan.start;
+      
+      const isResizing = targetRowId === undefined;
+      
+      if (isResizing && selfRegion) {
+        const isResizingRight = Math.abs(newSpan.start - oldStart) < 2;
+        const isResizingLeft = Math.abs(newSpan.end - oldEnd) < 2;
+        
+        if (isResizingRight) {
+          const minStart = Math.min(...overlapping.map(r => r.startMs));
+          return { start: newSpan.start, end: Math.max(newSpan.start + 10, minStart) };
+        } else if (isResizingLeft) {
+          const maxEnd = Math.max(...overlapping.map(r => r.endMs));
+          return { start: Math.min(newSpan.end - 10, maxEnd), end: newSpan.end };
+        }
+      }
+
+      const targetRegion = overlapping[0];
+      const midA = (newSpan.start + newSpan.end) / 2;
+      const midB = (targetRegion.startMs + targetRegion.endMs) / 2;
+      
+      if (midA < midB) {
+        const start = targetRegion.startMs - duration;
+        return { start: Math.max(0, start), end: Math.max(duration, targetRegion.startMs) };
+      } else {
+        return { start: targetRegion.endMs, end: targetRegion.endMs + duration };
+      }
+    };
+
+    if (isZoomItem) {
+      return checkOverlapAndResolve(zoomRegions);
+    }
+
+    if (isTrimItem) {
+      return checkOverlapAndResolve(trimRegions);
+    }
+
+    return newSpan;
+  }, [zoomRegions, trimRegions, annotationRegions, audioRegions, mapSourceToEffective, isTrimTrackVisible, mapEffectiveToSource]);
 
   const handleAddZoom = useCallback(() => {
     if (!videoDuration || videoDuration === 0 || activeDurationMs === 0) {
@@ -1046,6 +1222,8 @@ export default function TimelineEditor({
       span: { start: 0, end: mapTime(totalMs) },
       label: 'Main Track',
       variant: 'video',
+      sourceUrl: videoPath,
+      sourceStartMs: 0,
       associatedAudio: originalAudio ? {
         ...originalAudio,
         sourceStartMs: 0,
@@ -1176,8 +1354,112 @@ export default function TimelineEditor({
     return [...videoItems, ...zooms, ...trims, ...annotations, ...audios];
   }, [
     isTrimTrackVisible, mapSourceToEffective, totalMs, zoomRegions, 
-    trimRegions, annotationRegions, audioRegions, totalMs, waveformCache
+    trimRegions, annotationRegions, audioRegions, totalMs, waveformCache, videoPath
   ]);
+
+  const getMagneticSnapSpan = useCallback((
+    activeItemId: string,
+    targetSpan: Span
+  ): Span => {
+    const baseExcludeId = activeItemId.split('-part-')[0];
+    
+    // 1. 找到当前操作的 item，获取它的 rowId 以及它对应的旧 span
+    const itemInRender = timelineItems.find(item => item.id === activeItemId);
+    if (!itemInRender) return targetSpan;
+
+    const rowId = itemInRender.rowId;
+    const oldSpan = itemInRender.span;
+
+    // 2. 收集同行所有兄弟片段以及视频主轨（VIDEO_ROW_ID）在时间轴上的有效边缘 (start, end)
+    const peerSpans = timelineItems
+      .filter(item => 
+        item.id !== activeItemId && 
+        item.id.split('-part-')[0] !== baseExcludeId &&
+        (item.rowId === rowId || item.rowId === VIDEO_ROW_ID)
+      )
+      .map(item => item.span);
+
+    // 3. 收集吸附目标点 (Snap Points)
+    // 除了这些 peerSpans 的 start 和 end 之外，还有播放头 activeCurrentTimeMs
+    const snapTargets: number[] = [activeCurrentTimeMs];
+    for (const peer of peerSpans) {
+      snapTargets.push(peer.start);
+      snapTargets.push(peer.end);
+    }
+
+    // 4. 计算磁吸阈值
+    const SNAP_THRESHOLD_MS = Math.max(50, Math.min(300, timelineScale.intervalMs / 5));
+
+    // 5. 区分是拖拽 (drag) 还是拉伸 (resize)
+    const duration = targetSpan.end - targetSpan.start;
+    const oldDuration = oldSpan.end - oldSpan.start;
+    const isTrimming = Math.abs(duration - oldDuration) > 1; // 时长变化大于 1ms 即为拉伸
+
+    let closestDelta = Infinity;
+    let snapOffset = 0;
+
+    if (isTrimming) {
+      // 拉伸状态：区分是拉左边缘还是拉右边缘
+      const isResizingLeft = Math.abs(targetSpan.end - oldSpan.end) <= 2; // 右边缘基本没变，说明拉左边缘
+      const isResizingRight = Math.abs(targetSpan.start - oldSpan.start) <= 2; // 左边缘基本没变，说明拉右边缘
+
+      if (isResizingLeft) {
+        // 磁吸 targetSpan.start
+        for (const t of snapTargets) {
+          const diff = t - targetSpan.start;
+          if (Math.abs(diff) < Math.abs(closestDelta) && Math.abs(diff) <= SNAP_THRESHOLD_MS) {
+            closestDelta = diff;
+            snapOffset = diff;
+          }
+        }
+        if (closestDelta !== Infinity) {
+          return { start: targetSpan.start + snapOffset, end: targetSpan.end };
+        }
+      } else if (isResizingRight) {
+        // 磁吸 targetSpan.end
+        for (const t of snapTargets) {
+          const diff = t - targetSpan.end;
+          if (Math.abs(diff) < Math.abs(closestDelta) && Math.abs(diff) <= SNAP_THRESHOLD_MS) {
+            closestDelta = diff;
+            snapOffset = diff;
+          }
+        }
+        if (closestDelta !== Infinity) {
+          return { start: targetSpan.start, end: targetSpan.end + snapOffset };
+        }
+      }
+    } else {
+      // 拖拽状态：整体平移
+      for (const t of snapTargets) {
+        // 检查 start 是否接近吸附点
+        const diffStart = t - targetSpan.start;
+        if (Math.abs(diffStart) < Math.abs(closestDelta) && Math.abs(diffStart) <= SNAP_THRESHOLD_MS) {
+          closestDelta = diffStart;
+          snapOffset = diffStart;
+        }
+        // 检查 end 是否接近吸附点
+        const diffEnd = t - targetSpan.end;
+        if (Math.abs(diffEnd) < Math.abs(closestDelta) && Math.abs(diffEnd) <= SNAP_THRESHOLD_MS) {
+          closestDelta = diffEnd;
+          snapOffset = diffEnd;
+        }
+      }
+
+      if (closestDelta !== Infinity) {
+        return { start: targetSpan.start + snapOffset, end: targetSpan.end + snapOffset };
+      }
+    }
+
+    return targetSpan;
+  }, [timelineItems, activeCurrentTimeMs, timelineScale.intervalMs]);
+
+  const handleItemRowChange = useCallback((id: string, newRowId: string) => {
+    const baseId = id.split('-part-')[0];
+    if (newRowId.startsWith('row-audio-')) {
+      const newTrackIndex = parseInt(newRowId.replace('row-audio-', ''), 10);
+      onAudioTrackChange?.(baseId, newTrackIndex);
+    }
+  }, [onAudioTrackChange]);
 
   const handleItemSpanChange = useCallback((id: string, span: Span) => {
     const targetSpan = isTrimTrackVisible 
@@ -1354,11 +1636,14 @@ export default function TimelineEditor({
           range={clampedRange}
           videoDuration={activeDurationMs / 1000}
           hasOverlap={hasOverlap}
+          getNonOverlappingSpan={getNonOverlappingSpan}
+          getMagneticSnapSpan={getMagneticSnapSpan}
           onRangeChange={setRange}
           minItemDurationMs={timelineScale.minItemDurationMs}
           minVisibleRangeMs={timelineScale.minVisibleRangeMs}
           gridSizeMs={timelineScale.gridMs}
           onItemSpanChange={handleItemSpanChange}
+          onItemRowChange={handleItemRowChange}
         >
           <KeyframeMarkers
             keyframes={keyframes}
