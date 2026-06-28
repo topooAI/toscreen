@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTimelineContext } from "dnd-timeline";
 import { useWaveformCache } from "../hooks/useWaveformCache";
 import { Button } from "../../ui/button";
-import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check, Target, Scan, Eye, EyeOff } from "lucide-react";
+import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check, Target, Scan } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../../lib/utils";
 import { useTimeMap } from "../hooks/useTimeMap";
@@ -31,9 +31,21 @@ const AUDIO_ROW_ID = "row-audio";
 const VIDEO_ROW_ID = "row-video";
 const FALLBACK_RANGE_MS = 1000;
 const TARGET_MARKER_COUNT = 12;
+const FALLBACK_TRACK_START_PX = 156;
+
+function getTrackStartPx(timeline: HTMLElement | null) {
+  if (!timeline) return FALLBACK_TRACK_START_PX;
+  const trackArea = timeline.querySelector<HTMLElement>('[data-timeline-track-area="true"]');
+  if (!trackArea) return FALLBACK_TRACK_START_PX;
+
+  const timelineRect = timeline.getBoundingClientRect();
+  const trackRect = trackArea.getBoundingClientRect();
+  return Math.max(0, trackRect.left - timelineRect.left);
+}
 
 interface TimelineEditorProps {
   videoDuration: number;
+  sourceVideoDuration?: number;
   currentTime: number;
   onSeek?: (time: number) => void;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
@@ -74,6 +86,8 @@ interface TimelineEditorProps {
   onTogglePlayPause: () => void;
   selectedVideoId: string | null;
   onSelectVideo: (id: string | null) => void;
+  onTimelineResizeStart?: () => void;
+  onTimelineResizeEnd?: () => void;
   videoPath?: string;
 }
 
@@ -196,7 +210,10 @@ function PlaybackCursor({
   timelineRef,
   videoRef,
   mapSourceToEffective,
+  mapEffectiveToSource,
   isTrimTrackVisible,
+  trackStartPx,
+  freezeExternalTime,
 }: { 
   currentTimeMs: number; 
   videoDurationMs: number;
@@ -204,13 +221,21 @@ function PlaybackCursor({
   timelineRef: React.RefObject<HTMLDivElement>;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
   mapSourceToEffective?: (ms: number) => number;
+  mapEffectiveToSource?: (ms: number) => number;
   isTrimTrackVisible?: boolean;
+  trackStartPx: number;
+  freezeExternalTime?: boolean;
 }) {
-  const { sidebarWidth, direction, range, valueToPixels, pixelsToValue } = useTimelineContext();
+  const { direction, range, valueToPixels, pixelsToValue } = useTimelineContext();
   const sideProperty = direction === "rtl" ? "right" : "left";
   const [isDragging, setIsDragging] = useState(false);
   const cursorLineRef = useRef<HTMLDivElement>(null);
   const cursorContainerRef = useRef<HTMLDivElement>(null);
+
+  const isDraggingRef = useRef(isDragging);
+  useEffect(() => {
+    isDraggingRef.current = isDragging;
+  }, [isDragging]);
 
   const currentTimeMsRef = useRef(_currentTimeMs);
   useEffect(() => {
@@ -229,7 +254,7 @@ function PlaybackCursor({
       }
       
       const video = videoRef?.current;
-      const rawTimeMs = video ? video.currentTime * 1000 : currentTimeMsRef.current;
+      const rawTimeMs = freezeExternalTime ? currentTimeMsRef.current : (video ? video.currentTime * 1000 : currentTimeMsRef.current);
       const timeMs = (isTrimTrackVisible || !mapSourceToEffective) 
         ? rawTimeMs 
         : mapSourceToEffective(rawTimeMs);
@@ -243,9 +268,9 @@ function PlaybackCursor({
       }
 
       let finalTimeMs = timeMs;
-      // 2. 只有在视频真正播放时，才跟随底层真实的 currentTime
-      // 当暂停或拖拽时，或者拿不到 video 实例时，完全信任 React 传递下来的 _currentTimeMs（精准落点，无视底层帧吸附）
-      if (video && !video.paused && !Number.isNaN(video.currentTime)) {
+      // 2. 只有在视频真正播放时，且没有在拖拽时，才跟随底层真实的 currentTime
+      // 当暂停或拖拽时，或者拿不到 video 实例时，完全信任 React 传递下来的 currentTimeMsRef（精准落点，无视底层帧吸附）
+      if (!freezeExternalTime && !isDraggingRef.current && video && !video.paused && !Number.isNaN(video.currentTime)) {
         finalTimeMs = timeMs;
       } else {
         finalTimeMs = currentTimeMsRef.current;
@@ -257,14 +282,13 @@ function PlaybackCursor({
         return;
       }
       
-      const clampedTime = Math.min(finalTimeMs, videoDurationMs);
+      const clampedTime = Math.max(0, finalTimeMs);
       if (clampedTime < range.start || clampedTime > range.end) {
         container.style.display = 'none';
       } else {
         container.style.display = '';
         const offset = valueToPixels(clampedTime - range.start);
-        const effectiveSidebarWidth = typeof sidebarWidth === 'number' && !Number.isNaN(sidebarWidth) ? sidebarWidth : 156;
-        line.style[sideProperty as any] = `${effectiveSidebarWidth + offset - 0.5}px`;
+        line.style[sideProperty as any] = `${trackStartPx + offset - 0.5}px`;
       }
       
       rafId = requestAnimationFrame(tick);
@@ -272,7 +296,7 @@ function PlaybackCursor({
     
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [videoRef, videoDurationMs, range.start, range.end, sidebarWidth, sideProperty, valueToPixels, mapSourceToEffective, isTrimTrackVisible]);
+  }, [videoRef, videoDurationMs, range.start, range.end, trackStartPx, sideProperty, valueToPixels, mapSourceToEffective, isTrimTrackVisible, freezeExternalTime]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -281,12 +305,15 @@ function PlaybackCursor({
       if (!timelineRef.current || !onSeek) return;
       
       const rect = timelineRef.current.getBoundingClientRect();
-      const clickX = e.clientX - rect.left - sidebarWidth;
+      const clickX = e.clientX - rect.left - trackStartPx;
       
       const relativeMs = pixelsToValue(clickX);
-      const absoluteMs = Math.max(0, Math.min(range.start + relativeMs, videoDurationMs));
+      const effectiveMs = Math.max(0, range.start + relativeMs);
+      const sourceMs = (isTrimTrackVisible || !mapEffectiveToSource)
+        ? effectiveMs
+        : mapEffectiveToSource(effectiveMs);
       
-      onSeek(absoluteMs / 1000);
+      onSeek(sourceMs / 1000);
     };
 
     const handleMouseUp = () => {
@@ -303,7 +330,7 @@ function PlaybackCursor({
       window.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = '';
     };
-  }, [isDragging, onSeek, timelineRef, sidebarWidth, range.start, videoDurationMs, pixelsToValue]);
+  }, [isDragging, onSeek, timelineRef, trackStartPx, range.start, videoDurationMs, pixelsToValue, isTrimTrackVisible, mapEffectiveToSource]);
 
   return (
     <div
@@ -338,11 +365,11 @@ function PlaybackCursor({
 const TimelineAxis = memo(({
   intervalMs,
   videoDurationMs,
-  sidebarWidth,
+  trackStartPx,
 }: {
   intervalMs: number;
   videoDurationMs: number;
-  sidebarWidth: number;
+  trackStartPx: number;
 }) => {
   const { direction, range, valueToPixels } = useTimelineContext();
   const sideProperty = direction === "rtl" ? "right" : "left";
@@ -352,7 +379,7 @@ const TimelineAxis = memo(({
       return { markers: [], minorTicks: [] };
     }
 
-    const maxTime = videoDurationMs > 0 ? videoDurationMs : range.end;
+    const maxTime = Math.max(videoDurationMs > 0 ? videoDurationMs : 0, range.end);
     const visibleStart = Math.max(0, Math.min(range.start, maxTime));
     const visibleEnd = Math.min(range.end, maxTime);
     const markerTimes = new Set<number>();
@@ -408,7 +435,7 @@ const TimelineAxis = memo(({
           <div
             key={`minor-${time}`}
             className="absolute bottom-0 h-1 w-[1px] bg-white/5"
-            style={{ [sideProperty]: `${sidebarWidth + offset}px` }}
+            style={{ [sideProperty]: `${trackStartPx + offset}px` }}
           />
         );
       })}
@@ -420,7 +447,7 @@ const TimelineAxis = memo(({
             key={marker.time} 
             className="absolute bottom-0 h-full flex flex-col justify-end items-center"
             style={{
-              [sideProperty]: `${sidebarWidth + offset}px`,
+              [sideProperty]: `${trackStartPx + offset}px`,
               transform: 'translateX(-50%)',
             }}
           >
@@ -440,12 +467,14 @@ const TimelineAxis = memo(({
   return (
     prev.intervalMs === next.intervalMs &&
     prev.videoDurationMs === next.videoDurationMs &&
-    prev.sidebarWidth === next.sidebarWidth
+    prev.trackStartPx === next.trackStartPx
   );
 });
 
 function Timeline({
   items,
+  zoomRegions,
+  zoomBoundaryRegions,
   videoDurationMs,
   intervalMs,
   currentTimeMs,
@@ -463,13 +492,20 @@ function Timeline({
   onSelectAudio,
   waveformCache,
   onAudioVolumeKeyframesChange,
+  onItemSpanChange,
+  onTimelineResizeStart,
+  onTimelineResizeEnd,
   videoRef,
   mapSourceToEffective,
+  mapEffectiveToSource,
   isTrimTrackVisible,
   selectedVideoId,
   onSelectVideo,
+  isTimelineResizing,
 }: {
   items: TimelineRenderItem[];
+  zoomRegions: ZoomRegion[];
+  zoomBoundaryRegions?: ZoomRegion[];
   videoDurationMs: number;
   intervalMs: number;
   currentTimeMs: number;
@@ -487,17 +523,22 @@ function Timeline({
   onSelectAudio?: (id: string | null) => void;
   waveformCache?: any;
   onAudioVolumeKeyframesChange?: (id: string, keyframes: any[]) => void;
+  onItemSpanChange?: (id: string, span: Span) => void;
+  onTimelineResizeStart?: () => void;
+  onTimelineResizeEnd?: () => void;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
   mapSourceToEffective?: (ms: number) => number;
+  mapEffectiveToSource?: (ms: number) => number;
   isTrimTrackVisible?: boolean;
   selectedVideoId: string | null;
   onSelectVideo: (id: string | null) => void;
+  isTimelineResizing?: boolean;
 }) {
   
   const trackRenderer = useMemo(() => {
     const hasAssociatedAudio = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio);
     const isAssociatedAudioSelected = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio?.id === selectedAudioId);
-    const videoRowHeight = isAssociatedAudioSelected ? 102 : (hasAssociatedAudio ? 84 : 64);
+    const videoRowHeight = isAssociatedAudioSelected ? 144 : (hasAssociatedAudio ? 126 : 122);
 
     return (
        <>
@@ -519,7 +560,6 @@ function Timeline({
             }}
             variant="video"
             sourceUrl={item.sourceUrl}
-            sourceStartMs={0}
             associatedAudio={item.associatedAudio}
             isAudioSelected={selectedAudioId === item.associatedAudio?.id}
             onSelectAudio={() => {
@@ -532,6 +572,11 @@ function Timeline({
               }
             }}
             audioPeaks={item.associatedAudio?.sourceUrl ? waveformCache.get(item.associatedAudio.sourceUrl)?.peaks : undefined}
+            sourceStartMs={item.sourceStartMs ?? 0}
+            sourceEndMs={item.sourceEndMs}
+            totalDurationMs={item.totalDurationMs}
+            zoomRegions={zoomRegions}
+            zoomBoundaryRegions={zoomBoundaryRegions}
             onVolumeKeyframesChange={(keyframes) => onAudioVolumeKeyframesChange?.(item.associatedAudio!.id, keyframes)}
           >
             {item.label}
@@ -566,6 +611,9 @@ function Timeline({
             onSelect={() => onSelectZoom?.(item.id)}
             variant="zoom"
             zoomDepth={item.zoomDepth}
+            onDirectSpanChange={onItemSpanChange}
+            onDirectResizeStart={onTimelineResizeStart}
+            onDirectResizeEnd={onTimelineResizeEnd}
           >
             {item.label}
           </Item>
@@ -632,17 +680,42 @@ function Timeline({
       })()}
     </>
   );
-}, [items, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange]);
+}, [items, zoomRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange]);
 
-const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef } = useTimelineContext();
+const { setTimelineRef, style, range, pixelsToValue, setSidebarRef } = useTimelineContext();
   const localTimelineRef = useRef<HTMLDivElement | null>(null);
+  const [trackStartPx, setTrackStartPx] = useState(FALLBACK_TRACK_START_PX);
 
   const setRefs = useCallback((node: HTMLDivElement | null) => {
-    setTimelineRef(node);
     localTimelineRef.current = node;
+    setTimelineRef(node);
   }, [setTimelineRef]);
 
+  useEffect(() => {
+    const timeline = localTimelineRef.current;
+    if (!timeline) return;
+
+    const updateTrackStart = () => {
+      setTrackStartPx(getTrackStartPx(timeline));
+    };
+
+    updateTrackStart();
+    console.debug('[Timeline] unified seek coordinates loaded');
+    const resizeObserver = new ResizeObserver(updateTrackStart);
+    resizeObserver.observe(timeline);
+    const trackArea = timeline.querySelector<HTMLElement>('[data-timeline-track-area="true"]');
+    if (trackArea) resizeObserver.observe(trackArea);
+
+    return () => resizeObserver.disconnect();
+  }, [items.length]);
+
   const handleTimelineClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (isTimelineResizing) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
     if (!onSeek || videoDurationMs <= 0) return;
     
     onSelectZoom?.(null);
@@ -653,22 +726,24 @@ const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef
     const rect = e.currentTarget.getBoundingClientRect();
     const rawClickX = e.clientX - rect.left;
     
-    // 如果点击在侧边栏以内 ( < 140 )，不响应
-    if (rawClickX < 140) return;
-    
-    // 如果点击在 16px 的呼吸留白区 (140 <= x <= 156)，触发秒复位到 0:00
-    if (rawClickX <= 156) {
+    if (rawClickX < trackStartPx) {
       onSeek(0);
       return;
     }
     
-    // 其他情况，计算相对于时间轴起点的 clickX
-    const clickX = rawClickX - sidebarWidth;
+    const clickX = rawClickX - trackStartPx;
     
     const relativeMs = pixelsToValue(clickX);
-    const absoluteMs = Math.max(0, Math.min(range.start + relativeMs, videoDurationMs));
-    onSeek(absoluteMs / 1000);
-  }, [sidebarWidth, range.start, pixelsToValue, onSeek, videoDurationMs, onSelectZoom, onSelectTrim, onSelectAnnotation, onSelectAudio]);
+    const effectiveMs = Math.max(0, range.start + relativeMs);
+    const sourceMs = (isTrimTrackVisible || !mapEffectiveToSource)
+      ? effectiveMs
+      : mapEffectiveToSource(effectiveMs);
+    
+    console.log(
+      `[TimelineSeek] rawX=${rawClickX.toFixed(1)} trackStart=${trackStartPx.toFixed(1)} effectiveMs=${effectiveMs.toFixed(1)} sourceMs=${sourceMs.toFixed(1)}`
+    );
+    onSeek(sourceMs / 1000);
+  }, [isTimelineResizing, trackStartPx, range.start, pixelsToValue, onSeek, videoDurationMs, onSelectZoom, onSelectTrim, onSelectAnnotation, onSelectAudio, isTrimTrackVisible, mapEffectiveToSource]);
 
   return (
     <div
@@ -684,7 +759,7 @@ const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef
       />
 
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px)] bg-[length:20px_100%] pointer-events-none" />
-      <TimelineAxis intervalMs={intervalMs} videoDurationMs={videoDurationMs} sidebarWidth={sidebarWidth} />
+      <TimelineAxis intervalMs={intervalMs} videoDurationMs={videoDurationMs} trackStartPx={trackStartPx} />
       {trackRenderer}
 
       <PlaybackCursor 
@@ -694,7 +769,10 @@ const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef
         timelineRef={localTimelineRef}
         videoRef={videoRef}
         mapSourceToEffective={mapSourceToEffective}
+        mapEffectiveToSource={mapEffectiveToSource}
         isTrimTrackVisible={isTrimTrackVisible}
+        trackStartPx={trackStartPx}
+        freezeExternalTime={isTimelineResizing}
       />
     </div>
   );
@@ -702,6 +780,7 @@ const { setTimelineRef, style, sidebarWidth, range, pixelsToValue, setSidebarRef
 
 export default function TimelineEditor({
   videoDuration,
+  sourceVideoDuration,
   currentTime,
   onSeek,
   zoomRegions,
@@ -739,15 +818,18 @@ export default function TimelineEditor({
   selectedVideoId,
   onSelectVideo,
   onAudioTrackChange,
+  onTimelineResizeStart,
+  onTimelineResizeEnd,
   videoPath,
 }: TimelineEditorProps) {
-  const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
+  const totalMs = useMemo(() => Math.max(0, Math.round((sourceVideoDuration ?? videoDuration) * 1000)), [sourceVideoDuration, videoDuration]);
+  const projectTotalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
   const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
 
-  const [isTrimTrackVisible, setIsTrimTrackVisible] = useState(false);
+  const isTrimTrackVisible = false; // 用户强制要求删除 Trim UI
   const { effectiveDurationMs, mapSourceToEffective, mapEffectiveToSource } = useTimeMap(trimRegions, totalMs);
   
-  const activeDurationMs = isTrimTrackVisible ? totalMs : effectiveDurationMs;
+  const activeDurationMs = isTrimTrackVisible ? projectTotalMs : Math.max(projectTotalMs, effectiveDurationMs);
   const activeCurrentTimeMs = isTrimTrackVisible ? currentTimeMs : mapSourceToEffective(currentTimeMs);
 
   const timelineScale = useMemo(() => calculateTimelineScale(activeDurationMs / 1000), [activeDurationMs]);
@@ -759,6 +841,8 @@ export default function TimelineEditor({
   const [range, setRange] = useState<Range>(() => createInitialRange(activeDurationMs));
   const [keyframes, setKeyframes] = useState<{ id: string; time: number }[]>([]);
   const [selectedKeyframeId, setSelectedKeyframeId] = useState<string | null>(null);
+  const [resizePreview, setResizePreview] = useState<{ id: string; span: Span } | null>(null);
+  const [isTimelineResizing, setIsTimelineResizing] = useState(false);
   const [shortcuts, setShortcuts] = useState({
     pan: 'Shift + Ctrl + Scroll',
     zoom: 'Ctrl + Scroll'
@@ -815,7 +899,7 @@ export default function TimelineEditor({
 
   useEffect(() => {
     setRange(createInitialRange(activeDurationMs));
-  }, [totalMs]);
+  }, [activeDurationMs]);
 
   useEffect(() => {
     // Only clamp if we have a valid duration and regions to clamp
@@ -1198,15 +1282,10 @@ export default function TimelineEditor({
   }, [addKeyframe, handleAddZoom, handleAddTrim, handleAddAnnotation, deleteSelectedKeyframe, deleteSelectedZoom, deleteSelectedTrim, deleteSelectedAnnotation, deleteSelectedAudio, selectedKeyframeId, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, annotationRegions, currentTime, onSelectAnnotation]);
 
   const clampedRange = useMemo<Range>(() => {
-    if (activeDurationMs === 0) {
-      return range;
-    }
-
-    return {
-      start: Math.max(0, Math.min(range.start, totalMs)),
-      end: Math.min(range.end, totalMs),
-    };
-  }, [range, totalMs]);
+    const start = Math.max(0, range.start);
+    const end = Math.max(range.end, start + timelineScale.minVisibleRangeMs);
+    return { start, end };
+  }, [range, timelineScale.minVisibleRangeMs]);
 
   const audioItemsToCache = useMemo(() => audioRegions || [], [audioRegions]);
   const waveformCache = useWaveformCache(audioItemsToCache);
@@ -1325,6 +1404,10 @@ export default function TimelineEditor({
              span: { start: mapTime(currentSourceStart), end: mapTime(trim.startMs) },
              label: 'Main Clip',
              variant: 'video',
+             sourceUrl: videoPath,
+             sourceStartMs: currentSourceStart,
+             sourceEndMs: trim.startMs,
+             totalDurationMs: trim.startMs - currentSourceStart,
              associatedAudio: originalAudio ? {
               ...originalAudio,
               sourceStartMs: currentSourceStart,
@@ -1341,6 +1424,10 @@ export default function TimelineEditor({
              span: { start: mapTime(currentSourceStart), end: mapTime(totalMs) },
              label: 'Main Clip',
              variant: 'video',
+             sourceUrl: videoPath,
+             sourceStartMs: currentSourceStart,
+             sourceEndMs: totalMs,
+             totalDurationMs: totalMs - currentSourceStart,
              associatedAudio: originalAudio ? {
                ...originalAudio,
                sourceStartMs: currentSourceStart,
@@ -1453,6 +1540,46 @@ export default function TimelineEditor({
     return targetSpan;
   }, [timelineItems, activeCurrentTimeMs, timelineScale.intervalMs]);
 
+  const previewZoomRegions = useMemo(() => {
+    if (!resizePreview || !zoomRegions.some(region => region.id === resizePreview.id)) {
+      return zoomRegions;
+    }
+
+    const previewSpan = isTrimTrackVisible
+      ? { ...resizePreview.span }
+      : {
+          start: mapEffectiveToSource(resizePreview.span.start),
+          end: mapEffectiveToSource(resizePreview.span.end),
+        };
+
+    return zoomRegions.map(region => (
+      region.id === resizePreview.id
+        ? { ...region, startMs: previewSpan.start, endMs: previewSpan.end }
+        : region
+    ));
+  }, [isTrimTrackVisible, mapEffectiveToSource, resizePreview, zoomRegions]);
+
+  const handleItemResizePreview = useCallback((id: string, span: Span | null) => {
+    if (!span || !zoomRegions.some(region => region.id === id)) {
+      setResizePreview(prev => (prev?.id === id ? null : prev));
+      return;
+    }
+
+    setResizePreview({ id, span });
+  }, [zoomRegions]);
+
+  const handleTimelineResizeStart = useCallback(() => {
+    setIsTimelineResizing(true);
+    onTimelineResizeStart?.();
+  }, [onTimelineResizeStart]);
+
+  const handleTimelineResizeEnd = useCallback(() => {
+    requestAnimationFrame(() => {
+      setIsTimelineResizing(false);
+      onTimelineResizeEnd?.();
+    });
+  }, [onTimelineResizeEnd]);
+
   const handleItemRowChange = useCallback((id: string, newRowId: string) => {
     const baseId = id.split('-part-')[0];
     if (newRowId.startsWith('row-audio-')) {
@@ -1546,18 +1673,6 @@ export default function TimelineEditor({
           </Button>
           <div className="w-px h-4 bg-white/10 mx-1" />
           <Button
-            onClick={() => setIsTrimTrackVisible(!isTrimTrackVisible)}
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-7 w-7 transition-all",
-              !isTrimTrackVisible ? "text-[#34B27B] bg-[#34B27B]/10" : "text-slate-400 hover:text-slate-200 hover:bg-white/10"
-            )}
-            title={!isTrimTrackVisible ? "Magnetic Mode On (Trims folded)" : "Source Mode On (Trims visible)"}
-          >
-            {!isTrimTrackVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </Button>
-          <Button
             onClick={handleAddAnnotation}
             variant="ghost"
             size="icon"
@@ -1643,7 +1758,10 @@ export default function TimelineEditor({
           minVisibleRangeMs={timelineScale.minVisibleRangeMs}
           gridSizeMs={timelineScale.gridMs}
           onItemSpanChange={handleItemSpanChange}
+          onItemResizePreview={handleItemResizePreview}
           onItemRowChange={handleItemRowChange}
+          onResizeInteractionStart={handleTimelineResizeStart}
+          onResizeInteractionEnd={handleTimelineResizeEnd}
         >
           <KeyframeMarkers
             keyframes={keyframes}
@@ -1652,6 +1770,8 @@ export default function TimelineEditor({
           />
           <Timeline
             items={timelineItems}
+            zoomRegions={zoomRegions}
+            zoomBoundaryRegions={previewZoomRegions}
             videoDurationMs={activeDurationMs}
             intervalMs={timelineScale.intervalMs}
             currentTimeMs={activeCurrentTimeMs}
@@ -1666,14 +1786,19 @@ export default function TimelineEditor({
             onSelectAudio={onSelectAudio}
             waveformCache={waveformCache}
             onAudioVolumeKeyframesChange={onAudioVolumeKeyframesChange}
+            onItemSpanChange={handleItemSpanChange}
+            onTimelineResizeStart={handleTimelineResizeStart}
+            onTimelineResizeEnd={handleTimelineResizeEnd}
             onAddZoom={handleAddZoom}
             onAddTrim={handleAddTrim}
             onAddAnnotation={handleAddAnnotation}
             videoRef={videoRef}
             mapSourceToEffective={mapSourceToEffective}
+            mapEffectiveToSource={mapEffectiveToSource}
             isTrimTrackVisible={isTrimTrackVisible}
             selectedVideoId={selectedVideoId}
             onSelectVideo={onSelectVideo}
+            isTimelineResizing={isTimelineResizing}
           />
         </TimelineWrapper>
       </div>

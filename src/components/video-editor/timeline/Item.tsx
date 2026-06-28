@@ -2,26 +2,26 @@ import React from 'react';
 import { useItem, useTimelineContext } from "dnd-timeline";
 import type { Span } from "dnd-timeline";
 import { cn } from "@/lib/utils";
-import { ZoomIn, Scissors, MessageSquare, Music, Film } from "lucide-react";
+// lucide-react icons removed per user requirement: pure text only
 import glassStyles from "./ItemGlass.module.css";
 import VolumeEnvelope from './VolumeEnvelope';
-import { VolumeKeyframe, AudioRegion } from '../types';
+import { VolumeKeyframe, AudioRegion, ZoomRegion } from '../types';
 import { useAudioWaveform } from "../hooks/useAudioWaveform";
 
+import { VideoThumbnails } from "./VideoThumbnails";
 
 interface WaveformOverlayProps { 
   id: string; 
   url?: string; 
   isReal?: boolean; 
   sourceStartMs: number; 
-  clipDurationMs: number; 
   effTotalDuration: number; 
   svgOffset?: number; 
   peaks?: number[]; 
   strokeColor?: string 
 }
 
-function WaveformOverlay({ id, url, isReal = false, sourceStartMs, clipDurationMs, effTotalDuration, svgOffset = 0, peaks: propPeaks, strokeColor }: WaveformOverlayProps) {
+function WaveformOverlay({ id, url, isReal = false, sourceStartMs, effTotalDuration, svgOffset = 0, peaks: propPeaks, strokeColor }: WaveformOverlayProps) {
   const isAudio = isReal;
   const sourceUrl = url;
   const { peaks: hookPeaks } = useAudioWaveform(sourceUrl || null, isAudio, 8000);
@@ -65,7 +65,7 @@ function WaveformOverlay({ id, url, isReal = false, sourceStartMs, clipDurationM
   if (!activePeaks || activePeaks.length === 0) return null;
 
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-90">
+    <div className="absolute bottom-0 left-0 right-0 h-[45%] pointer-events-none overflow-hidden opacity-90">
       <svg 
         id={`waveform-${id}`}
         viewBox={`0 0 ${svgAbsoluteWidth} 100`}
@@ -104,6 +104,7 @@ interface ItemProps {
   children?: React.ReactNode;
   zoomDepth?: number;
   variant?: 'zoom' | 'trim' | 'annotation' | 'video' | 'audio';
+  isNestedTrim?: boolean;
   audioPeaks?: number[];
   audioPeaksDurationMs?: number;
   sourceStartMs?: number;
@@ -114,6 +115,11 @@ interface ItemProps {
   volumeKeyframes?: VolumeKeyframe[];
   onVolumeChange?: (vol: number) => void;
   onVolumeKeyframesChange?: (keyframes: VolumeKeyframe[]) => void;
+  onDirectSpanChange?: (id: string, span: Span) => void;
+  onDirectResizeStart?: () => void;
+  onDirectResizeEnd?: () => void;
+  zoomRegions?: ZoomRegion[];
+  zoomBoundaryRegions?: ZoomRegion[];
   associatedAudio?: AudioRegion;
   isAudioSelected?: boolean;
   onSelectAudio?: () => void;
@@ -131,12 +137,14 @@ const ZOOM_LABELS: Record<number, string> = {
 
 function ItemComponent({ 
   id, 
+  rowId,
   span, 
   isSelected = false, 
   onSelect,
   children,
   zoomDepth = 1,
   variant = 'zoom',
+  isNestedTrim = false,
   audioPeaks,
   audioPeaksDurationMs,
   sourceStartMs = 0,
@@ -146,18 +154,35 @@ function ItemComponent({
   volume = 1.0,
   volumeKeyframes,
   onVolumeKeyframesChange,
+  onDirectSpanChange,
+  onDirectResizeStart,
+  onDirectResizeEnd,
+  zoomRegions = [],
+  zoomBoundaryRegions,
   associatedAudio,
   isAudioSelected = false,
   onSelectAudio,
 }: ItemProps) {
+  const { valueToPixels } = useTimelineContext();
+  const pxPerMs = valueToPixels(1);
+  const baseWidthPx = (span.end - span.start) * pxPerMs;
+  const isZoom = variant === 'zoom';
+  const isTrim = variant === 'trim';
+  const isVideo = variant === 'video';
+  const isAudio = variant === 'audio';
+  const dynamicResizeHandleWidth = isZoom || isTrim
+    ? Math.max(4, Math.min(10, baseWidthPx / 3))
+    : Math.max(4, Math.min(12, baseWidthPx / 4));
+
   const { setNodeRef, attributes, listeners, itemStyle, itemContentStyle, transform } = useItem({
     id,
     span,
+    resizeHandleWidth: 2 * dynamicResizeHandleWidth,
+    data: { rowId, variant },
   });
 
-  const { valueToPixels } = useTimelineContext();
-
   const nodeRef = React.useRef<HTMLDivElement | null>(null);
+  const contentNodeRef = React.useRef<HTMLDivElement | null>(null);
   const handleNodeRef = React.useCallback((node: HTMLDivElement | null) => {
     setNodeRef(node);
     nodeRef.current = node;
@@ -165,13 +190,7 @@ function ItemComponent({
 
   const isResizingLeft = React.useRef(false);
   const isResizingRight = React.useRef(false);
-
-  const pxPerMs = valueToPixels(1);
-
-  const isZoom = variant === 'zoom';
-  const isTrim = variant === 'trim';
-  const isVideo = variant === 'video';
-  const isAudio = variant === 'audio';
+  const directResizeSpanRef = React.useRef<Span | null>(null);
 
   // 精确计算拖拽时容器左边缘的物理位移量
   const baseLeftPx = span.start * pxPerMs;
@@ -179,8 +198,7 @@ function ItemComponent({
   const dragDeltaX = currentLeftPx - baseLeftPx;
 
   const svgOffset = isResizingLeft.current ? -dragDeltaX : 0;
-  const baseWidthPx = (span.end - span.start) * pxPerMs;
-  const sourceUrl = associatedAudio?.sourceUrl || propsSourceUrl;
+  const sourceUrl = isVideo ? propsSourceUrl : (associatedAudio?.sourceUrl || propsSourceUrl);
 
   const effTotalDuration = audioPeaksDurationMs || totalDurationMs || Math.max(1, sourceEndMs - sourceStartMs);
 
@@ -188,6 +206,110 @@ function ItemComponent({
   const { peaks: hookPeaks, durationMs: hookDurationMs } = useAudioWaveform(sourceUrl || null, isAudio, 8000);
   const activePeaks = (audioPeaks && audioPeaks.length > 0) ? audioPeaks : hookPeaks;
   const trueTotalDurMs = (activePeaks === hookPeaks && hookDurationMs > 0) ? hookDurationMs : effTotalDuration;
+
+  const handleDirectResizePointerDown = React.useCallback((direction: 'start' | 'end') => (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!onDirectSpanChange || (!isZoom && !isTrim)) return;
+    const node = nodeRef.current;
+    const parentNode = node?.parentElement;
+    if (!node || !parentNode) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect?.();
+    onDirectResizeStart?.();
+
+    const startClientX = event.clientX;
+    const initialSpan = { ...span };
+    const parentRect = parentNode.getBoundingClientRect();
+    const nodeRect = node.getBoundingClientRect();
+    const initialLeftPx = nodeRect.left - parentRect.left;
+    const initialWidthPx = nodeRect.width;
+    const initialRightPx = initialLeftPx + initialWidthPx;
+    const minDurationMs = 1;
+    const minWidthPx = Math.max(1, minDurationMs * pxPerMs);
+    const previousOpacity = node.style.opacity;
+
+    const ghost = node.cloneNode(true) as HTMLElement;
+    ghost.removeAttribute('id');
+    ghost.style.position = 'absolute';
+    ghost.style.top = node.style.top || '0px';
+    ghost.style.left = `${initialLeftPx}px`;
+    ghost.style.right = 'auto';
+    ghost.style.width = `${initialWidthPx}px`;
+    ghost.style.height = `${nodeRect.height}px`;
+    ghost.style.zIndex = '999';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.transition = 'none';
+    ghost.style.transform = 'none';
+    ghost.setAttribute('data-direct-resize-ghost', 'true');
+
+    parentNode.appendChild(ghost);
+    node.style.opacity = '0';
+    directResizeSpanRef.current = initialSpan;
+
+    const applyPreview = (leftPx: number, widthPx: number) => {
+      ghost.style.left = `${leftPx}px`;
+      ghost.style.width = `${widthPx}px`;
+    };
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      const deltaPx = moveEvent.clientX - startClientX;
+      const deltaMs = deltaPx / Math.max(pxPerMs, 0.0001);
+      const nextSpan = direction === 'start'
+        ? {
+            start: Math.max(0, Math.min(initialSpan.start + deltaMs, initialSpan.end - minDurationMs)),
+            end: initialSpan.end,
+          }
+        : {
+            start: initialSpan.start,
+            end: Math.max(initialSpan.start + minDurationMs, initialSpan.end + deltaMs),
+          };
+
+      directResizeSpanRef.current = nextSpan;
+
+      if (direction === 'start') {
+        const nextLeftPx = initialLeftPx + ((nextSpan.start - initialSpan.start) * pxPerMs);
+        applyPreview(nextLeftPx, Math.max(minWidthPx, initialRightPx - nextLeftPx));
+      } else {
+        applyPreview(initialLeftPx, Math.max(minWidthPx, (nextSpan.end - nextSpan.start) * pxPerMs));
+      }
+    };
+
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      upEvent.preventDefault();
+      upEvent.stopPropagation();
+
+      const blockSyntheticClick = (clickEvent: MouseEvent) => {
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+      };
+      window.addEventListener('click', blockSyntheticClick, { capture: true, once: true });
+
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      if (directResizeSpanRef.current) {
+        onDirectSpanChange(id, directResizeSpanRef.current);
+      }
+      node.style.opacity = previousOpacity;
+      ghost.remove();
+      directResizeSpanRef.current = null;
+      isResizingLeft.current = false;
+      isResizingRight.current = false;
+      onDirectResizeEnd?.();
+    };
+
+    if (direction === 'start') {
+      isResizingLeft.current = true;
+      isResizingRight.current = false;
+    } else {
+      isResizingLeft.current = false;
+      isResizingRight.current = true;
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }, [baseLeftPx, baseWidthPx, id, isTrim, isZoom, onDirectResizeEnd, onDirectResizeStart, onDirectSpanChange, onSelect, pxPerMs, span]);
 
   // 使用 MutationObserver 在 dnd-timeline 内部不触发 React 渲染的拖拽过程中，实时修正波形的物理偏移并设置拖拽物理墙
   React.useEffect(() => {
@@ -250,7 +372,7 @@ function ItemComponent({
         ref={handleNodeRef}
         style={{ 
           ...itemStyle, 
-          height: isAudioSelected ? 96 : 78,
+          height: isAudioSelected ? 138 : 120,
           marginTop: 3,
           marginBottom: 3,
           minWidth: 24 
@@ -259,8 +381,8 @@ function ItemComponent({
         {...attributes}
         onPointerDownCapture={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
-          isResizingLeft.current = e.clientX - rect.left < 20;
-          isResizingRight.current = rect.right - e.clientX < 20;
+          isResizingLeft.current = e.clientX - rect.left <= dynamicResizeHandleWidth;
+          isResizingRight.current = rect.right - e.clientX <= dynamicResizeHandleWidth;
         }}
         onPointerUp={() => {
           isResizingLeft.current = false;
@@ -274,10 +396,10 @@ function ItemComponent({
             <div 
               className={cn(
                 glassStyles.glassBlue,
-                "w-full overflow-hidden flex items-center justify-between flex-shrink-0 cursor-pointer relative rounded-lg",
+                "w-full overflow-hidden flex items-center justify-between flex-shrink-0 cursor-pointer relative",
                 isAudioSelected && "selected"
               )}
-              style={{ color: '#fff', height: isAudioSelected ? 42 : 24, margin: 0 }}
+              style={{ color: '#fff', height: isAudioSelected ? 42 : 24, margin: 0, width: 'calc(100% - 3px)' }}
               onPointerDown={(event) => {
                 event.stopPropagation();
                 onSelectAudio?.();
@@ -293,7 +415,6 @@ function ItemComponent({
                   url={associatedUrl} 
                   isReal={true} 
                   sourceStartMs={sourceStartMs} 
-                  clipDurationMs={sourceEndMs - sourceStartMs}
                   effTotalDuration={effTotalDuration} 
                   svgOffset={svgOffset} 
                   peaks={associatedPeaks} 
@@ -301,7 +422,6 @@ function ItemComponent({
                 />
               )}
 
-              {/* 统一规范的标题排版：完全处于中心横线上方，顶对齐，上边距与左边距均为 6px */}
               <div 
                 style={{
                   position: 'absolute',
@@ -311,14 +431,14 @@ function ItemComponent({
                   left: 0,
                   right: 0,
                   display: 'flex',
-                  alignItems: 'center',
-                  paddingLeft: '8px',
+                  alignItems: 'flex-start',
+                  paddingTop: '6px',
+                  paddingLeft: '6px',
                   pointerEvents: 'none',
                   zIndex: 20
                 }}
-                className="text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none gap-1.5"
+                className="text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none"
               >
-                <Music className="w-3 h-3 text-blue-400 flex-shrink-0" />
                 <span className="text-[9.5px] font-medium tracking-wide whitespace-nowrap truncate max-w-[120px] leading-none mt-[1px]">
                   {associatedAudio.name || "原声音频"}
                 </span>
@@ -339,10 +459,11 @@ function ItemComponent({
             {/* 2. 视频轨道区域（手风琴下半部分，独立圆角卡片） */}
             <div
               className={cn(
-                glassStyles.glassPurple,
-                "w-full overflow-hidden flex items-center justify-between cursor-grab active:cursor-grabbing relative transition-all duration-300 ease-in-out rounded-lg flex-shrink-0"
+                glassStyles.glassVideo,
+                "w-full overflow-hidden flex items-center justify-between cursor-grab active:cursor-grabbing relative transition-all duration-300 ease-in-out flex-shrink-0",
+                isSelected && "selected"
               )}
-              style={{ color: '#fff', margin: 0, height: 42 }}
+              style={{ color: '#fff', margin: 0, height: 84, width: 'calc(100% - 3px)' }}
               onPointerDown={(event) => {
                 event.stopPropagation();
                 onSelect?.();
@@ -351,25 +472,23 @@ function ItemComponent({
                 event.stopPropagation();
               }}
             >
-              {/* Left Resize Handle */}
-              <div
-                className={cn(glassStyles.zoomEndCap, glassStyles.left, "flex items-center justify-center")}
-                style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 10 }}
-                title="Resize left"
-              >
-                <div className="w-1 h-3 bg-white/80 rounded-full shadow-sm" />
-              </div>
+              {/* VideoThumbnails 背景图层 */}
+              {sourceUrl && (
+                <VideoThumbnails 
+                  id={id} 
+                  src={sourceUrl} 
+                  sourceStartMs={sourceStartMs} 
+                  effTotalDuration={effTotalDuration} 
+                  svgOffset={svgOffset} 
+                  pxPerMs={pxPerMs} 
+                  zoomRegions={zoomRegions} 
+                  boundaryZoomRegions={zoomBoundaryRegions}
+                  clipStartMs={span.start}
+                />
+              )}
 
-              {/* Right Resize Handle */}
-              <div
-                className={cn(glassStyles.zoomEndCap, glassStyles.right, "flex items-center justify-center")}
-                style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 10 }}
-                title="Resize right"
-              >
-                <div className="w-1 h-3 bg-white/80 rounded-full shadow-sm" />
-              </div>
+              {/* Removed Resize Handles for Video Track to prevent click interception at the edges */}
 
-              {/* 统一规范的标题排版：完全处于中心横线上方，顶对齐，上边距与左边距均为 6px */}
               <div 
                 style={{
                   position: 'absolute',
@@ -377,23 +496,17 @@ function ItemComponent({
                   left: 0,
                   right: 0,
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
                   paddingTop: '6px',
-                  paddingLeft: '8px',
+                  paddingLeft: '6px',
                   pointerEvents: 'none',
                   zIndex: 20
                 }}
-                className="text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none gap-1.5"
+                className="text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none"
               >
-                <Film className="w-3.5 h-3.5 text-white/70 flex-shrink-0" />
                 <span className="text-[9.5px] font-medium tracking-wide whitespace-nowrap hidden sm:inline-block truncate leading-none mt-[1px]">
                   {children}
                 </span>
-                {isSelected && (
-                  <span className="text-[8.5px] text-white/50 whitespace-nowrap ml-auto pr-1.5">
-                    原声已挂载
-                  </span>
-                )}
               </div>
             </div>
 
@@ -405,30 +518,35 @@ function ItemComponent({
 
   const glassClass = isAudio
     ? glassStyles.glassBlue
-    : (isZoom || isVideo)
+    : isZoom
     ? glassStyles.glassPurple 
+    : isVideo
+    ? glassStyles.glassVideo
     : isTrim 
     ? glassStyles.glassRed 
     : glassStyles.glassYellow;
 
-  const endCapColor = isAudio 
-    ? '#3b82f6' 
-    : (isZoom || isVideo) 
-    ? '#7c3aed' 
-    : isTrim 
-    ? '#ef4444' 
-    : '#B4A046';
-
   return (
     <div
       ref={handleNodeRef}
-      style={{ ...itemStyle, minWidth: 24 }}
+      style={{
+        ...itemStyle,
+        minWidth: 24,
+        ...(isNestedTrim ? {
+          top: 'auto',
+          bottom: 0,
+          height: 18,
+          zIndex: 30,
+          marginTop: 'auto',
+          marginBottom: 0
+        } : {})
+      }}
       {...listeners}
       {...attributes}
       onPointerDownCapture={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        isResizingLeft.current = e.clientX - rect.left < 20;
-        isResizingRight.current = rect.right - e.clientX < 20;
+        isResizingLeft.current = e.clientX - rect.left <= dynamicResizeHandleWidth;
+        isResizingRight.current = rect.right - e.clientX <= dynamicResizeHandleWidth;
         onSelect?.();
       }}
       className="group"
@@ -439,30 +557,38 @@ function ItemComponent({
     >
       <div style={itemContentStyle}>
         <div
+          ref={contentNodeRef}
           className={cn(
             glassClass,
             "w-full h-full overflow-hidden cursor-grab active:cursor-grabbing relative",
             isSelected && "selected"
           )}
-          style={{ height: 'calc(100% - 6px)', margin: '3px 0', color: '#fff' }}
+          style={{ 
+            height: isNestedTrim ? '100%' : (isVideo ? '116px' : 'calc(100% - 6px)'), 
+            margin: isNestedTrim ? 0 : '3px 0', 
+            color: '#fff', 
+            width: 'calc(100% - 3px)' 
+          }}
           onClick={(event) => {
             event.stopPropagation();
             onSelect?.();
           }}
         >
-          {/* Left Resize Handle (Jitter style circular/rounded bar) */}
+          {/* Left Resize Handle */}
           <div
             className={cn(glassStyles.zoomEndCap, glassStyles.left, "flex items-center justify-center")}
-            style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 10 }}
+            style={{ cursor: 'col-resize', pointerEvents: 'auto', width: `${dynamicResizeHandleWidth}px` }}
+            onPointerDown={handleDirectResizePointerDown('start')}
             title="Resize left"
           >
             <div className="w-1 h-3 bg-white/60 rounded-full" />
           </div>
 
-          {/* Right Resize Handle (Jitter style circular/rounded bar) */}
+          {/* Right Resize Handle */}
           <div
             className={cn(glassStyles.zoomEndCap, glassStyles.right, "flex items-center justify-center")}
-            style={{ cursor: 'col-resize', pointerEvents: 'auto', width: 10 }}
+            style={{ cursor: 'col-resize', pointerEvents: 'auto', width: `${dynamicResizeHandleWidth}px` }}
+            onPointerDown={handleDirectResizePointerDown('end')}
             title="Resize right"
           >
             <div className="w-1 h-3 bg-white/60 rounded-full" />
@@ -470,12 +596,23 @@ function ItemComponent({
 
           {/* Waveform 背景图层（与标题层平铺兄弟关系） */}
           {isVideo && sourceUrl && (
-            <WaveformOverlay id={id} url={sourceUrl} isReal={false} sourceStartMs={sourceStartMs} clipDurationMs={sourceEndMs - sourceStartMs} effTotalDuration={trueTotalDurMs} svgOffset={svgOffset} peaks={[]} />
+            <VideoThumbnails 
+              id={id} 
+              src={sourceUrl} 
+              sourceStartMs={sourceStartMs} 
+              effTotalDuration={trueTotalDurMs} 
+              svgOffset={svgOffset} 
+              pxPerMs={pxPerMs} 
+              zoomRegions={zoomRegions} 
+              boundaryZoomRegions={zoomBoundaryRegions}
+              clipStartMs={span.start}
+            />
           )}
           {isAudio && sourceUrl && (
-            <WaveformOverlay id={id} url={sourceUrl} isReal={true} sourceStartMs={sourceStartMs} clipDurationMs={sourceEndMs - sourceStartMs} effTotalDuration={trueTotalDurMs} svgOffset={svgOffset} peaks={activePeaks} />
+            <WaveformOverlay id={id} url={sourceUrl} isReal={true} sourceStartMs={sourceStartMs} effTotalDuration={trueTotalDurMs} svgOffset={svgOffset} peaks={activePeaks} />
           )}
 
+          {/* 统一规范的标题排版：完全处于左上角，顶对齐，上边距与左边距均为 6px。无任何图标 */}
           <div 
             style={{
               position: 'absolute',
@@ -484,50 +621,17 @@ function ItemComponent({
               left: 0,
               right: 0,
               display: 'flex',
-              alignItems: 'center',
-              paddingTop: isAudio ? '6px' : 0,
-              paddingLeft: '8px',
+              alignItems: 'flex-start', // 改为顶对齐
+              paddingTop: '6px', // 统一 6px
+              paddingLeft: '6px', // 统一 6px
               pointerEvents: 'none',
               zIndex: 20
             }}
-            className="text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none gap-1.5"
+            className="text-white/90 opacity-80 group-hover:opacity-100 transition-opacity select-none"
           >
-            {isVideo ? (
-              <>
-                <Film className="w-3.5 h-3.5 text-white/70 flex-shrink-0" />
-                <span className="text-[9.5px] font-medium tracking-wide whitespace-nowrap hidden sm:inline-block truncate leading-none mt-[1px]">
-                  {children}
-                </span>
-              </>
-            ) : isZoom ? (
-              <>
-                <ZoomIn className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="text-[9.5px] font-medium tracking-wide whitespace-nowrap hidden sm:inline-block leading-none mt-[1px]">
-                  {zoomDepth ? ZOOM_LABELS[zoomDepth] : children}
-                </span>
-              </>
-            ) : isTrim ? (
-              <>
-                <Scissors className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="text-[9.5px] font-medium tracking-wide whitespace-nowrap hidden sm:inline-block truncate leading-none mt-[1px]">
-                  {children}
-                </span>
-              </>
-            ) : isAudio ? (
-              <>
-                <Music className="w-3.5 h-3.5 flex-shrink-0 text-blue-400" />
-                <span className="text-[9.5px] font-medium tracking-wide whitespace-nowrap truncate max-w-[80%] leading-none mt-[1px]">
-                  {children}
-                </span>
-              </>
-            ) : (
-              <>
-                <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="text-[9.5px] font-medium tracking-wide leading-none mt-[1px]">
-                  {children}
-                </span>
-              </>
-            )}
+            <span className="text-[9.5px] font-medium tracking-wide whitespace-nowrap hidden sm:inline-block truncate leading-none mt-[1px]">
+              {isZoom && zoomDepth ? ZOOM_LABELS[zoomDepth] : children}
+            </span>
           </div>
 
           {/* 音量包络线交互层（绝对定位，占满下半部） */}
@@ -562,6 +666,9 @@ export default React.memo(ItemComponent, (prev, next) => {
     prev.sourceUrl === next.sourceUrl &&
     prev.volume === next.volume &&
     prev.volumeKeyframes === next.volumeKeyframes &&
-    prev.audioPeaks === next.audioPeaks
+    prev.audioPeaks === next.audioPeaks &&
+    prev.onDirectSpanChange === next.onDirectSpanChange &&
+    prev.onDirectResizeStart === next.onDirectResizeStart &&
+    prev.onDirectResizeEnd === next.onDirectResizeEnd
   );
 });

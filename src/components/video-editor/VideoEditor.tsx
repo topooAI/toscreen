@@ -211,12 +211,21 @@ export default function VideoEditor() {
   ), [duration, annotationRegions, audioRegions]);
 
   const currentTimeStateRef = useRef(currentTime);
+  const timelineResizeLockRef = useRef(0);
   const projectClockRef = useRef<number | null>(null);
   const projectClockBaseRef = useRef({ startedAt: 0, startTime: 0 });
 
   useEffect(() => {
     currentTimeStateRef.current = currentTime;
   }, [currentTime]);
+
+  const handleTimelineResizeStart = useCallback(() => {
+    timelineResizeLockRef.current += 1;
+  }, []);
+
+  const handleTimelineResizeEnd = useCallback(() => {
+    timelineResizeLockRef.current = Math.max(0, timelineResizeLockRef.current - 1);
+  }, []);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -1349,6 +1358,9 @@ export default function VideoEditor() {
                       videoPath={videoPath ? toFileUrl(videoPath) : ''}
                       onDurationChange={handleDurationChange}
                       onTimeUpdate={(time) => {
+                        if (timelineResizeLockRef.current > 0) {
+                          return;
+                        }
                         const video = videoPlaybackRef.current?.video;
                         if (
                           duration > 0 &&
@@ -1448,6 +1460,8 @@ export default function VideoEditor() {
                   onAudioVolumeChange={handleAudioVolumeChange}
                   onAudioVolumeKeyframesChange={handleAudioVolumeKeyframesChange}
                   onAudioDelete={handleAudioDelete}
+                  onTimelineResizeStart={handleTimelineResizeStart}
+                  onTimelineResizeEnd={handleTimelineResizeEnd}
                   selectedAudioId={selectedAudioId}
                   onSelectAudio={handleSelectAudio}
                   audioRegions={audioRegions}
