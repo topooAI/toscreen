@@ -95,13 +95,6 @@ export default function VideoEditor() {
           needsFix = true;
         }
         
-        // Rescue clips that are entirely outside the visible timeline
-        if (duration > 0 && newR.startMs >= duration * 1000) {
-          newR.startMs = Math.max(0, (duration * 1000) - 5000);
-          newR.endMs = newR.startMs + 5000;
-          needsFix = true;
-        }
-        
         return newR;
       });
 
@@ -109,7 +102,7 @@ export default function VideoEditor() {
         setAudioRegions(fixedRegions);
       }
     }
-  }, [audioRegions, companionAudioPath, duration]);
+  }, [audioRegions, companionAudioPath]);
 
   const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
@@ -209,6 +202,69 @@ export default function VideoEditor() {
   const [exportQuality, setExportQuality] = useState<ExportQuality>('good');
   const [isFullScreenBinding, setIsFullScreenBinding] = useState(true);
 
+  const projectDuration = useMemo(() => Math.max(
+    duration,
+    ...annotationRegions.map((region) => region.endMs / 1000),
+    ...audioRegions
+      .filter((region) => !region.isOriginal || region.isDetached)
+      .map((region) => region.endMs / 1000),
+  ), [duration, annotationRegions, audioRegions]);
+
+  const currentTimeStateRef = useRef(currentTime);
+  const projectClockRef = useRef<number | null>(null);
+  const projectClockBaseRef = useRef({ startedAt: 0, startTime: 0 });
+
+  useEffect(() => {
+    currentTimeStateRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (projectClockRef.current !== null) {
+        cancelAnimationFrame(projectClockRef.current);
+        projectClockRef.current = null;
+      }
+      return;
+    }
+
+    const startTime = Math.min(Math.max(currentTimeStateRef.current, 0), Math.max(projectDuration, 0));
+    projectClockBaseRef.current = {
+      startedAt: performance.now(),
+      startTime,
+    };
+
+    const tick = () => {
+      const { startedAt, startTime } = projectClockBaseRef.current;
+      const nextTime = startTime + (performance.now() - startedAt) / 1000;
+      const clampedTime = Math.min(nextTime, projectDuration);
+
+      setCurrentTime(clampedTime);
+
+      const video = videoPlaybackRef.current?.video;
+      if (video && duration > 0 && clampedTime < duration && video.paused) {
+        videoPlaybackRef.current?.play().catch(() => {});
+      }
+
+      if (clampedTime >= projectDuration) {
+        setIsPlaying(false);
+        videoPlaybackRef.current?.pause();
+        projectClockRef.current = null;
+        return;
+      }
+
+      projectClockRef.current = requestAnimationFrame(tick);
+    };
+
+    projectClockRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (projectClockRef.current !== null) {
+        cancelAnimationFrame(projectClockRef.current);
+        projectClockRef.current = null;
+      }
+    };
+  }, [isPlaying, projectDuration, duration]);
+
   // Web Audio Mixer for additional audio tracks
   useAudioMixer({ 
     audioRegions, 
@@ -229,6 +285,7 @@ export default function VideoEditor() {
   // Helper to convert file path to proper file:// URL
   const toFileUrl = (path: string) => {
     if (!path) return '';
+    if (path.startsWith('blob:') || path.startsWith('http://') || path.startsWith('https://') || path.startsWith('file://')) return path;
     const normalized = path.replace(/\\/g, '/');
     const full = `file://${normalized.startsWith('/') ? '' : '/'}${normalized}`;
     return encodeURI(full);
@@ -263,7 +320,7 @@ export default function VideoEditor() {
           }
 
           // If proxy is available, use it for UI playback. Always keep original for export.
-          setVideoPath(result.path);
+          setVideoPath((result as any).proxyPath || result.path);
           setOriginalVideoPath(result.path);
           setError(null);
           
@@ -399,19 +456,38 @@ export default function VideoEditor() {
   function togglePlayPause() {
     const playback = videoPlaybackRef.current;
     const video = playback?.video;
-    if (!playback || !video) return;
 
     if (isPlaying) {
-      playback.pause();
+      playback?.pause();
+      setIsPlaying(false);
     } else {
-      playback.play().catch(err => console.error('Video play failed:', err));
+      if (currentTime >= projectDuration) {
+        handleSeek(0);
+      }
+
+      if (playback && video && currentTime < duration - 0.05) {
+        playback.play().catch(err => {
+          console.error('Video play failed:', err);
+          setIsPlaying(false);
+        });
+      } else {
+        setIsPlaying(true);
+      }
     }
   }
 
   function handleSeek(time: number) {
+    const nextTime = Math.max(0, Math.min(time, projectDuration || time));
+    setCurrentTime(nextTime);
     const video = videoPlaybackRef.current?.video;
     if (!video) return;
-    video.currentTime = time;
+    
+    if (duration > 0 && nextTime < duration) {
+      video.currentTime = nextTime;
+    } else {
+      video.pause();
+      video.currentTime = Math.max(0, duration - 0.001);
+    }
   }
 
   const handleSelectZoom = useCallback((id: string | null) => {
@@ -669,6 +745,10 @@ export default function VideoEditor() {
     }));
   }, [setAudioRegions]);
 
+  const handleAudioTrackChange = useCallback((id: string, newTrackIndex: number) => {
+    setAudioRegions(prev => prev.map(r => r.id === id ? { ...r, trackIndex: newTrackIndex } : r));
+  }, [setAudioRegions]);
+
   const handleAudioVolumeChange = useCallback((id: string, volume: number) => {
     setAudioRegions(prev => prev.map(r => r.id === id ? { ...r, volume } : r));
   }, [setAudioRegions]);
@@ -783,20 +863,13 @@ export default function VideoEditor() {
         }
         e.preventDefault();
 
-        const playback = videoPlaybackRef.current;
-        if (playback?.video) {
-          if (playback.video.paused) {
-            playback.play().catch(console.error);
-          } else {
-            playback.pause();
-          }
-        }
+        togglePlayPause();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, []);
+  }, [togglePlayPause]);
 
   useEffect(() => {
     if (selectedZoomId && !zoomRegions.some((region) => region.id === selectedZoomId)) {
@@ -1275,9 +1348,36 @@ export default function VideoEditor() {
                       ref={videoPlaybackRef}
                       videoPath={videoPath ? toFileUrl(videoPath) : ''}
                       onDurationChange={handleDurationChange}
-                      onTimeUpdate={setCurrentTime}
+                      onTimeUpdate={(time) => {
+                        const video = videoPlaybackRef.current?.video;
+                        if (
+                          duration > 0 &&
+                          projectDuration > duration &&
+                          currentTimeStateRef.current >= duration - 0.05 &&
+                          time < currentTimeStateRef.current - 0.25
+                        ) {
+                          return;
+                        }
+                        // 核心修复：如果视频处于暂停状态（说明用户正在拖拽时间轴或点击），
+                        // 绝对不能信任底层 video 触发的 timeupdate！
+                        // 因为底层的 timeupdate 只能对齐到关键帧，会强制把用户精准拖拽的 currentTime 拉回关键帧时间，造成极大的游标偏移！
+                        if (video && video.paused) {
+                           return;
+                        }
+                        setCurrentTime(time);
+                      }}
                       currentTime={currentTime}
-                      onPlayStateChange={setIsPlaying}
+                      onPlayStateChange={(playing) => {
+                        if (
+                          !playing &&
+                          projectDuration > duration &&
+                          currentTimeStateRef.current >= duration - 0.05 &&
+                          currentTimeStateRef.current < projectDuration
+                        ) {
+                          return;
+                        }
+                        setIsPlaying(playing);
+                      }}
                       onError={setError}
                       wallpaper={wallpaper}
                       zoomRegions={zoomRegions}
@@ -1318,7 +1418,8 @@ export default function VideoEditor() {
             <Panel defaultSize={30} minSize={20}>
               <div className="h-full bg-[#09090b] rounded-2xl border border-white/5 shadow-lg overflow-hidden flex flex-col">
                 <TimelineEditor
-                  videoDuration={duration}
+                  videoDuration={projectDuration}
+                  sourceVideoDuration={duration}
                   currentTime={currentTime}
                   onSeek={handleSeek}
                   videoRef={videoElementRef}
@@ -1343,6 +1444,7 @@ export default function VideoEditor() {
                   onSelectAnnotation={handleSelectAnnotation}
                   onAudioAdded={handleAudioAdded as any}
                   onAudioSpanChange={handleAudioSpanChange}
+                  onAudioTrackChange={handleAudioTrackChange}
                   onAudioVolumeChange={handleAudioVolumeChange}
                   onAudioVolumeKeyframesChange={handleAudioVolumeKeyframesChange}
                   onAudioDelete={handleAudioDelete}
@@ -1357,6 +1459,7 @@ export default function VideoEditor() {
                   onTogglePlayPause={togglePlayPause}
                   selectedVideoId={selectedVideoId}
                   onSelectVideo={setSelectedVideoId}
+                  videoPath={videoPath ? toFileUrl(videoPath) : undefined}
                 />
               </div>
             </Panel>

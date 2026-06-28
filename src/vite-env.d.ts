@@ -25,6 +25,7 @@ interface Window {
     getRecordedVideoPath: () => Promise<{
       success: boolean
       path?: string
+      proxyPath?: string
       message?: string
       error?: string
     }>
@@ -42,7 +43,7 @@ interface Window {
     setCurrentVideoPath: (path: string, proxyPath?: string, audioPath?: string) => Promise<{ success: boolean }>
     getCurrentVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string }>
     clearCurrentVideoPath: () => Promise<{ success: boolean }>
-    generateProxyVideo: (inputPath: string) => Promise<{ success: boolean, outputPath?: string, error?: string }>;
+    generateProxyVideo: (inputPath: string) => Promise<{ success: boolean, proxyPath?: string, error?: string }>;
     onProxyGenerationProgress: (callback: (percent: number) => void) => () => void;
     saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean, error?: string, message?: string }>;
     loadProject: (videoPath: string) => Promise<{ success: boolean, project?: any, message?: string }>;

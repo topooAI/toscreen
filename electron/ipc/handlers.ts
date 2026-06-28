@@ -146,8 +146,11 @@ export function registerIpcHandlers(
 
       const latestVideo = videoFiles.sort().reverse()[0]
       const videoPath = path.join(RECORDINGS_DIR, latestVideo)
+      const parsed = path.parse(videoPath)
+      const proxyPath = path.join(parsed.dir, `${parsed.name}-proxy.mp4`)
+      const hasProxy = await fs.access(proxyPath).then(() => true).catch(() => false)
 
-      return { success: true, path: videoPath }
+      return { success: true, path: videoPath, proxyPath: hasProxy ? proxyPath : undefined }
     } catch (error) {
       console.error('Failed to get video path:', error)
       return { success: false, message: 'Failed to get video path', error: String(error) }

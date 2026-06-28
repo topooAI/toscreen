@@ -30,7 +30,7 @@ interface Window {
     selectSource: (source: any) => Promise<any>
     getSelectedSource: () => Promise<any>
     storeRecordedVideo: (videoData: ArrayBuffer, fileName: string) => Promise<{ success: boolean; path?: string; message?: string }>
-    getRecordedVideoPath: () => Promise<{ success: boolean; path?: string; message?: string }>
+    getRecordedVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; message?: string }>
     setRecordingState: (recording: boolean, videoStartTime?: number) => Promise<void>
     onStopRecordingFromTray: (callback: () => void) => () => void
     openExternalUrl: (url: string) => Promise<{ success: boolean; error?: string }>
@@ -49,7 +49,7 @@ interface Window {
     stopNativeRecording: () => Promise<{ success: boolean; outputPath?: string; audioOutputPath?: string; error?: string }>;
     hudOverlayHide: () => void;
     hudOverlayClose: () => void;
-    generateProxyVideo: (inputPath: string) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+    generateProxyVideo: (inputPath: string) => Promise<{ success: boolean; proxyPath?: string; error?: string }>;
     onProxyGenerationProgress: (callback: (percent: number) => void) => () => void;
     saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean; error?: string; message?: string }>;
     loadProject: (videoPath: string) => Promise<{ success: boolean; project?: any; message?: string }>;

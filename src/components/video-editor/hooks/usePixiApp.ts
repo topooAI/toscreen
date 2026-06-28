@@ -16,16 +16,23 @@ export function usePixiApp(containerRef: React.RefObject<HTMLDivElement>) {
     let app: Application | null = null;
 
     (async () => {
-      app = new Application();
-      
-      await app.init({
-        width: container.clientWidth,
-        height: container.clientHeight,
-        backgroundAlpha: 0,
-        antialias: true,
-        resolution: window.devicePixelRatio || 1,
-        autoDensity: true,
-      });
+      try {
+        app = new Application();
+        
+        await app.init({
+          preference: 'webgl',
+          width: container.clientWidth,
+          height: container.clientHeight,
+          backgroundAlpha: 0,
+          antialias: true,
+          resolution: window.devicePixelRatio || 1,
+          autoDensity: true,
+        });
+      } catch (error) {
+        console.warn('[usePixiApp] PIXI renderer unavailable; advanced preview disabled.', error);
+        app = null;
+        return;
+      }
 
       app.ticker.maxFPS = 60;
 

@@ -87,6 +87,45 @@ export function useVideoTexture({
     layoutVideoContentRef.current = layoutVideoContent;
   }, [layoutVideoContent]);
 
+  useEffect(() => {
+    if (!videoReady) return;
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    const { handlePlay, handlePause, handleSeeked, handleSeeking } = createVideoEventHandlers({
+      video,
+      isSeekingRef,
+      isPlayingRef,
+      allowPlaybackRef,
+      currentTimeRef,
+      timeUpdateAnimationRef,
+      onPlayStateChange: (p) => callbacksRef.current.onPlayStateChange(p),
+      onTimeUpdate: (t) => callbacksRef.current.onTimeUpdate(t),
+      trimRegionsRef: trimRegionsRef as React.MutableRefObject<TrimRegion[]>,
+      isSkippingRef,
+      immuneUntilRef,
+    });
+
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('ended', handlePause);
+    video.addEventListener('seeked', handleSeeked);
+    video.addEventListener('seeking', handleSeeking);
+
+    return () => {
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('ended', handlePause);
+      video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('seeking', handleSeeking);
+      if (timeUpdateAnimationRef.current) {
+        cancelAnimationFrame(timeUpdateAnimationRef.current);
+        timeUpdateAnimationRef.current = null;
+      }
+    };
+  }, [videoReady, videoRef, trimRegionsRef]);
+
   // Initialize PIXI texture only when native video is ready
   useEffect(() => {
     if (!pixiReady || !videoReady) return;
@@ -126,26 +165,6 @@ export function useVideoTexture({
     layoutVideoContentRef.current();
     video.pause();
     allowPlaybackRef.current = true;
-
-    const { handlePlay, handlePause, handleSeeked, handleSeeking } = createVideoEventHandlers({
-      video,
-      isSeekingRef,
-      isPlayingRef,
-      allowPlaybackRef,
-      currentTimeRef,
-      timeUpdateAnimationRef,
-      onPlayStateChange: (p) => callbacksRef.current.onPlayStateChange(p),
-      onTimeUpdate: (t) => callbacksRef.current.onTimeUpdate(t),
-      trimRegionsRef,
-      isSkippingRef,
-      immuneUntilRef,
-    });
-    
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('ended', handlePause);
-    video.addEventListener('seeked', handleSeeked);
-    video.addEventListener('seeking', handleSeeking);
     
     return () => {
       // Defensive cleanup: Check if refs and objects still exist before touching them
@@ -154,12 +173,6 @@ export function useVideoTexture({
       const currentVideoContainer = videoContainerRef.current;
       const currentBlurFilter = blurFilterRef.current;
 
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('ended', handlePause);
-      video.removeEventListener('seeked', handleSeeked);
-      video.removeEventListener('seeking', handleSeeking);
-      
       try {
         if (currentVideoSprite && !currentVideoSprite.destroyed) {
           if (currentVideoContainer && currentVideoContainer.children.includes(currentVideoSprite)) {
