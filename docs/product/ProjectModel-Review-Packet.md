@@ -85,5 +85,6 @@ The current `ProjectModel` direction can continue as the Phase 1 architecture fo
 
 - `npm run audit:project-model-review-packet`
 - `npm run audit:project-model-review-doc`
+- `npm run audit:phase1-user-review-packet`
 - `npm run audit:phase1-ownership-list`
 - `npm run audit:phase1`

@@ -203,6 +203,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:phase1-user-acceptance-doc"],
   },
   {
+    id: "phase1-user-review-packet",
+    command: npmCommand,
+    args: ["run", "audit:phase1-user-review-packet"],
+  },
+  {
     id: "timeline-acceptance-doc",
     command: npmCommand,
     args: ["run", "audit:timeline-acceptance-doc"],
