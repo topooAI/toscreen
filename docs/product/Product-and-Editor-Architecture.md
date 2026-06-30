@@ -768,6 +768,25 @@ Use this checklist to answer two questions: how far Codex can move independently
 第一阶段的默认执行原则：Codex 可以独立推进工程稳定性、兼容层、校验脚本、模型草案和小步 UI 修复；凡是影响产品定位、镜头语言、时间轴手感、未来能力取舍或最终视觉判断的节点，必须由用户验收后再继续。
 Default Phase 1 execution rule: Codex can independently move engineering stability, compatibility layers, verification scripts, model drafts, and small UI fixes; anything affecting product positioning, camera language, timeline feel, future capability tradeoffs, or final visual judgment must be reviewed by the user before continuing.
 
+#### 13.1.1 第一阶段执行对照清单 / Phase 1 Execution Checklist
+
+这个列表用于日常执行：Codex 可以连续推进“工程确定性”工作；用户只在产品判断、真实体验和阶段放行处介入。
+Use this checklist during daily execution: Codex can keep moving on engineering-deterministic work; the user only steps in for product judgment, real UX validation, and phase gates.
+
+| 顺序 / Order | 节点 / Checkpoint | Codex 是否可独立完成 / Can Codex Own It? | 用户什么时候介入 / When User Steps In | 用户需要对照什么 / What User Checks | 当前判断 / Current Judgment |
+|---|---|---|---|---|---|
+| 1 | 产品定位与第一阶段边界 / Product positioning and Phase 1 boundary | 部分可以：我可以整理文档、提出边界和拆阶段。 / Partly: I can document, structure boundaries, and split phases. | 只要涉及“做不做某个大能力”就需要你确认。 / Whenever a major capability is included or excluded. | ToScreen 是否仍是 AI product-demo editor，而不是普通剪辑器或单纯录屏工具。 / Whether ToScreen remains an AI product-demo editor, not a generic editor or recorder. | 需要你最终确认 / Needs final user confirmation |
+| 2 | ProjectModel 与兼容层 / ProjectModel and compatibility layer | 可以独立完成。 / Yes. | 模型能跑通后，你确认方向是否符合未来产品。 / After the model runs, you confirm whether it fits the future product. | Project / Asset / Track / Clip / Scene / UI Source / AI Edit Plan 是否合理。 / Whether Project / Asset / Track / Clip / Scene / UI Source / AI Edit Plan feel right. | 已进入实现 / In implementation |
+| 3 | 保存、恢复、重启稳定性 / Save, restore, and restart stability | 可以独立修复和写脚本验证。 / Yes, including scripts. | Electron 重启后，需要你用真实录制项目验收。 / After Electron restart, you test with a real recording. | 画面、音频、Zoom、背景、光标、项目状态是否都恢复。 / Picture, audio, zoom, background, cursor, and project state all restore. | 脚本已覆盖，仍需要实机体验 / Script-covered, still needs hands-on review |
+| 4 | Timeline 基础手感 / Timeline basic feel | 代码修复可以独立做。 / Code fixes yes. | 每次改拖拽、拉伸、磁吸、游标后都需要你体验。 / You test after changes to drag, resize, snap, or playhead. | 是否跟手、不闪、不跳、不错误改游标、不破坏片段位置。 / Whether it follows the pointer, avoids flicker/jumps, and does not move the playhead incorrectly. | 必须用户验收 / Must be user-validated |
+| 5 | Screen Studio 核心体验追平 / Screen Studio-grade core experience | 可以逐模块实现。 / Yes, module by module. | 每个模块完成后，你在 Electron 里对照 Screen Studio 式体验。 / After each module, you compare inside Electron. | 录屏预览、光标模拟、Zoom/Focus、背景虚化、基础剪辑、播放、导出。 / Recording preview, cursor simulation, Zoom/Focus, blur, basic editing, playback, export. | 分模块推进 / Module-by-module |
+| 6 | Preview 与 Export 一致性 / Preview and export consistency | 可以独立收敛数据源和渲染合同。 / Yes. | 能完整导出真实项目后，需要你看成片。 / Once real export works end to end, you review the output. | 预览和导出是否同画面、同节奏、同缩放、同光标。 / Preview and export match in picture, timing, zoom, and cursor. | 工程合同已开始 / Contract started |
+| 7 | Camera/Focus/3D 运镜结构 / Camera, Focus, and 3D camera structure | 方案和模型可以独立提出。 / I can propose model and migration. | 改命名、改操作方式、改镜头语言前必须确认。 / Before changing naming, interactions, or camera language. | Focus 是否应该升级为 Camera Clip，3D 运镜是否进入当前阶段。 / Whether Focus becomes Camera Clip and whether 3D camera work enters this phase. | 需要产品判断 / Needs product judgment |
+| 8 | 多源画面：摄像头、数字人、B-roll / Multi-source composition: camera, digital human, B-roll | 模型入口可以独立保留。 / Model entry can be reserved independently. | 是否做 UI 和真实剪辑能力，需要你确认。 / UI and real editing capability need your confirmation. | 是否只是为未来留结构，还是 Phase 1 就要能实际剪。 / Whether this is future structure only or real Phase 1 editing scope. | 模型支持，UI 待定 / Model-supported, UI TBD |
+| 9 | Lottie 与 UI-aware Motion / Lottie and UI-aware motion | 数据结构和文档可以独立做。 / Data structures and docs yes. | 接 Figma/DOM/UI 源文件、做动画编辑 UI 前确认。 / Confirm before Figma/DOM/UI-source integration or animation UI. | 是做 Jitter-like product motion，不是做完整 Jitter 替代品。 / It should be Jitter-like product motion, not a full Jitter replacement. | 入口已保留 / Entry reserved |
+| 10 | AI 自动剪辑 / AI auto-editing | AI Edit Plan 结构可以独立设计。 / AI Edit Plan structure yes. | AI 到底替用户做哪些决策，需要你给真实用例。 / You provide real cases for which decisions AI should make. | AI 是生成可审阅计划，不是不可控地直接改项目。 / AI generates reviewable plans, not uncontrolled project mutations. | 先做计划层 / Plan layer first |
+| 11 | 阶段放行 / Phase gate | 我可以汇总状态、跑门禁、列风险。 / I can summarize status, run gates, and list risks. | 每个阶段结束时你决定是否进入下一阶段。 / You decide whether to enter the next phase at each phase end. | Electron 实机体验、导出成片、架构方向三者是否都能接受。 / Electron UX, exported video, and architecture direction are all acceptable. | 必须用户放行 / User gate required |
+
 ### 13.2 我可以独立完成 / Work Codex Can Own Independently
 
 | ID | 工作项 / Work Item | 输出 / Output | 是否需要用户介入 / User Involvement |
