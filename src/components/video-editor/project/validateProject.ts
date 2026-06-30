@@ -197,6 +197,18 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
         validateCursorClipProps(props, `Cursor clip ${clip.id || "(missing id)"}`, errors);
       }
     }
+    if (clip.type === "annotation") {
+      const props = isRecord(clip.props) ? clip.props : undefined;
+      const sourceRegion = isRecord(props?.sourceRegion) ? props.sourceRegion : undefined;
+      if (!props) {
+        errors.push(`Annotation clip ${clip.id || "(missing id)"} props are required.`);
+      }
+      if (!sourceRegion) {
+        errors.push(`Annotation clip ${clip.id || "(missing id)"} sourceRegion is required.`);
+      } else {
+        validateAnnotationSourceRegion(sourceRegion, `Annotation clip ${clip.id || "(missing id)"} sourceRegion`, errors);
+      }
+    }
     if (clip.type === "camera") {
       const props = isRecord(clip.props) ? clip.props : undefined;
       const mode = props?.mode;
@@ -736,6 +748,120 @@ function validateCursorPoint(value: unknown, label: string, errors: string[]) {
   }
   if (point.isClick !== undefined && typeof point.isClick !== "boolean") {
     errors.push(`${label}.isClick must be boolean.`);
+  }
+}
+
+function validateAnnotationSourceRegion(region: Record<string, unknown>, label: string, errors: string[]) {
+  if (typeof region.id !== "string" || !region.id.trim()) {
+    errors.push(`${label}.id is required.`);
+  }
+  validateTimeRange(region.startMs, region.endMs, label, errors);
+  if (!isOneOf(region.type, ["text", "image", "figure"])) {
+    errors.push(`${label}.type is invalid or missing.`);
+  }
+  if (region.content !== undefined && typeof region.content !== "string") {
+    errors.push(`${label}.content must be a string.`);
+  }
+  if (region.textContent !== undefined && typeof region.textContent !== "string") {
+    errors.push(`${label}.textContent must be a string.`);
+  }
+  if (region.imageContent !== undefined && typeof region.imageContent !== "string") {
+    errors.push(`${label}.imageContent must be a string.`);
+  }
+  validateFinitePoint(region.position, `${label}.position`, ["x", "y"], errors);
+  validatePositiveDimensions(region.size, `${label}.size`, errors);
+  validateAnnotationTextStyle(region.style, `${label}.style`, errors);
+  if (!isFiniteNumber(region.zIndex)) {
+    errors.push(`${label}.zIndex must be finite.`);
+  }
+  if (region.figureData !== undefined) {
+    validateFigureData(region.figureData, `${label}.figureData`, errors);
+  }
+}
+
+function validateFinitePoint(
+  value: unknown,
+  label: string,
+  keys: readonly string[],
+  errors: string[],
+) {
+  const point = isRecord(value) ? value : undefined;
+  if (!point) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  keys.forEach((key) => {
+    if (!isFiniteNumber(point[key])) {
+      errors.push(`${label}.${key} must be finite.`);
+    }
+  });
+}
+
+function validatePositiveDimensions(value: unknown, label: string, errors: string[]) {
+  const size = isRecord(value) ? value : undefined;
+  if (!size) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  ["width", "height"].forEach((key) => {
+    if (!isFiniteNumber(size[key])) {
+      errors.push(`${label}.${key} must be finite.`);
+    } else if (size[key] <= 0) {
+      errors.push(`${label}.${key} must be positive.`);
+    }
+  });
+}
+
+function validateAnnotationTextStyle(value: unknown, label: string, errors: string[]) {
+  const style = isRecord(value) ? value : undefined;
+  if (!style) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  ["color", "backgroundColor", "fontFamily"].forEach((key) => {
+    if (typeof style[key] !== "string") {
+      errors.push(`${label}.${key} must be a string.`);
+    }
+  });
+  if (!isFiniteNumber(style.fontSize) || style.fontSize <= 0) {
+    errors.push(`${label}.fontSize must be positive.`);
+  }
+  if (!isValidFontWeight(style.fontWeight)) {
+    errors.push(`${label}.fontWeight is invalid or missing.`);
+  }
+  if (!isOneOf(style.fontStyle, ["normal", "italic"])) {
+    errors.push(`${label}.fontStyle is invalid or missing.`);
+  }
+  if (!isOneOf(style.textDecoration, ["none", "underline"])) {
+    errors.push(`${label}.textDecoration is invalid or missing.`);
+  }
+  if (!isOneOf(style.textAlign, ["left", "center", "right"])) {
+    errors.push(`${label}.textAlign is invalid or missing.`);
+  }
+}
+
+function isValidFontWeight(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0;
+  }
+  if (typeof value !== "string") return false;
+  return /^(normal|bold|lighter|bolder|[1-9]00)$/.test(value);
+}
+
+function validateFigureData(value: unknown, label: string, errors: string[]) {
+  const figureData = isRecord(value) ? value : undefined;
+  if (!figureData) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  if (!isOneOf(figureData.arrowDirection, ["up", "down", "left", "right", "up-right", "up-left", "down-right", "down-left"])) {
+    errors.push(`${label}.arrowDirection is invalid or missing.`);
+  }
+  if (typeof figureData.color !== "string") {
+    errors.push(`${label}.color must be a string.`);
+  }
+  if (!isFiniteNumber(figureData.strokeWidth) || figureData.strokeWidth <= 0) {
+    errors.push(`${label}.strokeWidth must be positive.`);
   }
 }
 

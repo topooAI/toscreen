@@ -138,6 +138,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:project-model-core-clips"],
   },
   {
+    id: "project-model-annotations",
+    command: npmCommand,
+    args: ["run", "audit:project-model-annotations"],
+  },
+  {
     id: "project-model-motion-clips",
     command: npmCommand,
     args: ["run", "audit:project-model-motion-clips"],

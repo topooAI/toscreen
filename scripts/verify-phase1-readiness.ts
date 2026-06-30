@@ -51,6 +51,7 @@ const requiredMachineGates = [
   "audit:project-model-lane-wrapping",
   "audit:project-model-clip-overlap-policy",
   "audit:project-model-core-clips",
+  "audit:project-model-annotations",
   "audit:project-model-motion-clips",
   "audit:project-model-review-packet",
   "audit:project-model-ai-plan-lifecycle",
@@ -135,7 +136,7 @@ console.log(JSON.stringify({
   machineVerified: [
     "ProjectModel smoke, restore, roundtrip, sidecar parity, and real recording restore gates are registered.",
     "Preview/export render settings, project duration, black tail, and Screen Studio core contracts are registered.",
-    "Camera migration, lane wrapping, core clip contracts, track hierarchy, asset compatibility, and AI plan model gates are registered.",
+    "Camera migration, lane wrapping, core clip and annotation contracts, track hierarchy, asset compatibility, and AI plan model gates are registered.",
   ],
   userRequired: requiredUserCheckpoints,
   userAcceptanceRecord: "docs/product/Phase1-User-Acceptance-Record.md",
