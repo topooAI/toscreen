@@ -118,6 +118,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:project-model-lane-wrapping"],
   },
   {
+    id: "project-model-clip-overlap-policy",
+    command: npmCommand,
+    args: ["run", "audit:project-model-clip-overlap-policy"],
+  },
+  {
     id: "project-model-track-hierarchy",
     command: npmCommand,
     args: ["run", "audit:project-model-track-hierarchy"],

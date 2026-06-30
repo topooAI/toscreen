@@ -32,6 +32,7 @@
     "audit:project-model-camera-migration": "tsx scripts/verify-project-model-camera-migration.ts",
     "audit:project-model-track-compatibility": "tsx scripts/verify-project-model-track-compatibility.ts",
     "audit:project-model-lane-wrapping": "tsx scripts/verify-project-model-lane-wrapping.ts",
+    "audit:project-model-clip-overlap-policy": "tsx scripts/verify-project-model-clip-overlap-policy.ts",
     "audit:project-model-track-hierarchy": "tsx scripts/verify-project-model-track-hierarchy.ts",
     "audit:project-model-asset-compatibility": "tsx scripts/verify-project-model-asset-compatibility.ts",
     "audit:project-model-ai-plan": "tsx scripts/verify-project-model-ai-plan-structure.ts",

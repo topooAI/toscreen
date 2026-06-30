@@ -47,6 +47,7 @@ const requiredMachineGates = [
   "audit:screenstudio-core-contract",
   "audit:project-model-camera-migration",
   "audit:project-model-lane-wrapping",
+  "audit:project-model-clip-overlap-policy",
   "audit:project-model-review-packet",
   "audit:project-model-review-doc",
   "audit:phase1-ownership-list",

@@ -30,6 +30,7 @@ const requiredAuditScripts = [
   "audit:project-model-camera-migration",
   "audit:project-model-track-compatibility",
   "audit:project-model-lane-wrapping",
+  "audit:project-model-clip-overlap-policy",
   "audit:project-model-track-hierarchy",
   "audit:project-model-asset-compatibility",
   "audit:project-model-ai-plan",
