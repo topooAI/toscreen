@@ -6,6 +6,7 @@ import {
   projectPathCandidatesForMediaPath,
 } from "../electron/ipc/projectFiles";
 import {
+  getProjectRenderSettings,
   restoreLegacyEditorStateFromProjectModel,
   validateVideoEditorProject,
 } from "../src/components/video-editor/project";
@@ -68,6 +69,18 @@ async function auditRecordingRestore(directory: string) {
     tracks?: number;
     clips?: number;
     restoredCompanionAudioPath?: string | null;
+    coreRestore?: {
+      sourceCameraClips: number;
+      restoredZoomRegions: number;
+      sourceAudioClips: number;
+      restoredAudioRegions: number;
+      sourceCursorClips: number;
+      restoredCursorPoints: number;
+      wallpaper: string;
+      showBlur: boolean;
+      motionBlurEnabled: boolean;
+      exportQuality: string;
+    };
   } = { present: false };
 
   if (!projectPath) {
@@ -83,6 +96,16 @@ async function auditRecordingRestore(directory: string) {
       const restored = validation.valid
         ? restoreLegacyEditorStateFromProjectModel(rawProject.projectModel)
         : null;
+      const renderSettings = validation.valid
+        ? getProjectRenderSettings(rawProject.projectModel)
+        : null;
+      const sourceCameraClips = countClips(rawProject.projectModel, "camera");
+      const sourceAudioClips = countClips(rawProject.projectModel, "audio");
+      const sourceCursorClips = countClips(rawProject.projectModel, "cursor");
+      const restoredZoomRegions = restored?.zoomRegions.length ?? 0;
+      const restoredAudioRegions = restored?.audioRegions.length ?? 0;
+      const restoredCursorPoints = restored?.cursorData?.length ?? 0;
+
       projectModel = {
         present: true,
         valid: validation.valid,
@@ -93,8 +116,39 @@ async function auditRecordingRestore(directory: string) {
         tracks: rawProject.projectModel.tracks?.length,
         clips: rawProject.projectModel.clips?.length,
         restoredCompanionAudioPath: restored?.companionAudioPath ?? null,
+        ...(renderSettings ? {
+          coreRestore: {
+            sourceCameraClips,
+            restoredZoomRegions,
+            sourceAudioClips,
+            restoredAudioRegions,
+            sourceCursorClips,
+            restoredCursorPoints,
+            wallpaper: renderSettings.canvas.wallpaper,
+            showBlur: renderSettings.canvas.showBlur,
+            motionBlurEnabled: renderSettings.effects.motionBlurEnabled,
+            exportQuality: renderSettings.exportSettings.quality,
+          },
+        } : {}),
       };
       if (!validation.valid) errors.push("ProjectModel sidecar is invalid.");
+      if (validation.valid) {
+        if (sourceCameraClips > 0 && restoredZoomRegions !== sourceCameraClips) {
+          errors.push(`Camera restore mismatch: expected ${sourceCameraClips} restored zoom regions, got ${restoredZoomRegions}.`);
+        }
+        if (sourceAudioClips > 0 && restoredAudioRegions < sourceAudioClips) {
+          errors.push(`Audio restore mismatch: expected at least ${sourceAudioClips} restored audio regions, got ${restoredAudioRegions}.`);
+        }
+        if (sourceCursorClips > 0 && restoredCursorPoints <= 0) {
+          errors.push("Cursor restore mismatch: cursor clip exists but restored cursor data is empty.");
+        }
+        if (!renderSettings?.canvas.wallpaper) {
+          errors.push("Canvas restore mismatch: restored wallpaper is empty.");
+        }
+        if (!renderSettings?.exportSettings.quality) {
+          errors.push("Export settings restore mismatch: restored export quality is empty.");
+        }
+      }
     } else {
       warnings.push("Project file exists but has no projectModel sidecar.");
     }
@@ -134,4 +188,8 @@ async function findFirstExistingPath(candidates: string[]) {
     if (await pathExists(candidate)) return candidate;
   }
   return null;
+}
+
+function countClips(project: { clips?: Array<{ type?: string }> }, type: string) {
+  return project.clips?.filter((clip) => clip.type === type).length ?? 0;
 }
