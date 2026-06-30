@@ -153,6 +153,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:phase1-ownership-list"],
   },
   {
+    id: "phase1-readiness",
+    command: npmCommand,
+    args: ["run", "audit:phase1-readiness"],
+  },
+  {
     id: "export-audio-render-settings",
     command: npmCommand,
     args: ["run", "audit:export-audio-render-settings"],
