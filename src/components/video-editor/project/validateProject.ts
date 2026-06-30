@@ -1,4 +1,12 @@
-import type { ProjectAsset, ProjectClip, ProjectScene, ProjectTrack, VideoEditorProject } from "./types";
+import type {
+  AIEditPlan,
+  ProjectAsset,
+  ProjectClip,
+  ProjectScene,
+  ProjectTrack,
+  ProjectUISource,
+  VideoEditorProject,
+} from "./types";
 
 export interface ProjectValidationResult {
   valid: boolean;
@@ -27,13 +35,21 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
   }
   if (!project.canvas) errors.push("Project canvas settings are required.");
   const assets = Array.isArray(project.assets) ? project.assets : [];
+  const uiSources = Array.isArray(project.uiSources) ? project.uiSources : [];
   const tracks = Array.isArray(project.tracks) ? project.tracks : [];
   const clips = Array.isArray(project.clips) ? project.clips : [];
   const scenes = Array.isArray(project.scenes) ? project.scenes : [];
+  const aiEditPlans = Array.isArray(project.aiEditPlans) ? project.aiEditPlans : [];
   if (!Array.isArray(project.assets)) errors.push("Project assets must be an array.");
+  if (project.uiSources !== undefined && !Array.isArray(project.uiSources)) {
+    errors.push("Project uiSources must be an array.");
+  }
   if (!Array.isArray(project.tracks)) errors.push("Project tracks must be an array.");
   if (!Array.isArray(project.clips)) errors.push("Project clips must be an array.");
   if (!Array.isArray(project.scenes)) errors.push("Project scenes must be an array.");
+  if (project.aiEditPlans !== undefined && !Array.isArray(project.aiEditPlans)) {
+    errors.push("Project aiEditPlans must be an array.");
+  }
 
   const assetIds = new Set<string>();
   assets.forEach((asset: ProjectAsset, index) => {
@@ -46,6 +62,37 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     assetIds.add(asset.id);
     if (!asset.type) errors.push(`Asset ${asset.id || "(missing id)"} type is required.`);
     if (!asset.sourceUrl) warnings.push(`Asset ${asset.id || "(missing id)"} has no sourceUrl.`);
+  });
+
+  const uiSourceIds = new Set<string>();
+  const uiElementIdsBySource = new Map<string, Set<string>>();
+  uiSources.forEach((uiSource: ProjectUISource, index) => {
+    if (!isRecord(uiSource)) {
+      errors.push(`UI source at index ${index} must be an object.`);
+      return;
+    }
+    if (!uiSource.id) errors.push("UI source id is required.");
+    if (uiSourceIds.has(uiSource.id)) errors.push(`Duplicate UI source id: ${uiSource.id}.`);
+    uiSourceIds.add(uiSource.id);
+    if (!uiSource.provider) errors.push(`UI source ${uiSource.id || "(missing id)"} provider is required.`);
+    if (!Array.isArray(uiSource.elements)) {
+      errors.push(`UI source ${uiSource.id || "(missing id)"} elements must be an array.`);
+      return;
+    }
+
+    const elementIds = new Set<string>();
+    uiSource.elements.forEach((element, elementIndex) => {
+      if (!isRecord(element)) {
+        errors.push(`UI source ${uiSource.id || "(missing id)"} element at index ${elementIndex} must be an object.`);
+        return;
+      }
+      if (!element.id) errors.push(`UI source ${uiSource.id || "(missing id)"} element id is required.`);
+      if (elementIds.has(element.id)) {
+        errors.push(`UI source ${uiSource.id || "(missing id)"} has duplicate element id: ${element.id}.`);
+      }
+      elementIds.add(element.id);
+    });
+    uiElementIdsBySource.set(uiSource.id, elementIds);
   });
 
   const trackIds = new Set<string>();
@@ -76,6 +123,21 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     }
     if (clip.assetId && !assetIds.has(clip.assetId)) {
       errors.push(`Clip ${clip.id || "(missing id)"} references missing asset ${clip.assetId}.`);
+    }
+    if (clip.type === "ui-element-motion") {
+      const props = isRecord(clip.props) ? clip.props : undefined;
+      const uiSourceId = typeof props?.uiSourceId === "string" ? props.uiSourceId : "";
+      const elementId = typeof props?.elementId === "string" ? props.elementId : "";
+      if (!uiSourceId) {
+        errors.push(`Clip ${clip.id || "(missing id)"} uiSourceId is required.`);
+      } else if (!uiSourceIds.has(uiSourceId)) {
+        errors.push(`Clip ${clip.id || "(missing id)"} references missing UI source ${uiSourceId}.`);
+      }
+      if (!elementId) {
+        errors.push(`Clip ${clip.id || "(missing id)"} elementId is required.`);
+      } else if (uiSourceId && uiElementIdsBySource.has(uiSourceId) && !uiElementIdsBySource.get(uiSourceId)?.has(elementId)) {
+        errors.push(`Clip ${clip.id || "(missing id)"} references missing UI element ${elementId}.`);
+      }
     }
     if (!Number.isFinite(clip.startMs) || !Number.isFinite(clip.endMs)) {
       errors.push(`Clip ${clip.id || "(missing id)"} startMs/endMs must be finite.`);
@@ -110,6 +172,54 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       });
     }
   });
+
+  const aiEditPlanIds = new Set<string>();
+  aiEditPlans.forEach((plan: AIEditPlan, index) => {
+    if (!isRecord(plan)) {
+      errors.push(`AI edit plan at index ${index} must be an object.`);
+      return;
+    }
+    if (!plan.id) errors.push("AI edit plan id is required.");
+    if (aiEditPlanIds.has(plan.id)) errors.push(`Duplicate AI edit plan id: ${plan.id}.`);
+    aiEditPlanIds.add(plan.id);
+    if (!Array.isArray(plan.steps)) {
+      errors.push(`AI edit plan ${plan.id || "(missing id)"} steps must be an array.`);
+      return;
+    }
+    const stepIds = new Set<string>();
+    plan.steps.forEach((step, stepIndex) => {
+      if (!isRecord(step)) {
+        errors.push(`AI edit plan ${plan.id || "(missing id)"} step at index ${stepIndex} must be an object.`);
+        return;
+      }
+      if (!step.id) errors.push(`AI edit plan ${plan.id || "(missing id)"} step id is required.`);
+      if (stepIds.has(step.id)) errors.push(`AI edit plan ${plan.id || "(missing id)"} has duplicate step id: ${step.id}.`);
+      stepIds.add(step.id);
+
+      const target = isRecord(step.target) ? step.target : undefined;
+      const clipIdsTarget = Array.isArray(target?.clipIds) ? target.clipIds : [];
+      clipIdsTarget.forEach((clipId) => {
+        if (typeof clipId === "string" && !clipIds.has(clipId)) {
+          errors.push(`AI edit plan ${plan.id || "(missing id)"} step ${step.id || "(missing id)"} references missing clip ${clipId}.`);
+        }
+      });
+      const trackIdsTarget = Array.isArray(target?.trackIds) ? target.trackIds : [];
+      trackIdsTarget.forEach((trackId) => {
+        if (typeof trackId === "string" && !trackIds.has(trackId)) {
+          errors.push(`AI edit plan ${plan.id || "(missing id)"} step ${step.id || "(missing id)"} references missing track ${trackId}.`);
+        }
+      });
+      const sceneIdsTarget = Array.isArray(target?.sceneIds) ? target.sceneIds : [];
+      sceneIdsTarget.forEach((sceneId) => {
+        if (typeof sceneId === "string" && !scenes.some((scene) => scene.id === sceneId)) {
+          errors.push(`AI edit plan ${plan.id || "(missing id)"} step ${step.id || "(missing id)"} references missing scene ${sceneId}.`);
+        }
+      });
+    });
+  });
+  if (project.activeAIEditPlanId && !aiEditPlanIds.has(project.activeAIEditPlanId)) {
+    errors.push(`Active AI edit plan ${project.activeAIEditPlanId} does not exist.`);
+  }
 
   return {
     valid: errors.length === 0,

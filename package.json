@@ -12,7 +12,8 @@
     "build:mac": "tsc && vite build && electron-builder --mac",
     "build:win": "tsc && vite build && electron-builder --win",
     "build:linux": "tsc && vite build && electron-builder --linux",
-    "audit:recordings": "tsx scripts/audit-recording-restore.ts"
+    "audit:recordings": "tsx scripts/audit-recording-restore.ts",
+    "audit:project-model-future": "tsx scripts/verify-project-model-future-entries.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

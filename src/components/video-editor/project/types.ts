@@ -20,6 +20,7 @@ export type AssetType =
   | "image"
   | "lottie"
   | "digital-human"
+  | "ui-source"
   | "cursor-data"
   | "font";
 
@@ -31,6 +32,7 @@ export type TrackType =
   | "annotation"
   | "lottie"
   | "image"
+  | "ui-motion"
   | "audio"
   | "voice"
   | "music"
@@ -46,6 +48,7 @@ export type ClipType =
   | "annotation"
   | "lottie"
   | "image"
+  | "ui-element-motion"
   | "cursor";
 
 export interface ProjectAsset {
@@ -165,6 +168,95 @@ export interface LottieClipProps {
   exitPreset?: string;
 }
 
+export type UISourceProvider =
+  | "figma"
+  | "dom-snapshot"
+  | "screenshot"
+  | "design-file"
+  | "manual";
+
+export interface UIElementBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ProjectUIElement {
+  id: string;
+  name?: string;
+  role?: "frame" | "component" | "text" | "button" | "input" | "image" | "icon" | "custom";
+  stableSelector?: string;
+  bounds?: UIElementBounds;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ProjectUISource {
+  id: string;
+  name: string;
+  provider: UISourceProvider;
+  sourceUrl?: string;
+  filePath?: string;
+  capturedAt?: string;
+  elements: ProjectUIElement[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface UIElementMotionClipProps {
+  uiSourceId: string;
+  elementId: string;
+  action: "highlight" | "move" | "scale" | "fade" | "morph" | "click" | "scroll" | "custom";
+  from?: Partial<UIElementBounds> & {
+    opacity?: number;
+    rotation?: number;
+  };
+  to?: Partial<UIElementBounds> & {
+    opacity?: number;
+    rotation?: number;
+  };
+  easing?: "linear" | "smooth" | "spring" | "catmull-rom";
+  generatedFrom?: {
+    recordingEventId?: string;
+    aiPlanStepId?: string;
+  };
+}
+
+export interface AIEditPlanStep {
+  id: string;
+  type:
+    | "cut"
+    | "trim"
+    | "camera"
+    | "caption"
+    | "annotation"
+    | "lottie"
+    | "ui-motion"
+    | "audio"
+    | "layout"
+    | "custom";
+  target?: {
+    clipIds?: string[];
+    trackIds?: string[];
+    sceneIds?: string[];
+    timeRangeMs?: {
+      startMs: number;
+      endMs: number;
+    };
+  };
+  params?: Record<string, unknown>;
+  rationale?: string;
+  status: "draft" | "accepted" | "rejected" | "applied";
+}
+
+export interface AIEditPlan {
+  id: string;
+  createdAt: string;
+  goal: string;
+  summary?: string;
+  status: "draft" | "reviewed" | "applied" | "rejected";
+  steps: AIEditPlanStep[];
+}
+
 export type ProjectClip =
   | BaseProjectClip<"screen-recording", ScreenRecordingClipProps>
   | BaseProjectClip<"camera", CameraClipProps>
@@ -173,6 +265,7 @@ export type ProjectClip =
   | BaseProjectClip<"audio", AudioClipProps>
   | BaseProjectClip<"cursor", CursorClipProps>
   | BaseProjectClip<"lottie", LottieClipProps>
+  | BaseProjectClip<"ui-element-motion", UIElementMotionClipProps>
   | BaseProjectClip<"video" | "image" | "text", Record<string, unknown>>;
 
 export interface ProjectCanvasSettings {
@@ -212,9 +305,12 @@ export interface VideoEditorProject {
   updatedAt: string;
   canvas: ProjectCanvasSettings;
   assets: ProjectAsset[];
+  uiSources?: ProjectUISource[];
   tracks: ProjectTrack[];
   clips: ProjectClip[];
   scenes: ProjectScene[];
+  aiEditPlans?: AIEditPlan[];
+  activeAIEditPlanId?: string;
   exportSettings: ProjectExportSettings;
   legacyState?: Record<string, unknown>;
 }
