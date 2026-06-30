@@ -16,6 +16,12 @@ import {
 } from "./phase1AcceptanceState";
 
 type HandoffStatus = "ready" | "blocked";
+type HandsOnStep = {
+  id: string;
+  label: string;
+  step: string;
+  failureNote: string;
+};
 
 const repoRoot = process.cwd();
 const acceptanceDocPath = path.join(repoRoot, "docs", "product", "Phase1-User-Acceptance-Record.md");
@@ -40,6 +46,13 @@ async function buildHandoffPacket(directory: string) {
     return "";
   });
   const acceptance = parsePhase1AcceptanceState(acceptanceContent);
+  const handsOnSteps = parseHandsOnSteps(acceptanceContent);
+  const missingHandsOnStepIds = phase1AcceptanceItems
+    .map((item) => item.id)
+    .filter((id) => !handsOnSteps.some((step) => step.id === id));
+  if (missingHandsOnStepIds.length > 0) {
+    errors.push(`Phase 1 hands-on steps are missing for: ${missingHandsOnStepIds.join(", ")}`);
+  }
   const latestRecording = await findLatestRecording(directory, errors, warnings);
   const projectPath = latestRecording
     ? await findFirstExistingPath(projectPathCandidatesForMediaPath(latestRecording.path))
@@ -94,12 +107,47 @@ async function buildHandoffPacket(directory: string) {
       currentPhaseStatus: acceptance.currentPhaseStatus,
       phaseReleased: acceptance.phaseReleased,
     },
+    handsOnSteps,
     nextHumanAction: acceptance.phaseReleased
       ? "Phase 1 acceptance is already marked released."
-      : "Open Electron with npm run dev:editor, load the latest recording, and check UA-01 through UA-08 in the acceptance record.",
+      : "Open Electron with npm run dev:editor, load the latest recording, and follow handsOnSteps for UA-01 through UA-08.",
     warnings,
     errors,
   };
+}
+
+function parseHandsOnSteps(content: string): HandsOnStep[] {
+  const itemById = new Map(phase1AcceptanceItems.map((item) => [item.id, item]));
+  const sectionStart = content.indexOf("### 3.1 实机验收步骤 / Hands-On Acceptance Steps");
+  if (sectionStart < 0) return [];
+  const nextSectionStart = content.indexOf("\n## 4.", sectionStart);
+  const section = nextSectionStart >= 0
+    ? content.slice(sectionStart, nextSectionStart)
+    : content.slice(sectionStart);
+  return section
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("| UA-"))
+    .map((line) => line.split("|").map((cell) => cell.trim()))
+    .filter((cells) => cells.length >= 4)
+    .map((cells) => ({
+      id: cells[1],
+      step: cells[2],
+      failureNote: cells[3],
+    }))
+    .filter(({ id, step, failureNote }) => (
+      itemById.has(id) &&
+      step.length > 0 &&
+      failureNote.length > 0 &&
+      step !== "实机步骤 / Hands-On Step" &&
+      failureNote !== "失败记录 / Failure Note"
+    ))
+    .map(({ id, step, failureNote }) => ({
+      id,
+      label: itemById.get(id)?.label ?? id,
+      step,
+      failureNote,
+    }));
 }
 
 async function findLatestRecording(
