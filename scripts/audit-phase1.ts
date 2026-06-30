@@ -87,6 +87,11 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:project-model-track-hierarchy"],
   },
+  {
+    id: "project-model-asset-compatibility",
+    command: npmCommand,
+    args: ["run", "audit:project-model-asset-compatibility"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];

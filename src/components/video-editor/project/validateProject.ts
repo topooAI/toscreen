@@ -144,6 +144,10 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     if (clip.assetId && !assetIds.has(clip.assetId)) {
       errors.push(`Clip ${clip.id || "(missing id)"} references missing asset ${clip.assetId}.`);
     }
+    const asset = clip.assetId ? assetsById.get(clip.assetId) : undefined;
+    if (asset && !isClipCompatibleWithAsset(clip.type, asset.type)) {
+      errors.push(`Clip ${clip.id || "(missing id)"} type ${clip.type} cannot reference asset ${asset.id} type ${asset.type}.`);
+    }
     if (clip.type === "camera") {
       const props = isRecord(clip.props) ? clip.props : undefined;
       const mode = props?.mode;
@@ -209,7 +213,6 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
           errors.push(`Presenter clip ${clip.id || "(missing id)"} transform.height must be positive.`);
         }
       }
-      const asset = clip.assetId ? assetsById.get(clip.assetId) : undefined;
       if (sourceKind === "digital-human" && asset && asset.type !== "digital-human") {
         errors.push(`Presenter clip ${clip.id || "(missing id)"} sourceKind digital-human must reference a digital-human asset.`);
       }
@@ -395,4 +398,23 @@ function isClipCompatibleWithTrack(
   };
 
   return allowedTrackTypesByClipType[clipType]?.includes(trackType) ?? false;
+}
+
+function isClipCompatibleWithAsset(
+  clipType: ProjectClip["type"],
+  assetType: ProjectAsset["type"],
+) {
+  const allowedAssetTypesByClipType: Partial<Record<ProjectClip["type"], ProjectAsset["type"][]>> = {
+    "screen-recording": ["screen-recording"],
+    video: ["screen-recording", "video"],
+    audio: ["audio"],
+    presenter: ["digital-human", "video"],
+    lottie: ["lottie"],
+    image: ["image"],
+    "ui-element-motion": ["ui-source"],
+    cursor: ["cursor-data"],
+  };
+
+  const allowedAssetTypes = allowedAssetTypesByClipType[clipType];
+  return allowedAssetTypes ? allowedAssetTypes.includes(assetType) : true;
 }
