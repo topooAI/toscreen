@@ -35,6 +35,7 @@ import { type AspectRatio, getAspectRatioValue } from "@/utils/aspectRatioUtils"
 import { getAssetPath } from "@/lib/assetPath";
 import {
   createProjectFromLegacyEditorState,
+  createProjectAutosaveSnapshot,
   getProjectRenderSettings,
   resolveExportAudioRegions,
   resolveRuntimeAudioRegions,
@@ -539,11 +540,6 @@ export default function VideoEditor() {
   useEffect(() => {
     if (!originalVideoPath) return;
     const timeout = setTimeout(() => {
-      // Create serialized copies (stripping 'file' object from audioRegions)
-      const serializedAudioRegions = audioRegions.map(ar => {
-        const { file, ...rest } = ar;
-        return rest;
-      });
       const projectModel = currentProjectModel;
       const projectModelValidation = validateVideoEditorProject(projectModel);
       if (!projectModelValidation.valid) {
@@ -551,27 +547,7 @@ export default function VideoEditor() {
       } else if (projectModelValidation.warnings.length > 0) {
         console.info("[ProjectModel] Sidecar model warnings", projectModelValidation.warnings);
       }
-      const projectData = {
-        zoomRegions,
-        trimRegions,
-        annotationRegions,
-        audioRegions: serializedAudioRegions,
-        projectModel,
-        cropRegion,
-        wallpaper,
-        shadowIntensity,
-        showBlur,
-        motionBlurEnabled,
-        borderRadius,
-        padding,
-        aspectRatio,
-        exportQuality,
-        cursorData,
-        cursorSize,
-        cursorSmoothing,
-        showVectorCursor,
-        cursorOffset,
-      };
+      const projectData = createProjectAutosaveSnapshot(projectModel, audioRegions);
       window.electronAPI.saveProject(originalVideoPath, projectData).catch(e => {
         console.error("Auto-save failed", e);
       });
@@ -580,10 +556,7 @@ export default function VideoEditor() {
   }, [
     currentProjectModel,
     videoPath, originalVideoPath,
-    zoomRegions, trimRegions, audioRegions, annotationRegions, cursorData,
-    cursorSize, cursorSmoothing, showVectorCursor, cursorOffset,
-    cropRegion, wallpaper, shadowIntensity, showBlur, motionBlurEnabled,
-    borderRadius, padding, aspectRatio, exportQuality
+    audioRegions,
   ]);
 
   const handleDurationChange = useCallback((dur: number) => {

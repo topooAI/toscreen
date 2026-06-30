@@ -1,4 +1,5 @@
 import {
+  createProjectAutosaveSnapshot,
   createProjectFromLegacyEditorState,
   restoreLegacyEditorStateFromProjectModel,
   validateVideoEditorProject,
@@ -92,25 +93,7 @@ if (!validation.valid) {
 }
 
 const savedProject = {
-  zoomRegions: legacyInput.zoomRegions,
-  trimRegions: legacyInput.trimRegions,
-  annotationRegions: legacyInput.annotationRegions,
-  audioRegions: legacyInput.audioRegions.map(({ file: _file, ...region }) => region),
-  projectModel,
-  cropRegion: legacyInput.cropRegion,
-  wallpaper: legacyInput.wallpaper,
-  shadowIntensity: legacyInput.shadowIntensity,
-  showBlur: legacyInput.showBlur,
-  motionBlurEnabled: legacyInput.motionBlurEnabled,
-  borderRadius: legacyInput.borderRadius,
-  padding: legacyInput.padding,
-  aspectRatio: legacyInput.aspectRatio,
-  exportQuality: legacyInput.exportQuality,
-  cursorData: legacyInput.cursorData,
-  cursorSize: legacyInput.cursorSize,
-  cursorSmoothing: legacyInput.cursorSmoothing,
-  showVectorCursor: legacyInput.showVectorCursor,
-  cursorOffset: legacyInput.cursorOffset,
+  ...createProjectAutosaveSnapshot(projectModel, legacyInput.audioRegions),
 };
 
 const restored = restoreLegacyEditorStateFromProjectModel(savedProject.projectModel);

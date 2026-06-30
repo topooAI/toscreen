@@ -43,6 +43,28 @@ export interface ProjectRenderSettings {
   };
 }
 
+export interface ProjectAutosaveSnapshot {
+  zoomRegions: ZoomRegion[];
+  trimRegions: TrimRegion[];
+  annotationRegions: AnnotationRegion[];
+  audioRegions: AudioRegion[];
+  projectModel: VideoEditorProject;
+  cropRegion: CropRegion;
+  wallpaper: string;
+  shadowIntensity: number;
+  showBlur: boolean;
+  motionBlurEnabled: boolean;
+  borderRadius: number;
+  padding: number;
+  aspectRatio: AspectRatio;
+  exportQuality: ExportQuality;
+  cursorData: CursorDataPoint[];
+  cursorSize: number;
+  cursorSmoothing: boolean;
+  showVectorCursor: boolean;
+  cursorOffset: number;
+}
+
 export function getProjectRenderSettings(project: VideoEditorProject): ProjectRenderSettings {
   const restored = restoreLegacyEditorStateFromProjectModel(project);
 
@@ -79,6 +101,39 @@ export function getProjectRenderSettings(project: VideoEditorProject): ProjectRe
   };
 }
 
+export function createProjectAutosaveSnapshot(
+  project: VideoEditorProject,
+  memoryAudioRegions: AudioRegion[] = [],
+): ProjectAutosaveSnapshot {
+  const renderSettings = getProjectRenderSettings(project);
+  const runtimeAudioRegions = resolveRuntimeAudioRegions(
+    renderSettings.timeline.audioRegions,
+    memoryAudioRegions,
+  );
+
+  return {
+    zoomRegions: renderSettings.timeline.zoomRegions,
+    trimRegions: renderSettings.timeline.trimRegions,
+    annotationRegions: renderSettings.timeline.annotationRegions,
+    audioRegions: serializeRuntimeAudioRegions(runtimeAudioRegions),
+    projectModel: project,
+    cropRegion: renderSettings.canvas.cropRegion,
+    wallpaper: renderSettings.canvas.wallpaper,
+    shadowIntensity: renderSettings.canvas.shadowIntensity,
+    showBlur: renderSettings.canvas.showBlur,
+    motionBlurEnabled: renderSettings.effects.motionBlurEnabled,
+    borderRadius: renderSettings.canvas.borderRadius,
+    padding: renderSettings.canvas.padding,
+    aspectRatio: renderSettings.canvas.aspectRatio,
+    exportQuality: renderSettings.exportSettings.quality,
+    cursorData: renderSettings.cursor.data,
+    cursorSize: renderSettings.cursor.size,
+    cursorSmoothing: renderSettings.cursor.smoothing,
+    showVectorCursor: renderSettings.cursor.showVectorCursor,
+    cursorOffset: renderSettings.cursor.offsetMs,
+  };
+}
+
 export function resolveRuntimeAudioRegions(
   renderSettingsAudioRegions: AudioRegion[],
   memoryAudioRegions: AudioRegion[],
@@ -107,4 +162,11 @@ export function resolveExportAudioRegions(
   memoryAudioRegions: AudioRegion[],
 ): AudioRegion[] {
   return resolveRuntimeAudioRegions(renderSettingsAudioRegions, memoryAudioRegions);
+}
+
+function serializeRuntimeAudioRegions(audioRegions: AudioRegion[]): AudioRegion[] {
+  return audioRegions.map((region) => {
+    const { file: _file, ...serializable } = region;
+    return serializable;
+  });
 }
