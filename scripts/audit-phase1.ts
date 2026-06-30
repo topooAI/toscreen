@@ -28,6 +28,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:project-model-restore"],
   },
   {
+    id: "project-model-roundtrip",
+    command: npmCommand,
+    args: ["run", "audit:project-model-roundtrip"],
+  },
+  {
     id: "recording-restore",
     command: npmCommand,
     args: ["run", "audit:recordings"],
