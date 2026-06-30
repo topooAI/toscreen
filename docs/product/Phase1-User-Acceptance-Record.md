@@ -16,7 +16,27 @@ This document records hands-on user acceptance for Phase 1. Machine gates only p
 5. UA-01 到 UA-08 全部改为 `[x]` 后，将阶段结论改为 `Released / 已放行`；此时 `npm run audit:phase1-readiness` 才应输出 `phaseComplete: true`。
    After UA-01 through UA-08 are all changed to `[x]`, change the phase conclusion to `Released / 已放行`; only then should `npm run audit:phase1-readiness` output `phaseComplete: true`.
 
-## 2. 用户验收清单 / User Acceptance Checklist
+## 2. 开发对照列表 / Development Ownership Checklist
+
+这个列表用于一边开发一边对照：默认 Codex 可以继续推进确定性的工程工作；只有进入“必须用户判断”的节点时才停下来。
+Use this list while iterating: by default, Codex can keep moving on deterministic engineering work; it stops only when a user judgment is required.
+
+| ID | 工作域 / Area | Codex 可以独立推进 / Codex Can Continue | 用户需要介入 / User Must Step In | 对照标准 / What To Check |
+|---|---|---|---|---|
+| DEV-01 | 产品定位 / Product positioning | 整理定位、范围、非目标、阶段路线和决策日志。 / Organize positioning, scope, non-goals, roadmap, and decision log. | 当 ToScreen 可能偏离 AI product-demo editor 时。 / When ToScreen may drift away from AI product-demo editor. | 是否仍然不是普通剪辑器、不是单纯录屏工具、不是完整 Jitter 替代品。 / It remains not a generic editor, recorder-only tool, or full Jitter replacement. |
+| DEV-02 | Phase 1 范围 / Phase 1 scope | 把数字人、多源画面、Lottie、UI-aware motion、3D 运镜、AI 自动剪辑先放进模型和文档。 / Keep digital human, multi-source video, Lottie, UI-aware motion, 3D camera, and AI editing in model/docs first. | 当某个大能力要从模型入口进入真实 UI 时。 / When a major capability moves from model hook into real UI. | 当前阶段是否仍以 Screen Studio 级稳定底座为第一目标。 / Phase 1 still prioritizes a Screen Studio-grade stable foundation. |
+| DEV-03 | ProjectModel 与兼容层 / ProjectModel and compatibility layer | 类型、adapter、validator、autosave、sidecar、旧项目 fallback、恢复路径。 / Types, adapters, validators, autosave, sidecar, legacy fallback, and restore path. | 模型语义改变，或会影响未来 AI/3D/Lottie/多源结构时。 / When model semantics change or affect future AI/3D/Lottie/multi-source structure. | Project / Asset / Track / Clip / Scene / UI Source / AI Edit Plan 是否合理。 / Project / Asset / Track / Clip / Scene / UI Source / AI Edit Plan remain coherent. |
+| DEV-04 | 保存与恢复 / Save and restore | 修复真实录制路径、画面、音频、Zoom、背景、光标和导出质量恢复。 / Fix restore for recording path, picture, audio, Zoom, background, cursor, and export quality. | Electron 重启后，用真实录制项目验收。 / After Electron restart, review with a real recording. | 不丢画面、不丢音频、不丢 Zoom/Focus、不丢背景/光标设置。 / No missing picture, audio, Zoom/Focus, background, or cursor settings. |
+| DEV-05 | Timeline 手感 / Timeline feel | 定位并修复拖拽、拉伸、磁吸、滚轮缩放、游标、片段换行 bug。 / Trace and fix drag, resize, snap, wheel zoom, playhead, and lane wrapping bugs. | 每次改变时间轴交互后都需要用户实机体验。 / User must test hands-on after every timeline interaction change. | 跟手、不闪、不跳、不错误定位游标、不破坏片段位置。 / It follows the pointer, does not flicker or jump, does not move the playhead incorrectly, and does not misplace clips. |
+| DEV-06 | Screen Studio 核心体验 / Screen Studio-grade UX | 分模块实现录屏预览、系统光标模拟、Zoom/Focus、背景虚化、播放、基础导出。 / Implement recording preview, system cursor simulation, Zoom/Focus, background blur, playback, and basic export module by module. | 每个体验模块完成后，用 Electron 对照验收。 / After each UX module, review it in Electron. | 能完成一条真实软件宣传视频的基础预览和编辑。 / A real software product-demo video can be previewed and edited at the basic level. |
+| DEV-07 | Preview/Export 一致性 / Preview/export parity | 收敛预览和导出的数据源、工程时长、画面、Zoom/Camera、光标、背景、音频。 / Converge preview/export data sources, project duration, picture, Zoom/Camera, cursor, background, and audio. | 完整导出真实项目后，用户看成片。 / After a real project exports end to end, user reviews the final video. | 预览和导出同画面、同节奏、同缩放、同光标、同背景效果。 / Preview and export match in picture, timing, zoom, cursor, and background effects. |
+| DEV-08 | Camera/Focus/3D 运镜 / Camera, Focus, and 3D camera | 先做模型迁移、兼容层和不破坏旧 Focus 的内部收口。 / Build model migration and compatibility without breaking existing Focus behavior. | 改命名、改操作方式、或 3D 运镜进入当前 UI 前。 / Before naming changes, interaction changes, or adding 3D camera to current UI. | Focus 是否升级为 Camera Clip，以及镜头语言是否符合产品方向。 / Whether Focus becomes Camera Clip and the camera language fits the product direction. |
+| DEV-09 | 多源画面 / Multi-source video | 保留摄像头、数字人、画中画、分屏、B-roll 的模型入口。 / Preserve model hooks for camera, digital human, PiP, split screen, and B-roll. | 是否做真实剪辑 UI 和第一阶段可操作能力，需要用户拍板。 / User decides whether real editing UI and Phase 1 interaction are needed. | 模型支持多源画面，但不膨胀成影视导播系统。 / Model supports multi-source video without becoming a film/broadcast switcher. |
+| DEV-10 | Lottie 与 UI-aware motion / Lottie and UI-aware motion | 定义数据结构、导入边界和未来 motion clip 模型。 / Define data structures, import boundaries, and future motion clip model. | 接 Figma/DOM/UI 源文件或做动画编辑 UI 前。 / Before Figma/DOM/UI-source integration or animation editing UI. | 做 Jitter-like product motion，不做 full Jitter。 / Build Jitter-like product motion, not full Jitter. |
+| DEV-11 | AI 自动剪辑 / AI auto-editing | 设计可审阅、可撤销、可解释的 AI Edit Plan。 / Design reviewable, undoable, explainable AI Edit Plan. | AI 要替用户自动做哪些剪辑决策时，需要真实用例确认。 / Real use cases are needed before deciding which edit decisions AI automates. | AI 先生成可审阅计划，再应用到时间轴。 / AI generates a reviewable plan before applying changes to the timeline. |
+| DEV-12 | 阶段放行 / Phase gate | 跑门禁、列风险、整理下一阶段建议、同步 GitHub。 / Run gates, list risks, summarize next-phase suggestions, and sync GitHub. | 是否关闭当前阶段并进入下一阶段，必须由用户确认。 / User must confirm whether to close the current phase and enter the next one. | UA-01 到 UA-08 全部通过，且阶段结论改为 `Released / 已放行`。 / UA-01 through UA-08 all pass and the phase conclusion changes to `Released / 已放行`. |
+
+## 3. 用户验收清单 / User Acceptance Checklist
 
 | ID | 验收项 / Acceptance Item | 用户需要验证 / What User Must Verify | 通过标准 / Pass Criteria | 状态 / Status | 备注 / Notes |
 |---|---|---|---|---|---|
@@ -29,7 +49,7 @@ This document records hands-on user acceptance for Phase 1. Machine gates only p
 | UA-07 | AI 自动剪辑真实用例确认 / AI auto-editing use-case review | AI 应该自动做哪些剪辑决策，哪些必须生成计划后由用户确认。 / Which edit decisions AI should automate, and which must stay as reviewable plans. | AI 先生成可审阅计划，再应用到时间轴的原则被确认。 / The reviewable-plan-before-apply principle is confirmed. | [ ] Pending | 参考 AI Edit Plan 结构。 / See AI Edit Plan structure. |
 | UA-08 | 阶段放行 / Phase gate | 当前阶段是否可以关闭，并进入下一阶段。 / Whether the current phase can close and the next phase can start. | UA-01 到 UA-07 全部通过，且用户明确同意进入下一阶段。 / UA-01 through UA-07 all pass, and the user explicitly approves moving forward. | [ ] Pending | `audit:phase1-readiness` 在放行前仍应输出 `phaseComplete: false`。 / `audit:phase1-readiness` should still report `phaseComplete: false` before release. |
 
-## 3. 机器门禁记录 / Machine Gate Record
+## 4. 机器门禁记录 / Machine Gate Record
 
 | 命令 / Command | 目的 / Purpose | 当前要求 / Current Requirement |
 |---|---|---|
@@ -37,7 +57,7 @@ This document records hands-on user acceptance for Phase 1. Machine gates only p
 | `npm run audit:phase1-readiness` | 输出机器已验证项和剩余用户验收项。 / Reports machine-verified items and remaining user checkpoints. | 放行前必须输出 `phaseComplete: false`；全部验收并改为 `Released / 已放行` 后才允许输出 `phaseComplete: true`。 / Must output `phaseComplete: false` before release; it may output `phaseComplete: true` only after every item is accepted and the status is changed to `Released / 已放行`. |
 | `npm run audit:recordings` | 检查真实最新录制项目恢复证据。 / Checks restore evidence for the latest real recording. | 必须通过，并输出 `coreRestore`。 / Must pass and output `coreRestore`. |
 
-## 4. 阶段结论 / Phase Conclusion
+## 5. 阶段结论 / Phase Conclusion
 
 - 当前阶段状态 / Current phase status: **Not released / 未放行**
 - 放行条件 / Release condition: UA-01 至 UA-08 全部改为 `[x]`，并由用户明确确认。
