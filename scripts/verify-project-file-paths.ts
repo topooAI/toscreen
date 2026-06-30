@@ -1,5 +1,6 @@
 import path from "node:path";
 import {
+  companionAudioPathCandidatesForMediaPath,
   normalizeMediaPath,
   projectPathCandidatesForMediaPath,
   projectPathForMediaPath,
@@ -59,6 +60,31 @@ if (normalized !== "/Users/viosson/Desktop/测试/recording-123.mov") {
   failed = true;
   console.error("[ProjectFiles] unicode normalization failed");
   console.error(normalized);
+}
+
+const audioCandidates = companionAudioPathCandidatesForMediaPath(cases[0].input);
+const expectedAudioCandidates = [
+  "/Users/viosson/Library/Application Support/toscreen/recordings/recording-1782710530746-audio.mov",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/recording-1782710530746-audio.m4a",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/recording-1782710530746-audio.wav",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/recording-1782710530746-audio.aac",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/recording-1782710530746.audio.mov",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/recording-1782710530746.audio.m4a",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/recording-1782710530746.audio.wav",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/recording-1782710530746.audio.aac",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/temp_audio_1782710530746.mov",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/temp_audio_1782710530746.m4a",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/temp_audio_1782710530746.wav",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/temp_audio_1782710530746.aac",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/temp_audio-1782710530746.mov",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/temp_audio-1782710530746.m4a",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/temp_audio-1782710530746.wav",
+  "/Users/viosson/Library/Application Support/toscreen/recordings/temp_audio-1782710530746.aac",
+];
+if (JSON.stringify(audioCandidates) !== JSON.stringify(expectedAudioCandidates)) {
+  failed = true;
+  console.error("[ProjectFiles] companion audio candidate order failed");
+  console.error(audioCandidates);
 }
 
 if (failed) {

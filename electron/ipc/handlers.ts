@@ -13,6 +13,7 @@ import {
 
 import { generateProxyVideo } from './proxyGenerator'
 import {
+  companionAudioPathCandidatesForMediaPath,
   normalizeMediaPath,
   projectPathCandidatesForMediaPath,
   projectPathForMediaPath,
@@ -157,8 +158,14 @@ export function registerIpcHandlers(
       const parsed = path.parse(videoPath)
       const proxyPath = path.join(parsed.dir, `${parsed.name}-proxy.mp4`)
       const hasProxy = await fs.access(proxyPath).then(() => true).catch(() => false)
+      const audioPath = await findFirstExistingPath(companionAudioPathCandidatesForMediaPath(videoPath))
 
-      return { success: true, path: videoPath, proxyPath: hasProxy ? proxyPath : undefined }
+      return {
+        success: true,
+        path: videoPath,
+        proxyPath: hasProxy ? proxyPath : undefined,
+        audioPath,
+      }
     } catch (error) {
       console.error('Failed to get video path:', error)
       return { success: false, message: 'Failed to get video path', error: String(error) }
@@ -508,4 +515,12 @@ export function registerIpcHandlers(
       return { success: false, error: String(error) };
     }
   });
+}
+
+async function findFirstExistingPath(candidates: string[]): Promise<string | undefined> {
+  for (const candidate of candidates) {
+    const exists = await fs.access(candidate).then(() => true).catch(() => false);
+    if (exists) return candidate;
+  }
+  return undefined;
 }

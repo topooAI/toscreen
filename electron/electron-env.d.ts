@@ -30,7 +30,7 @@ interface Window {
     selectSource: (source: any) => Promise<any>
     getSelectedSource: () => Promise<any>
     storeRecordedVideo: (videoData: ArrayBuffer, fileName: string) => Promise<{ success: boolean; path?: string; message?: string }>
-    getRecordedVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; message?: string }>
+    getRecordedVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string; message?: string }>
     setRecordingState: (recording: boolean, videoStartTime?: number) => Promise<void>
     onStopRecordingFromTray: (callback: () => void) => () => void
     openExternalUrl: (url: string) => Promise<{ success: boolean; error?: string }>

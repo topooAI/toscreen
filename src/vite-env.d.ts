@@ -26,6 +26,7 @@ interface Window {
       success: boolean
       path?: string
       proxyPath?: string
+      audioPath?: string
       message?: string
       error?: string
     }>

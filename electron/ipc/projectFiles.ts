@@ -35,6 +35,28 @@ export function projectPathCandidatesForMediaPath(mediaPath: string): string[] {
   return Array.from(new Set([canonicalProjectPath, exactProjectPath]))
 }
 
+export function companionAudioPathCandidatesForMediaPath(mediaPath: string): string[] {
+  const normalizedPath = normalizeMediaPath(mediaPath)
+  const parsed = path.parse(normalizedPath)
+  const baseName = parsed.name.endsWith('-proxy')
+    ? parsed.name.slice(0, -'-proxy'.length)
+    : parsed.name
+  const timestamp = baseName.match(/^recording-(.+)$/)?.[1]
+  const audioExtensions = ['.mov', '.m4a', '.wav', '.aac']
+  const candidateBases = [
+    `${baseName}-audio`,
+    `${baseName}.audio`,
+    timestamp ? `temp_audio_${timestamp}` : undefined,
+    timestamp ? `temp_audio-${timestamp}` : undefined,
+  ].filter((value): value is string => Boolean(value))
+
+  return Array.from(new Set(
+    candidateBases.flatMap((candidateBase) => (
+      audioExtensions.map((extension) => path.join(parsed.dir, `${candidateBase}${extension}`))
+    )),
+  ))
+}
+
 function decodePath(value: string): string {
   try {
     return decodeURIComponent(value)
