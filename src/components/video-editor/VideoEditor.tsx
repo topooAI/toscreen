@@ -216,6 +216,61 @@ export default function VideoEditor() {
       .map((region) => region.endMs / 1000),
   ), [duration, annotationRegions, audioRegions]);
 
+  const currentProjectModel = useMemo(() => createProjectFromLegacyEditorState({
+    videoPath,
+    originalVideoPath,
+    companionAudioPath,
+    durationSeconds: duration,
+    projectDurationSeconds: projectDuration,
+    zoomRegions,
+    trimRegions,
+    annotationRegions,
+    audioRegions,
+    cursorData,
+    cursorSize,
+    cursorSmoothing,
+    showVectorCursor,
+    cursorOffset,
+    cropRegion,
+    wallpaper,
+    shadowIntensity,
+    showBlur,
+    motionBlurEnabled,
+    borderRadius,
+    padding,
+    aspectRatio,
+    exportQuality,
+  }), [
+    videoPath,
+    originalVideoPath,
+    companionAudioPath,
+    duration,
+    projectDuration,
+    zoomRegions,
+    trimRegions,
+    annotationRegions,
+    audioRegions,
+    cursorData,
+    cursorSize,
+    cursorSmoothing,
+    showVectorCursor,
+    cursorOffset,
+    cropRegion,
+    wallpaper,
+    shadowIntensity,
+    showBlur,
+    motionBlurEnabled,
+    borderRadius,
+    padding,
+    aspectRatio,
+    exportQuality,
+  ]);
+
+  const currentRenderSettings = useMemo(
+    () => getProjectRenderSettings(currentProjectModel),
+    [currentProjectModel],
+  );
+
   const currentTimeStateRef = useRef(currentTime);
   const timelineResizeLockRef = useRef(0);
   const projectClockRef = useRef<number | null>(null);
@@ -476,31 +531,7 @@ export default function VideoEditor() {
         const { file, ...rest } = ar;
         return rest;
       });
-      const projectModel = createProjectFromLegacyEditorState({
-        videoPath,
-        originalVideoPath,
-        companionAudioPath,
-        durationSeconds: duration,
-        projectDurationSeconds: projectDuration,
-        zoomRegions,
-        trimRegions,
-        annotationRegions,
-        audioRegions,
-        cursorData,
-        cursorSize,
-        cursorSmoothing,
-        showVectorCursor,
-        cursorOffset,
-        cropRegion,
-        wallpaper,
-        shadowIntensity,
-        showBlur,
-        motionBlurEnabled,
-        borderRadius,
-        padding,
-        aspectRatio,
-        exportQuality,
-      });
+      const projectModel = currentProjectModel;
       const projectModelValidation = validateVideoEditorProject(projectModel);
       if (!projectModelValidation.valid) {
         console.warn("[ProjectModel] Generated invalid sidecar model", projectModelValidation.errors);
@@ -528,7 +559,8 @@ export default function VideoEditor() {
     }, 1000); // 1s debounce
     return () => clearTimeout(timeout);
   }, [
-    videoPath, originalVideoPath, companionAudioPath, duration, projectDuration,
+    currentProjectModel,
+    videoPath, originalVideoPath,
     zoomRegions, trimRegions, audioRegions, annotationRegions, cursorData,
     cursorSize, cursorSmoothing, showVectorCursor, cursorOffset,
     cropRegion, wallpaper, shadowIntensity, showBlur, motionBlurEnabled,
@@ -1092,36 +1124,11 @@ export default function VideoEditor() {
         return;
       }
 
-      const exportProjectModel = createProjectFromLegacyEditorState({
-        videoPath,
-        originalVideoPath,
-        companionAudioPath,
-        durationSeconds: duration,
-        projectDurationSeconds: projectDuration,
-        zoomRegions,
-        trimRegions,
-        annotationRegions,
-        audioRegions,
-        cursorData,
-        cursorSize,
-        cursorSmoothing,
-        showVectorCursor,
-        cursorOffset,
-        cropRegion,
-        wallpaper,
-        shadowIntensity,
-        showBlur,
-        motionBlurEnabled,
-        borderRadius,
-        padding,
-        aspectRatio,
-        exportQuality,
-      });
-      const exportProjectValidation = validateVideoEditorProject(exportProjectModel);
+      const exportProjectValidation = validateVideoEditorProject(currentProjectModel);
       if (!exportProjectValidation.valid) {
         console.warn("[ProjectModel] Export render settings source is invalid", exportProjectValidation.errors);
       }
-      const renderSettings = getProjectRenderSettings(exportProjectModel);
+      const renderSettings = currentRenderSettings;
 
       const aspectRatioValue = getAspectRatioValue(renderSettings.canvas.aspectRatio);
       const sourceWidth = video.videoWidth || 1920;
@@ -1229,7 +1236,7 @@ export default function VideoEditor() {
       setIsExporting(false);
       exporterRef.current = null;
     }
-  }, [videoPath, originalVideoPath, companionAudioPath, duration, projectDuration, zoomRegions, trimRegions, annotationRegions, audioRegions, cursorData, cursorSize, cursorSmoothing, showVectorCursor, cursorOffset, cropRegion, wallpaper, shadowIntensity, showBlur, motionBlurEnabled, borderRadius, padding, aspectRatio, exportQuality, isPlaying]);
+  }, [videoPath, originalVideoPath, audioRegions, isPlaying, currentProjectModel, currentRenderSettings]);
 
   const handleCancelExport = useCallback(() => {
     if (exporterRef.current) {
@@ -1459,9 +1466,9 @@ export default function VideoEditor() {
               <div className="w-full h-full flex flex-col items-center justify-center bg-black/40 rounded-2xl border border-white/5 shadow-2xl overflow-hidden">
                 {/* Video preview */}
                 <div className="w-full flex justify-center items-center" style={{ flex: '1 1 auto', margin: '6px 0 0' }}>
-                  <div className="relative" style={{ width: 'auto', height: '100%', aspectRatio: getAspectRatioValue(aspectRatio), maxWidth: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+                  <div className="relative" style={{ width: 'auto', height: '100%', aspectRatio: getAspectRatioValue(currentRenderSettings.canvas.aspectRatio), maxWidth: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
                     <VideoPlayback
-                      aspectRatio={aspectRatio}
+                      aspectRatio={currentRenderSettings.canvas.aspectRatio}
                       ref={videoPlaybackRef}
                       videoPath={videoPath ? toFileUrl(videoPath) : ''}
                       onDurationChange={handleDurationChange}
@@ -1499,31 +1506,31 @@ export default function VideoEditor() {
                         setIsPlaying(playing);
                       }}
                       onError={setError}
-                      wallpaper={wallpaper}
-                      zoomRegions={zoomRegions}
+                      wallpaper={currentRenderSettings.canvas.wallpaper}
+                      zoomRegions={currentRenderSettings.timeline.zoomRegions}
                       selectedZoomId={selectedZoomId}
                       onSelectZoom={handleSelectZoom}
                       onZoomFocusChange={handleZoomFocusChange}
                       isPlaying={isPlaying}
-                      showShadow={shadowIntensity > 0}
-                      shadowIntensity={shadowIntensity}
-                      showBlur={showBlur}
-                      motionBlurEnabled={motionBlurEnabled}
-                      borderRadius={borderRadius}
-                      padding={padding}
-                      cropRegion={cropRegion}
-                      trimRegions={trimRegions}
-                      annotationRegions={annotationRegions}
+                      showShadow={currentRenderSettings.canvas.shadowIntensity > 0}
+                      shadowIntensity={currentRenderSettings.canvas.shadowIntensity}
+                      showBlur={currentRenderSettings.canvas.showBlur}
+                      motionBlurEnabled={currentRenderSettings.effects.motionBlurEnabled}
+                      borderRadius={currentRenderSettings.canvas.borderRadius}
+                      padding={currentRenderSettings.canvas.padding}
+                      cropRegion={currentRenderSettings.canvas.cropRegion}
+                      trimRegions={currentRenderSettings.timeline.trimRegions}
+                      annotationRegions={currentRenderSettings.timeline.annotationRegions}
                       selectedAnnotationId={selectedAnnotationId}
                       onSelectAnnotation={handleSelectAnnotation}
                       onAnnotationPositionChange={handleAnnotationPositionChange}
                       onAnnotationSizeChange={handleAnnotationSizeChange}
                       isFullScreenBinding={isFullScreenBinding}
-                      cursorSize={cursorSize}
-                      cursorSmoothing={cursorSmoothing}
-                      showVectorCursor={showVectorCursor}
-                      cursorData={cursorData}
-                      cursorOffset={cursorOffset}
+                      cursorSize={currentRenderSettings.cursor.size}
+                      cursorSmoothing={currentRenderSettings.cursor.smoothing}
+                      showVectorCursor={currentRenderSettings.cursor.showVectorCursor}
+                      cursorData={currentRenderSettings.cursor.data}
+                      cursorOffset={currentRenderSettings.cursor.offsetMs}
                     />
                   </div>
                 </div>
