@@ -77,6 +77,11 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:project-model-track-compatibility"],
   },
+  {
+    id: "project-model-lane-wrapping",
+    command: npmCommand,
+    args: ["run", "audit:project-model-lane-wrapping"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];

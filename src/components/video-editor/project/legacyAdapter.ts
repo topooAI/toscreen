@@ -163,6 +163,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
     { id: TRACK_IDS.audio, type: "audio", name: "Audio", order: 3 },
     { id: TRACK_IDS.cursor, type: "cursor", name: "Cursor", order: 4 },
   ];
+  const laneAllocator = createLaneAllocator(tracks);
 
   const clips: ProjectClip[] = [];
   if (screenAssetId) {
@@ -191,10 +192,18 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
   }
 
   input.zoomRegions.forEach((region) => {
+    const trackId = laneAllocator.assign({
+      baseTrackId: TRACK_IDS.camera,
+      trackType: "camera",
+      baseName: "Camera",
+      baseOrder: 1,
+      startMs: region.startMs,
+      endMs: region.endMs,
+    });
     clips.push({
       id: stableId("clip-camera", region.id),
       type: "camera",
-      trackId: TRACK_IDS.camera,
+      trackId,
       startMs: region.startMs,
       endMs: region.endMs,
       name: `Zoom ${region.depth}`,
@@ -214,10 +223,18 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
   });
 
   input.annotationRegions.forEach((region) => {
+    const trackId = laneAllocator.assign({
+      baseTrackId: TRACK_IDS.annotation,
+      trackType: "annotation",
+      baseName: "Annotation",
+      baseOrder: 2,
+      startMs: region.startMs,
+      endMs: region.endMs,
+    });
     clips.push({
       id: stableId("clip-annotation", region.id),
       type: "annotation",
-      trackId: TRACK_IDS.annotation,
+      trackId,
       startMs: region.startMs,
       endMs: region.endMs,
       name: region.type,
@@ -234,10 +251,18 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
 
   input.audioRegions.forEach((region) => {
     const { file: _file, ...serializableRegion } = region;
+    const trackId = laneAllocator.assign({
+      baseTrackId: TRACK_IDS.audio,
+      trackType: "audio",
+      baseName: "Audio",
+      baseOrder: 3,
+      startMs: region.startMs,
+      endMs: region.endMs,
+    });
     clips.push({
       id: stableId("clip-audio", region.id),
       type: "audio",
-      trackId: TRACK_IDS.audio,
+      trackId,
       assetId: audioAssetId(region),
       startMs: region.startMs,
       endMs: region.endMs,
@@ -429,4 +454,60 @@ function stableId(prefix: string, value: string) {
     hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
   }
   return `${prefix}-${Math.abs(hash).toString(36)}`;
+}
+
+interface LaneAllocatorInput {
+  baseTrackId: string;
+  trackType: ProjectTrack["type"];
+  baseName: string;
+  baseOrder: number;
+  startMs: number;
+  endMs: number;
+}
+
+interface LaneSpan {
+  startMs: number;
+  endMs: number;
+}
+
+function createLaneAllocator(tracks: ProjectTrack[]) {
+  const lanesByBaseTrackId = new Map<string, LaneSpan[][]>();
+
+  return {
+    assign(input: LaneAllocatorInput) {
+      const lanes = lanesByBaseTrackId.get(input.baseTrackId) ?? [];
+      lanesByBaseTrackId.set(input.baseTrackId, lanes);
+
+      const laneIndex = findFirstAvailableLane(lanes, input.startMs, input.endMs);
+      if (!lanes[laneIndex]) lanes[laneIndex] = [];
+      lanes[laneIndex].push({ startMs: input.startMs, endMs: input.endMs });
+
+      if (laneIndex === 0) return input.baseTrackId;
+
+      const laneTrackId = `${input.baseTrackId}-lane-${laneIndex + 1}`;
+      if (!tracks.some((track) => track.id === laneTrackId)) {
+        tracks.push({
+          id: laneTrackId,
+          type: input.trackType,
+          name: `${input.baseName} ${laneIndex + 1}`,
+          order: input.baseOrder + laneIndex / 100,
+          parentId: input.baseTrackId,
+        });
+      }
+      return laneTrackId;
+    },
+  };
+}
+
+function findFirstAvailableLane(lanes: LaneSpan[][], startMs: number, endMs: number) {
+  const normalizedStart = Math.min(startMs, endMs);
+  const normalizedEnd = Math.max(startMs, endMs);
+  const laneIndex = lanes.findIndex((lane) => (
+    lane.every((span) => !spansOverlap(normalizedStart, normalizedEnd, span.startMs, span.endMs))
+  ));
+  return laneIndex >= 0 ? laneIndex : lanes.length;
+}
+
+function spansOverlap(firstStartMs: number, firstEndMs: number, secondStartMs: number, secondEndMs: number) {
+  return firstStartMs < secondEndMs && secondStartMs < firstEndMs;
 }

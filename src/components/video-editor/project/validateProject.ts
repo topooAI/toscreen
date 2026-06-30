@@ -113,6 +113,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
   });
 
   const clipIds = new Set<string>();
+  const clipsByTrackId = new Map<string, ProjectClip[]>();
   clips.forEach((clip: ProjectClip, index) => {
     if (!isRecord(clip)) {
       errors.push(`Clip at index ${index} must be an object.`);
@@ -236,6 +237,24 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     }
     if (typeof project.durationMs === "number" && clip.endMs > project.durationMs) {
       warnings.push(`Clip ${clip.id || "(missing id)"} extends beyond project duration.`);
+    }
+    if (trackIds.has(clip.trackId)) {
+      const clipsOnTrack = clipsByTrackId.get(clip.trackId) ?? [];
+      clipsOnTrack.push(clip);
+      clipsByTrackId.set(clip.trackId, clipsOnTrack);
+    }
+  });
+
+  clipsByTrackId.forEach((clipsOnTrack, trackId) => {
+    const sortedClips = clipsOnTrack
+      .filter((clip) => Number.isFinite(clip.startMs) && Number.isFinite(clip.endMs))
+      .sort((first, second) => first.startMs - second.startMs || first.endMs - second.endMs);
+    for (let index = 1; index < sortedClips.length; index += 1) {
+      const previousClip = sortedClips[index - 1];
+      const currentClip = sortedClips[index];
+      if (currentClip.startMs < previousClip.endMs) {
+        errors.push(`Track ${trackId} has overlapping clips ${previousClip.id} and ${currentClip.id}.`);
+      }
     }
   });
 
