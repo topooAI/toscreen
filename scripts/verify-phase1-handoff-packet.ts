@@ -66,6 +66,7 @@ const machineEvidenceByAcceptanceId: Record<string, string[]> = {
 
 const repoRoot = process.cwd();
 const acceptanceDocPath = path.join(repoRoot, "docs", "product", "Phase1-User-Acceptance-Record.md");
+const packageJsonPath = path.join(repoRoot, "package.json");
 const recordingsDir = process.argv[2] || path.join(
   os.homedir(),
   "Library/Application Support/toscreen/recordings",
@@ -95,6 +96,7 @@ async function buildHandoffPacket(directory: string) {
     errors.push(`Phase 1 hands-on steps are missing for: ${missingHandsOnStepIds.join(", ")}`);
   }
   const acceptancePlan = buildAcceptancePlan(acceptance.checkedIds, handsOnSteps);
+  await validateAcceptancePlanEvidence(acceptancePlan, errors);
   const latestRecording = await findLatestRecording(directory, errors, warnings);
   const projectPath = latestRecording
     ? await findFirstExistingPath(projectPathCandidatesForMediaPath(latestRecording.path))
@@ -175,6 +177,47 @@ function buildAcceptancePlan(
       machineEvidence: machineEvidenceByAcceptanceId[item.id] ?? [],
     };
   });
+}
+
+async function validateAcceptancePlanEvidence(
+  acceptancePlan: AcceptancePlanItem[],
+  errors: string[],
+) {
+  const packageJson = await fs.readFile(packageJsonPath, "utf8")
+    .then((content) => JSON.parse(content) as { scripts?: Record<string, string> })
+    .catch((error) => {
+      errors.push(`package.json is not readable for acceptance evidence validation: ${String(error)}`);
+      return null;
+    });
+  if (!packageJson) return;
+
+  const scripts = packageJson.scripts ?? {};
+  const expectedIds = phase1AcceptanceItems.map((item) => item.id);
+  const planIds = acceptancePlan.map((item) => item.id);
+  const missingPlanIds = expectedIds.filter((id) => !planIds.includes(id));
+  if (missingPlanIds.length > 0) {
+    errors.push(`Acceptance plan is missing items for: ${missingPlanIds.join(", ")}`);
+  }
+
+  for (const item of acceptancePlan) {
+    if (item.step.length === 0 || item.failureNote.length === 0) {
+      errors.push(`Acceptance plan item ${item.id} is missing a hands-on step or failure note.`);
+    }
+    if (item.machineEvidence.length === 0) {
+      errors.push(`Acceptance plan item ${item.id} has no machine evidence commands.`);
+    }
+    for (const command of item.machineEvidence) {
+      const match = /^npm run ([\w:-]+)$/.exec(command);
+      if (!match) {
+        errors.push(`Acceptance plan item ${item.id} has unsupported evidence command: ${command}`);
+        continue;
+      }
+      const scriptName = match[1];
+      if (!scripts[scriptName]) {
+        errors.push(`Acceptance plan item ${item.id} references missing npm script: ${scriptName}`);
+      }
+    }
+  }
 }
 
 function parseHandsOnSteps(content: string): HandsOnStep[] {
