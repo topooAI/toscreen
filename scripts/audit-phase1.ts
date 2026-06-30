@@ -73,6 +73,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:preview-project-time"],
   },
   {
+    id: "export-black-tail-rendering",
+    command: npmCommand,
+    args: ["run", "audit:export-black-tail-rendering"],
+  },
+  {
     id: "export-entrypoints",
     command: npmCommand,
     args: ["run", "audit:export-entrypoints"],
