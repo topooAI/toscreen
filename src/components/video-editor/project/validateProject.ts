@@ -124,6 +124,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
   });
 
   const clipIds = new Set<string>();
+  const clipsById = new Map<string, ProjectClip>();
   const clipsByTrackId = new Map<string, ProjectClip[]>();
   clips.forEach((clip: ProjectClip, index) => {
     if (!isRecord(clip)) {
@@ -133,6 +134,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     if (!clip.id) errors.push("Clip id is required.");
     if (clipIds.has(clip.id)) errors.push(`Duplicate clip id: ${clip.id}.`);
     clipIds.add(clip.id);
+    clipsById.set(clip.id, clip);
 
     if (!trackIds.has(clip.trackId)) {
       errors.push(`Clip ${clip.id || "(missing id)"} references missing track ${clip.trackId}.`);
@@ -331,27 +333,77 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     }
   });
 
+  const sceneIds = new Set<string>();
+  const sceneRanges: Array<{ id: string; startMs: number; endMs: number }> = [];
   scenes.forEach((scene: ProjectScene, index) => {
     if (!isRecord(scene)) {
       errors.push(`Scene at index ${index} must be an object.`);
       return;
     }
     if (!scene.id) errors.push("Scene id is required.");
+    if (scene.id) {
+      if (sceneIds.has(scene.id)) errors.push(`Duplicate scene id: ${scene.id}.`);
+      sceneIds.add(scene.id);
+    }
+    if (typeof scene.name !== "string" || !scene.name.trim()) {
+      errors.push(`Scene ${scene.id || "(missing id)"} name is required.`);
+    }
+    if (!isOneOf(scene.purpose, ["hook", "problem", "demo", "feature", "result", "cta", "custom"])) {
+      errors.push(`Scene ${scene.id || "(missing id)"} purpose is invalid or missing.`);
+    }
     if (!Number.isFinite(scene.startMs) || !Number.isFinite(scene.endMs)) {
       errors.push(`Scene ${scene.id || "(missing id)"} startMs/endMs must be finite.`);
+    } else if (scene.startMs < 0 || scene.endMs < 0) {
+      errors.push(`Scene ${scene.id || "(missing id)"} startMs/endMs must be non-negative.`);
     } else if (scene.endMs < scene.startMs) {
       errors.push(`Scene ${scene.id || "(missing id)"} endMs is before startMs.`);
+    } else {
+      if (scene.endMs === scene.startMs) {
+        warnings.push(`Scene ${scene.id || "(missing id)"} has zero duration.`);
+      }
+      if (typeof project.durationMs === "number" && scene.endMs > project.durationMs) {
+        warnings.push(`Scene ${scene.id || "(missing id)"} extends beyond project duration.`);
+      }
+      sceneRanges.push({ id: scene.id || `(missing id ${index})`, startMs: scene.startMs, endMs: scene.endMs });
     }
     if (!Array.isArray(scene.clipIds)) {
       errors.push(`Scene ${scene.id || "(missing id)"} clipIds must be an array.`);
     } else {
+      const sceneClipIds = new Set<string>();
       scene.clipIds.forEach((clipId) => {
+        if (sceneClipIds.has(clipId)) {
+          errors.push(`Scene ${scene.id || "(missing id)"} has duplicate clip id ${clipId}.`);
+        }
+        sceneClipIds.add(clipId);
         if (!clipIds.has(clipId)) {
           errors.push(`Scene ${scene.id || "(missing id)"} references missing clip ${clipId}.`);
+          return;
+        }
+        const clip = clipsById.get(clipId);
+        if (
+          clip &&
+          Number.isFinite(scene.startMs) &&
+          Number.isFinite(scene.endMs) &&
+          Number.isFinite(clip.startMs) &&
+          Number.isFinite(clip.endMs) &&
+          !rangesOverlap(scene.startMs, scene.endMs, clip.startMs, clip.endMs)
+        ) {
+          errors.push(`Scene ${scene.id || "(missing id)"} references clip ${clipId} outside its time range.`);
         }
       });
     }
+    if (scene.aiSummary !== undefined && typeof scene.aiSummary !== "string") {
+      errors.push(`Scene ${scene.id || "(missing id)"} aiSummary must be a string.`);
+    }
   });
+  const sortedSceneRanges = sceneRanges.sort((first, second) => first.startMs - second.startMs || first.endMs - second.endMs);
+  for (let index = 1; index < sortedSceneRanges.length; index += 1) {
+    const previousScene = sortedSceneRanges[index - 1];
+    const currentScene = sortedSceneRanges[index];
+    if (currentScene.startMs < previousScene.endMs) {
+      errors.push(`Scenes ${previousScene.id} and ${currentScene.id} overlap.`);
+    }
+  }
 
   const aiEditPlanIds = new Set<string>();
   aiEditPlans.forEach((plan: AIEditPlan, index) => {
@@ -518,6 +570,10 @@ function validateOpacity(value: unknown, label: string, errors: string[]) {
   if (isFiniteNumber(value) && (value < 0 || value > 1)) {
     errors.push(`${label} must be between 0 and 1.`);
   }
+}
+
+function rangesOverlap(firstStartMs: number, firstEndMs: number, secondStartMs: number, secondEndMs: number) {
+  return firstStartMs < secondEndMs && secondStartMs < firstEndMs;
 }
 
 function validateAIEditPlanLifecycle(

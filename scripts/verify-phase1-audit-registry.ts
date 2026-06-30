@@ -38,6 +38,7 @@ const requiredAuditScripts = [
   "audit:project-model-ai-plan-lifecycle",
   "audit:project-model-review-packet",
   "audit:project-model-sidecar-parity",
+  "audit:project-model-scenes",
   "audit:project-model-review-doc",
   "audit:phase1-ownership-list",
   "audit:phase1-readiness",

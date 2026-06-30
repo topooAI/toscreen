@@ -158,6 +158,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:project-model-sidecar-parity"],
   },
   {
+    id: "project-model-scenes",
+    command: npmCommand,
+    args: ["run", "audit:project-model-scenes"],
+  },
+  {
     id: "project-model-review-doc",
     command: npmCommand,
     args: ["run", "audit:project-model-review-doc"],
