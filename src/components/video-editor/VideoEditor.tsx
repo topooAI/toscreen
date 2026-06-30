@@ -401,6 +401,9 @@ export default function VideoEditor() {
             toast.success("工程已自动恢复");
             console.info(`[ProjectModel] Auto-restored project via ${restoredFrom}`, {
               projectPath: projectResult.projectPath,
+              companionAudioPath: projectResult.project?.projectModel
+                ? restoreLegacyEditorStateFromProjectModel(projectResult.project.projectModel).companionAudioPath
+                : (result as any).audioPath,
             });
           } else {
             // New recording project! Auto-load the companion recorded audio track if available
@@ -1342,6 +1345,9 @@ export default function VideoEditor() {
             const restoredFrom = applyLoadedProject(projectResult.project);
             console.info(`[ProjectModel] Drop-restored project via ${restoredFrom}`, {
               projectPath: projectResult.projectPath,
+              companionAudioPath: projectResult.project?.projectModel
+                ? restoreLegacyEditorStateFromProjectModel(projectResult.project.projectModel).companionAudioPath
+                : null,
             });
           }
         } else if (isAudio) {
