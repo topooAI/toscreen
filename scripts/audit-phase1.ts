@@ -82,6 +82,11 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:project-model-lane-wrapping"],
   },
+  {
+    id: "project-model-track-hierarchy",
+    command: npmCommand,
+    args: ["run", "audit:project-model-track-hierarchy"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];

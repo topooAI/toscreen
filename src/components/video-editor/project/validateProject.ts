@@ -111,6 +111,17 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     if (!track.type) errors.push(`Track ${track.id || "(missing id)"} type is required.`);
     if (!Number.isFinite(track.order)) errors.push(`Track ${track.id || "(missing id)"} order must be finite.`);
   });
+  tracks.forEach((track) => {
+    if (!isRecord(track) || !track.id || !track.parentId) return;
+    const parentTrack = tracksById.get(track.parentId);
+    if (track.parentId === track.id) {
+      errors.push(`Track ${track.id} cannot use itself as parent.`);
+    } else if (!parentTrack) {
+      errors.push(`Track ${track.id} references missing parent track ${track.parentId}.`);
+    } else if (parentTrack.type !== track.type) {
+      errors.push(`Track ${track.id} type ${track.type} must match parent track ${parentTrack.id} type ${parentTrack.type}.`);
+    }
+  });
 
   const clipIds = new Set<string>();
   const clipsByTrackId = new Map<string, ProjectClip[]>();

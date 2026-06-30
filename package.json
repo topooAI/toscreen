@@ -24,7 +24,8 @@
     "audit:project-model-multisource": "tsx scripts/verify-project-model-multisource-entries.ts",
     "audit:project-model-camera": "tsx scripts/verify-project-model-camera-entries.ts",
     "audit:project-model-track-compatibility": "tsx scripts/verify-project-model-track-compatibility.ts",
-    "audit:project-model-lane-wrapping": "tsx scripts/verify-project-model-lane-wrapping.ts"
+    "audit:project-model-lane-wrapping": "tsx scripts/verify-project-model-lane-wrapping.ts",
+    "audit:project-model-track-hierarchy": "tsx scripts/verify-project-model-track-hierarchy.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
