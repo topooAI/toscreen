@@ -36,6 +36,7 @@ import { getAssetPath } from "@/lib/assetPath";
 import {
   createProjectFromLegacyEditorState,
   createProjectAutosaveSnapshot,
+  calculateLegacyProjectDurationSeconds,
   getProjectRenderSettings,
   resolveExportAudioRegions,
   resolveRuntimeAudioRegions,
@@ -211,13 +212,13 @@ export default function VideoEditor() {
   const [exportQuality, setExportQuality] = useState<ExportQuality>('good');
   const [isFullScreenBinding, setIsFullScreenBinding] = useState(true);
 
-  const projectDuration = useMemo(() => Math.max(
-    duration,
-    ...annotationRegions.map((region) => region.endMs / 1000),
-    ...audioRegions
-      .filter((region) => !region.isOriginal || region.isDetached)
-      .map((region) => region.endMs / 1000),
-  ), [duration, annotationRegions, audioRegions]);
+  const projectDuration = useMemo(() => calculateLegacyProjectDurationSeconds({
+    durationSeconds: duration,
+    zoomRegions,
+    trimRegions,
+    annotationRegions,
+    audioRegions,
+  }), [duration, zoomRegions, trimRegions, annotationRegions, audioRegions]);
 
   const currentProjectModel = useMemo(() => createProjectFromLegacyEditorState({
     videoPath,

@@ -52,6 +52,15 @@ export interface LegacyEditorProjectInput {
   now?: Date;
 }
 
+export interface LegacyProjectDurationInput {
+  durationSeconds: number;
+  projectDurationSeconds?: number;
+  zoomRegions: ZoomRegion[];
+  trimRegions: TrimRegion[];
+  annotationRegions: AnnotationRegion[];
+  audioRegions: AudioRegion[];
+}
+
 export interface LegacyEditorRestoredState {
   companionAudioPath?: string | null;
   zoomRegions: ZoomRegion[];
@@ -74,18 +83,24 @@ export interface LegacyEditorRestoredState {
   cursorOffset?: number;
 }
 
+export function calculateLegacyProjectDurationSeconds(input: LegacyProjectDurationInput): number {
+  const candidatesMs = [
+    secondsToMs(input.durationSeconds),
+    secondsToMs(input.projectDurationSeconds ?? 0),
+    ...input.zoomRegions.map((region) => safeEndMs(region.endMs)),
+    ...input.trimRegions.map((region) => safeEndMs(region.endMs)),
+    ...input.annotationRegions.map((region) => safeEndMs(region.endMs)),
+    ...input.audioRegions.map((region) => safeEndMs(region.endMs)),
+  ];
+
+  return Math.max(0, ...candidatesMs) / 1000;
+}
+
 export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInput): VideoEditorProject {
   const now = input.now ?? new Date();
   const updatedAt = now.toISOString();
   const sourceDurationMs = Math.max(0, Math.round(input.durationSeconds * 1000));
-  const projectDurationMs = Math.max(
-    sourceDurationMs,
-    Math.round(input.projectDurationSeconds * 1000),
-    ...input.zoomRegions.map((region) => region.endMs),
-    ...input.trimRegions.map((region) => region.endMs),
-    ...input.annotationRegions.map((region) => region.endMs),
-    ...input.audioRegions.map((region) => region.endMs),
-  );
+  const projectDurationMs = Math.round(calculateLegacyProjectDurationSeconds(input) * 1000);
 
   const projectId = input.projectId || stableId("project", input.originalVideoPath || input.videoPath || "unsaved");
   const screenAssetId = input.originalVideoPath
@@ -510,4 +525,12 @@ function findFirstAvailableLane(lanes: LaneSpan[][], startMs: number, endMs: num
 
 function spansOverlap(firstStartMs: number, firstEndMs: number, secondStartMs: number, secondEndMs: number) {
   return firstStartMs < secondEndMs && secondStartMs < firstEndMs;
+}
+
+function secondsToMs(value: number) {
+  return Number.isFinite(value) ? Math.max(0, Math.round(value * 1000)) : 0;
+}
+
+function safeEndMs(value: number) {
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }

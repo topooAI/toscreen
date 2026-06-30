@@ -16,6 +16,7 @@
     "audit:phase1-registry": "tsx scripts/verify-phase1-audit-registry.ts",
     "audit:export-entrypoints": "tsx scripts/verify-export-entrypoints.ts",
     "audit:preview-export-contract": "tsx scripts/verify-preview-export-contract.ts",
+    "audit:project-duration": "tsx scripts/verify-project-duration-contract.ts",
     "audit:project-model-smoke": "tsx scripts/audit-project-model-smoke.ts",
     "audit:project-model-restore": "tsx scripts/verify-project-model-restore.ts",
     "audit:project-model-roundtrip": "tsx scripts/verify-project-model-roundtrip.ts",

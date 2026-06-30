@@ -53,6 +53,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:preview-export-contract"],
   },
   {
+    id: "project-duration",
+    command: npmCommand,
+    args: ["run", "audit:project-duration"],
+  },
+  {
     id: "export-entrypoints",
     command: npmCommand,
     args: ["run", "audit:export-entrypoints"],
