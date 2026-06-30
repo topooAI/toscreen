@@ -61,6 +61,7 @@ const requiredMachineGates = [
   "audit:phase1-ownership-list",
   "audit:phase1-acceptance-state",
   "audit:phase1-user-acceptance-doc",
+  "audit:timeline-acceptance-doc",
   "audit:phase1-handoff",
 ];
 
@@ -139,6 +140,7 @@ console.log(JSON.stringify({
     "ProjectModel smoke, restore, roundtrip, sidecar parity, and real recording restore gates are registered.",
     "Preview/export render settings, project duration, black tail, Screen Studio core, and Electron runtime contracts are registered.",
     "Camera migration, lane wrapping, core clip and annotation contracts, track hierarchy, asset compatibility, and AI plan model gates are registered.",
+    "Timeline acceptance breakdown is registered under the Phase 1 user acceptance record.",
     "Phase 1 handoff packet is registered for Electron hands-on acceptance.",
   ],
   userRequired: requiredUserCheckpoints,
