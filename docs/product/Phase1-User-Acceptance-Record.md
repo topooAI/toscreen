@@ -71,8 +71,8 @@ Use this as the shortest working checklist: the left side is engineering work Co
 
 ### 3.1 实机验收步骤 / Hands-On Acceptance Steps
 
-先运行 `npm run audit:phase1-handoff`，确认它输出 `status: "ready"`、最新录制路径、ProjectModel 恢复摘要、UA-01 到 UA-08 的待验收列表，以及 `handsOnSteps` 里的逐项实机步骤。然后启动 `npm run dev:editor`，用同一个真实录制项目逐项验证。
-Run `npm run audit:phase1-handoff` first and confirm it reports `status: "ready"`, the latest recording path, ProjectModel restore summary, pending UA-01 through UA-08, and per-item hands-on steps in `handsOnSteps`. Then start `npm run dev:editor` and use the same real recording for the checks below.
+先运行 `npm run audit:phase1-handoff`，确认它输出 `status: "ready"`、最新录制路径、ProjectModel 恢复摘要、UA-01 到 UA-08 的待验收列表，以及 `acceptancePlan` 里的逐项状态、机器证据、实机步骤和失败记录。然后启动 `npm run dev:editor`，用同一个真实录制项目逐项验证。
+Run `npm run audit:phase1-handoff` first and confirm it reports `status: "ready"`, the latest recording path, ProjectModel restore summary, pending UA-01 through UA-08, and per-item status, machine evidence, hands-on steps, and failure notes in `acceptancePlan`. Then start `npm run dev:editor` and use the same real recording for the checks below.
 
 | ID | 实机步骤 / Hands-On Step | 失败记录 / Failure Note |
 |---|---|---|
@@ -92,7 +92,7 @@ Run `npm run audit:phase1-handoff` first and confirm it reports `status: "ready"
 | `npm run audit:phase1` | Phase 1 聚合机器门禁。 / Aggregate Phase 1 machine gate. | 必须通过。 / Must pass. |
 | `npm run audit:phase1-readiness` | 输出机器已验证项和剩余用户验收项。 / Reports machine-verified items and remaining user checkpoints. | 放行前必须输出 `phaseComplete: false`；全部验收并改为 `Released / 已放行` 后才允许输出 `phaseComplete: true`。 / Must output `phaseComplete: false` before release; it may output `phaseComplete: true` only after every item is accepted and the status is changed to `Released / 已放行`. |
 | `npm run audit:recordings` | 检查真实最新录制项目恢复证据。 / Checks restore evidence for the latest real recording. | 必须通过，并输出 `coreRestore`。 / Must pass and output `coreRestore`. |
-| `npm run audit:phase1-handoff` | 输出实机验收前预检包。 / Outputs the hands-on acceptance handoff packet. | 必须能找到最新真实录制、合法 ProjectModel sidecar、待验收 UA 列表和 `handsOnSteps`。 / Must find the latest real recording, valid ProjectModel sidecar, pending UA list, and `handsOnSteps`. |
+| `npm run audit:phase1-handoff` | 输出实机验收前预检包。 / Outputs the hands-on acceptance handoff packet. | 必须能找到最新真实录制、合法 ProjectModel sidecar、待验收 UA 列表、`handsOnSteps` 和 `acceptancePlan`。 / Must find the latest real recording, valid ProjectModel sidecar, pending UA list, `handsOnSteps`, and `acceptancePlan`. |
 
 ## 5. 阶段结论 / Phase Conclusion
 

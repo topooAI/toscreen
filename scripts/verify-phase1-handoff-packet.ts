@@ -22,6 +22,47 @@ type HandsOnStep = {
   step: string;
   failureNote: string;
 };
+type AcceptancePlanItem = HandsOnStep & {
+  status: "accepted" | "pending";
+  machineEvidence: string[];
+};
+
+const machineEvidenceByAcceptanceId: Record<string, string[]> = {
+  "UA-01": [
+    "npm run audit:project-model-review-doc",
+    "npm run audit:project-model-review-packet",
+  ],
+  "UA-02": [
+    "npm run audit:recordings",
+    "npm run audit:project-model-restore",
+    "npm run audit:project-model-sidecar-parity",
+  ],
+  "UA-03": [
+    "npm run audit:timeline-acceptance-doc",
+    "npm run audit:electron-editor-runtime",
+  ],
+  "UA-04": [
+    "npm run audit:screenstudio-core-contract",
+    "npm run audit:electron-editor-runtime",
+  ],
+  "UA-05": [
+    "npm run audit:preview-export-contract",
+    "npm run audit:export-duration-render-settings",
+    "npm run audit:export-black-tail-rendering",
+  ],
+  "UA-06": [
+    "npm run audit:project-model-camera",
+    "npm run audit:project-model-camera-migration",
+  ],
+  "UA-07": [
+    "npm run audit:project-model-ai-plan",
+    "npm run audit:project-model-ai-plan-lifecycle",
+  ],
+  "UA-08": [
+    "npm run audit:phase1-readiness",
+    "npm run audit:phase1-acceptance-state",
+  ],
+};
 
 const repoRoot = process.cwd();
 const acceptanceDocPath = path.join(repoRoot, "docs", "product", "Phase1-User-Acceptance-Record.md");
@@ -53,6 +94,7 @@ async function buildHandoffPacket(directory: string) {
   if (missingHandsOnStepIds.length > 0) {
     errors.push(`Phase 1 hands-on steps are missing for: ${missingHandsOnStepIds.join(", ")}`);
   }
+  const acceptancePlan = buildAcceptancePlan(acceptance.checkedIds, handsOnSteps);
   const latestRecording = await findLatestRecording(directory, errors, warnings);
   const projectPath = latestRecording
     ? await findFirstExistingPath(projectPathCandidatesForMediaPath(latestRecording.path))
@@ -108,12 +150,31 @@ async function buildHandoffPacket(directory: string) {
       phaseReleased: acceptance.phaseReleased,
     },
     handsOnSteps,
+    acceptancePlan,
     nextHumanAction: acceptance.phaseReleased
       ? "Phase 1 acceptance is already marked released."
-      : "Open Electron with npm run dev:editor, load the latest recording, and follow handsOnSteps for UA-01 through UA-08.",
+      : "Open Electron with npm run dev:editor, load the latest recording, and follow acceptancePlan for UA-01 through UA-08.",
     warnings,
     errors,
   };
+}
+
+function buildAcceptancePlan(
+  checkedIds: string[],
+  handsOnSteps: HandsOnStep[],
+): AcceptancePlanItem[] {
+  const stepById = new Map(handsOnSteps.map((step) => [step.id, step]));
+  return phase1AcceptanceItems.map((item) => {
+    const step = stepById.get(item.id);
+    return {
+      id: item.id,
+      label: item.label,
+      status: checkedIds.includes(item.id) ? "accepted" : "pending",
+      step: step?.step ?? "",
+      failureNote: step?.failureNote ?? "",
+      machineEvidence: machineEvidenceByAcceptanceId[item.id] ?? [],
+    };
+  });
 }
 
 function parseHandsOnSteps(content: string): HandsOnStep[] {

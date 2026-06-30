@@ -42,6 +42,8 @@ const requiredPhrases = [
   "实机验收步骤 / Hands-On Acceptance Steps",
   "status: \"ready\"",
   "handsOnSteps",
+  "acceptancePlan",
+  "machine evidence",
   "完全退出并重启 Electron",
   "拖拽、拉伸、磁吸、滚轮缩放、移动游标",
   "系统光标模拟、Zoom/Focus、背景虚化、黑屏尾部",
