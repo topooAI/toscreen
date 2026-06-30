@@ -21,6 +21,26 @@ This document records hands-on user acceptance for Phase 1. Machine gates only p
 这个列表用于一边开发一边对照：默认 Codex 可以继续推进确定性的工程工作；只有进入“必须用户判断”的节点时才停下来。
 Use this list while iterating: by default, Codex can keep moving on deterministic engineering work; it stops only when a user judgment is required.
 
+### 2.1 快速对照清单 / Quick Reference Checklist
+
+这张清单是工作时放在旁边看的最短版本：左边是 Codex 可以直接推进的工程闭环，右边是必须由用户验收或拍板的节点。
+Use this as the shortest working checklist: the left side is engineering work Codex can continue directly; the right side is where the user must review or decide.
+
+| 对照项 / Checkpoint | Codex 独立推进 / Codex Owns | 用户介入节点 / User Steps In |
+|---|---|---|
+| 1. 产品方向 / Product direction | 整理定位、非目标、路线和文档。 / Maintain positioning, non-goals, roadmap, and docs. | 当 ToScreen 可能偏离 AI product-demo editor 时确认。 / Confirm if ToScreen may drift away from AI product-demo editor. |
+| 2. Phase 1 范围 / Phase 1 scope | 先把 AI、3D、Lottie、多源、数字人放进模型入口。 / Keep AI, 3D, Lottie, multi-source, and digital-human hooks in the model first. | 某个大能力要进入真实 UI 前拍板。 / Decide before a major capability enters real UI. |
+| 3. ProjectModel 底座 / ProjectModel foundation | 类型、adapter、validator、autosave、sidecar、兼容恢复。 / Types, adapters, validators, autosave, sidecar, and compatibility restore. | 模型语义或未来结构边界改变时确认。 / Confirm when model semantics or future structure boundaries change. |
+| 4. 保存与重启恢复 / Save and restart restore | 修复路径、视频、音频、Zoom、背景、光标、导出设置恢复。 / Fix restore for paths, video, audio, Zoom, background, cursor, and export settings. | Electron 重启后用真实录制验收。 / Review with a real recording after Electron restart. |
+| 5. Timeline 手感 / Timeline feel | 修复拖拽、拉伸、磁吸、滚轮、游标、换轨和不重叠。 / Fix drag, resize, snap, wheel, playhead, lane wrapping, and no-overlap behavior. | 每次手感变化后在 Electron 里实际试。 / Test hands-on in Electron after every feel change. |
+| 6. Screen Studio 底座 / Screen Studio-grade foundation | 恢复录屏预览、系统光标、Zoom/Focus、背景虚化、播放、基础导出。 / Restore recording preview, system cursor, Zoom/Focus, background blur, playback, and basic export. | 每个体验模块完成后验收是否达标。 / Review each UX module after it is implemented. |
+| 7. Preview/Export 一致 / Preview/export parity | 统一预览和导出的画面、时长、Zoom/Camera、光标、背景和音频来源。 / Unify preview/export picture, duration, Zoom/Camera, cursor, background, and audio sources. | 导出完整成片后做最终观感判断。 / Judge the final exported video after an end-to-end export. |
+| 8. Camera/Focus/3D 运镜 / Camera, Focus, and 3D camera | 先做模型迁移、兼容层和 Camera Clip 数据结构。 / Build model migration, compatibility, and Camera Clip data structure first. | 改名、改操作语言、3D 运镜进入 UI 前确认。 / Confirm before renaming, interaction changes, or 3D camera UI work. |
+| 9. 多源画面 / Multi-source video | 保留摄像头、数字人、B-roll、画中画、分屏模型入口。 / Preserve hooks for camera, digital human, B-roll, PiP, and split screen. | 是否进入 Phase 1 可操作 UI 需要用户拍板。 / User decides whether it enters interactive Phase 1 UI. |
+| 10. Lottie/UI-aware motion | 定义素材、Motion Clip、UI Source 和导入边界。 / Define assets, Motion Clips, UI Source, and import boundaries. | 接 Figma/DOM/UI 源或做动画编辑 UI 前确认。 / Confirm before Figma/DOM/UI-source integration or animation editing UI. |
+| 11. AI 自动剪辑 / AI auto-editing | 设计可审阅、可撤销、可解释的 AI Edit Plan。 / Design reviewable, undoable, explainable AI Edit Plan. | AI 自动做哪些剪辑决策必须用真实用例确认。 / Real examples are required to decide what AI automates. |
+| 12. 阶段放行 / Phase gate | 跑门禁、列风险、整理下一阶段建议并同步 GitHub。 / Run gates, list risks, summarize next-phase suggestions, and sync GitHub. | 是否关闭 Phase 1 并进入下一阶段必须由用户确认。 / User must confirm closing Phase 1 and moving to the next phase. |
+
 | ID | 工作域 / Area | Codex 可以独立推进 / Codex Can Continue | 用户需要介入 / User Must Step In | 对照标准 / What To Check |
 |---|---|---|---|---|
 | DEV-01 | 产品定位 / Product positioning | 整理定位、范围、非目标、阶段路线和决策日志。 / Organize positioning, scope, non-goals, roadmap, and decision log. | 当 ToScreen 可能偏离 AI product-demo editor 时。 / When ToScreen may drift away from AI product-demo editor. | 是否仍然不是普通剪辑器、不是单纯录屏工具、不是完整 Jitter 替代品。 / It remains not a generic editor, recorder-only tool, or full Jitter replacement. |

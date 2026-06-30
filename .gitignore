@@ -25,3 +25,28 @@ dist-ssr
 release/**
 
 # npx electron-builder --mac --win
+
+# Local scratch artifacts from timeline/debug iterations.
+# Existing tracked files remain tracked; these rules only hide new/untracked noise.
+/scratch/
+/chat_logs/*.md
+/all_patches.txt
+/fix_*.js
+/fix_*.py
+/get_*.js
+/get_*.py
+/parse*.js
+/parse*.py
+/patch*.js
+/patch*.py
+/patch_*.txt
+/recover_*.js
+/recover_*.py
+/recover_item.py
+/test_*.cjs
+/test_*.js
+/test_*.py
+/test_*.ts
+/update_*.js
+/update_*.py
+/src/components/video-editor/timeline/ItemGlass.css
