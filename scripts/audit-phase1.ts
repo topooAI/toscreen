@@ -73,6 +73,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:project-model-camera"],
   },
   {
+    id: "camera-migration",
+    command: npmCommand,
+    args: ["run", "audit:project-model-camera-migration"],
+  },
+  {
     id: "track-clip-compatibility",
     command: npmCommand,
     args: ["run", "audit:project-model-track-compatibility"],

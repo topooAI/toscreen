@@ -21,6 +21,7 @@ const requiredAuditScripts = [
   "audit:project-model-future",
   "audit:project-model-multisource",
   "audit:project-model-camera",
+  "audit:project-model-camera-migration",
   "audit:project-model-track-compatibility",
   "audit:project-model-lane-wrapping",
   "audit:project-model-track-hierarchy",
