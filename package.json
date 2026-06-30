@@ -13,6 +13,7 @@
     "build:win": "tsc && vite build && electron-builder --win",
     "build:linux": "tsc && vite build && electron-builder --linux",
     "audit:phase1": "tsx scripts/audit-phase1.ts",
+    "audit:phase1-registry": "tsx scripts/verify-phase1-audit-registry.ts",
     "audit:export-entrypoints": "tsx scripts/verify-export-entrypoints.ts",
     "audit:preview-export-contract": "tsx scripts/verify-preview-export-contract.ts",
     "audit:project-model-smoke": "tsx scripts/audit-project-model-smoke.ts",
