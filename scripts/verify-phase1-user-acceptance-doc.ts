@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { parsePhase1AcceptanceState } from "./phase1AcceptanceState";
 
 const docPath = path.join(
   process.cwd(),
@@ -16,6 +17,7 @@ const requiredPhrases = [
   "npm run audit:phase1-readiness",
   "npm run audit:recordings",
   "phaseComplete: false",
+  "phaseComplete: true",
   "coreRestore",
   "UA-01 | ProjectModel 方向确认",
   "UA-02 | Electron 重启恢复验收",
@@ -29,7 +31,7 @@ const requiredPhrases = [
 ];
 
 const missing = requiredPhrases.filter((phrase) => !content.includes(phrase));
-const checkedItems = content.match(/\| UA-\d\d \|[^\n]+\| \[x\] /g) ?? [];
+const acceptance = parsePhase1AcceptanceState(content);
 
 if (missing.length > 0) {
   console.error(JSON.stringify({
@@ -44,6 +46,8 @@ console.log(JSON.stringify({
   status: "ok",
   docPath,
   checked: requiredPhrases.length,
-  userAcceptedItems: checkedItems.length,
-  phaseReleased: checkedItems.length === 8,
+  userAcceptedItems: acceptance.userAcceptedItems,
+  pendingIds: acceptance.pendingIds,
+  currentPhaseStatus: acceptance.currentPhaseStatus,
+  phaseReleased: acceptance.phaseReleased,
 }, null, 2));

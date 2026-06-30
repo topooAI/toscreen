@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { parsePhase1AcceptanceState } from "./phase1AcceptanceState";
 
 const repoRoot = process.cwd();
 const packageJsonPath = path.join(repoRoot, "package.json");
@@ -30,6 +31,7 @@ const phase1Audit = fs.readFileSync(phase1AuditPath, "utf8");
 const architectureDoc = fs.readFileSync(architectureDocPath, "utf8");
 const reviewPacket = fs.readFileSync(reviewPacketPath, "utf8");
 const userAcceptance = fs.readFileSync(userAcceptancePath, "utf8");
+const userAcceptanceState = parsePhase1AcceptanceState(userAcceptance);
 
 const requiredMachineGates = [
   "audit:phase1",
@@ -54,6 +56,7 @@ const requiredMachineGates = [
   "audit:project-model-scenes",
   "audit:project-model-review-doc",
   "audit:phase1-ownership-list",
+  "audit:phase1-acceptance-state",
   "audit:phase1-user-acceptance-doc",
 ];
 
@@ -135,6 +138,14 @@ console.log(JSON.stringify({
   ],
   userRequired: requiredUserCheckpoints,
   userAcceptanceRecord: "docs/product/Phase1-User-Acceptance-Record.md",
-  phaseComplete: false,
-  reason: "Phase 1 still requires user review of model direction, Electron hands-on behavior, exported output, and phase release.",
+  userAcceptance: {
+    accepted: userAcceptanceState.checkedIds,
+    pending: userAcceptanceState.pendingIds,
+    currentPhaseStatus: userAcceptanceState.currentPhaseStatus,
+    phaseReleased: userAcceptanceState.phaseReleased,
+  },
+  phaseComplete: userAcceptanceState.phaseReleased,
+  reason: userAcceptanceState.phaseReleased
+    ? "Phase 1 user acceptance is complete and the acceptance record is marked released."
+    : "Phase 1 still requires user review of model direction, Electron hands-on behavior, exported output, and phase release.",
 }, null, 2));

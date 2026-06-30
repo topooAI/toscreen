@@ -42,6 +42,7 @@ const requiredAuditScripts = [
   "audit:project-model-review-doc",
   "audit:phase1-ownership-list",
   "audit:phase1-readiness",
+  "audit:phase1-acceptance-state",
   "audit:phase1-user-acceptance-doc",
   "audit:export-audio-render-settings",
   "audit:preview-audio-render-settings",

@@ -13,6 +13,8 @@ This document records hands-on user acceptance for Phase 1. Machine gates only p
    Test the 8 user checkpoints below and change `[ ]` to `[x]`.
 4. 只有全部通过后，Phase 1 才能进入阶段放行。
    Phase 1 can move to release only after every item passes.
+5. UA-01 到 UA-08 全部改为 `[x]` 后，将阶段结论改为 `Released / 已放行`；此时 `npm run audit:phase1-readiness` 才应输出 `phaseComplete: true`。
+   After UA-01 through UA-08 are all changed to `[x]`, change the phase conclusion to `Released / 已放行`; only then should `npm run audit:phase1-readiness` output `phaseComplete: true`.
 
 ## 2. 用户验收清单 / User Acceptance Checklist
 
@@ -32,7 +34,7 @@ This document records hands-on user acceptance for Phase 1. Machine gates only p
 | 命令 / Command | 目的 / Purpose | 当前要求 / Current Requirement |
 |---|---|---|
 | `npm run audit:phase1` | Phase 1 聚合机器门禁。 / Aggregate Phase 1 machine gate. | 必须通过。 / Must pass. |
-| `npm run audit:phase1-readiness` | 输出机器已验证项和剩余用户验收项。 / Reports machine-verified items and remaining user checkpoints. | 必须通过，并明确 `phaseComplete: false`。 / Must pass and explicitly report `phaseComplete: false`. |
+| `npm run audit:phase1-readiness` | 输出机器已验证项和剩余用户验收项。 / Reports machine-verified items and remaining user checkpoints. | 放行前必须输出 `phaseComplete: false`；全部验收并改为 `Released / 已放行` 后才允许输出 `phaseComplete: true`。 / Must output `phaseComplete: false` before release; it may output `phaseComplete: true` only after every item is accepted and the status is changed to `Released / 已放行`. |
 | `npm run audit:recordings` | 检查真实最新录制项目恢复证据。 / Checks restore evidence for the latest real recording. | 必须通过，并输出 `coreRestore`。 / Must pass and output `coreRestore`. |
 
 ## 4. 阶段结论 / Phase Conclusion
