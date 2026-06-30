@@ -21,6 +21,7 @@ const requiredAuditScripts = [
   "audit:project-model-future",
   "audit:project-model-multisource",
   "audit:project-model-camera",
+  "audit:project-model-track-compatibility",
   "audit:phase1-registry",
 ];
 

@@ -98,6 +98,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
   });
 
   const trackIds = new Set<string>();
+  const tracksById = new Map<string, ProjectTrack>();
   tracks.forEach((track: ProjectTrack, index) => {
     if (!isRecord(track)) {
       errors.push(`Track at index ${index} must be an object.`);
@@ -106,6 +107,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     if (!track.id) errors.push("Track id is required.");
     if (trackIds.has(track.id)) errors.push(`Duplicate track id: ${track.id}.`);
     trackIds.add(track.id);
+    tracksById.set(track.id, track);
     if (!track.type) errors.push(`Track ${track.id || "(missing id)"} type is required.`);
     if (!Number.isFinite(track.order)) errors.push(`Track ${track.id || "(missing id)"} order must be finite.`);
   });
@@ -122,6 +124,10 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
 
     if (!trackIds.has(clip.trackId)) {
       errors.push(`Clip ${clip.id || "(missing id)"} references missing track ${clip.trackId}.`);
+    }
+    const track = tracksById.get(clip.trackId);
+    if (track && !isClipCompatibleWithTrack(clip.type, track.type)) {
+      errors.push(`Clip ${clip.id || "(missing id)"} type ${clip.type} cannot be placed on track ${track.id} type ${track.type}.`);
     }
     if (clip.assetId && !assetIds.has(clip.assetId)) {
       errors.push(`Clip ${clip.id || "(missing id)"} references missing asset ${clip.assetId}.`);
@@ -338,4 +344,25 @@ function validateFocus(value: unknown, label: string, errors: string[]) {
       errors.push(`${label}.${key} must be a finite normalized value between 0 and 1.`);
     }
   });
+}
+
+function isClipCompatibleWithTrack(
+  clipType: ProjectClip["type"],
+  trackType: ProjectTrack["type"],
+) {
+  const allowedTrackTypesByClipType: Record<ProjectClip["type"], ProjectTrack["type"][]> = {
+    "screen-recording": ["video"],
+    video: ["video"],
+    audio: ["audio", "voice", "music"],
+    camera: ["camera"],
+    presenter: ["presenter"],
+    text: ["text"],
+    annotation: ["annotation"],
+    lottie: ["lottie"],
+    image: ["image", "video"],
+    "ui-element-motion": ["ui-motion"],
+    cursor: ["cursor"],
+  };
+
+  return allowedTrackTypesByClipType[clipType]?.includes(trackType) ?? false;
 }

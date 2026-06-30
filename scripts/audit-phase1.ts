@@ -72,6 +72,11 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:project-model-camera"],
   },
+  {
+    id: "track-clip-compatibility",
+    command: npmCommand,
+    args: ["run", "audit:project-model-track-compatibility"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];
