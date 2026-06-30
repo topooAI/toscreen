@@ -40,6 +40,7 @@
     "audit:project-model-review-doc": "tsx scripts/verify-project-model-review-doc.ts",
     "audit:phase1-ownership-list": "tsx scripts/verify-phase1-ownership-list.ts",
     "audit:phase1-readiness": "tsx scripts/verify-phase1-readiness.ts",
+    "audit:phase1-user-acceptance-doc": "tsx scripts/verify-phase1-user-acceptance-doc.ts",
     "audit:export-audio-render-settings": "tsx scripts/verify-export-audio-render-settings.ts",
     "audit:preview-audio-render-settings": "tsx scripts/verify-preview-audio-render-settings.ts"
   },

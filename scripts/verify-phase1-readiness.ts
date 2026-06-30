@@ -16,6 +16,12 @@ const reviewPacketPath = path.join(
   "product",
   "ProjectModel-Review-Packet.md",
 );
+const userAcceptancePath = path.join(
+  repoRoot,
+  "docs",
+  "product",
+  "Phase1-User-Acceptance-Record.md",
+);
 
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as {
   scripts?: Record<string, string>;
@@ -23,6 +29,7 @@ const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as {
 const phase1Audit = fs.readFileSync(phase1AuditPath, "utf8");
 const architectureDoc = fs.readFileSync(architectureDocPath, "utf8");
 const reviewPacket = fs.readFileSync(reviewPacketPath, "utf8");
+const userAcceptance = fs.readFileSync(userAcceptancePath, "utf8");
 
 const requiredMachineGates = [
   "audit:phase1",
@@ -43,6 +50,7 @@ const requiredMachineGates = [
   "audit:project-model-review-packet",
   "audit:project-model-review-doc",
   "audit:phase1-ownership-list",
+  "audit:phase1-user-acceptance-doc",
 ];
 
 const requiredUserCheckpoints = [
@@ -90,6 +98,9 @@ const missingReviewPacketPhrases = requiredReviewPacketPhrases.filter(
 const missingUserCheckpoints = requiredUserCheckpoints.filter(
   (phrase) => !architectureDoc.includes(phrase),
 );
+const missingUserAcceptanceItems = requiredUserCheckpoints.filter(
+  (phrase) => !userAcceptance.includes(phrase),
+);
 
 const failures = {
   missingPackageScripts,
@@ -97,6 +108,7 @@ const failures = {
   missingArchitecturePhrases,
   missingReviewPacketPhrases,
   missingUserCheckpoints,
+  missingUserAcceptanceItems,
 };
 
 const hasFailures = Object.values(failures).some((items) => items.length > 0);
@@ -118,6 +130,7 @@ console.log(JSON.stringify({
     "Camera migration, lane wrapping, track hierarchy, asset compatibility, and AI plan model gates are registered.",
   ],
   userRequired: requiredUserCheckpoints,
+  userAcceptanceRecord: "docs/product/Phase1-User-Acceptance-Record.md",
   phaseComplete: false,
   reason: "Phase 1 still requires user review of model direction, Electron hands-on behavior, exported output, and phase release.",
 }, null, 2));

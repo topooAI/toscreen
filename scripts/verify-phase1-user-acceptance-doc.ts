@@ -1,0 +1,49 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const docPath = path.join(
+  process.cwd(),
+  "docs",
+  "product",
+  "Phase1-User-Acceptance-Record.md",
+);
+
+const content = fs.readFileSync(docPath, "utf8");
+
+const requiredPhrases = [
+  "Phase 1 用户验收记录 / Phase 1 User Acceptance Record",
+  "npm run audit:phase1",
+  "npm run audit:phase1-readiness",
+  "npm run audit:recordings",
+  "phaseComplete: false",
+  "coreRestore",
+  "UA-01 | ProjectModel 方向确认",
+  "UA-02 | Electron 重启恢复验收",
+  "UA-03 | Timeline 手感验收",
+  "UA-04 | Screen Studio 核心体验验收",
+  "UA-05 | Preview/Export 成片验收",
+  "UA-06 | Camera/Focus 操作语言确认",
+  "UA-07 | AI 自动剪辑真实用例确认",
+  "UA-08 | 阶段放行",
+  "Current phase status: **Not released / 未放行**",
+];
+
+const missing = requiredPhrases.filter((phrase) => !content.includes(phrase));
+const checkedItems = content.match(/\| UA-\d\d \|[^\n]+\| \[x\] /g) ?? [];
+
+if (missing.length > 0) {
+  console.error(JSON.stringify({
+    status: "failed",
+    docPath,
+    missing,
+  }, null, 2));
+  process.exit(1);
+}
+
+console.log(JSON.stringify({
+  status: "ok",
+  docPath,
+  checked: requiredPhrases.length,
+  userAcceptedItems: checkedItems.length,
+  phaseReleased: checkedItems.length === 8,
+}, null, 2));
