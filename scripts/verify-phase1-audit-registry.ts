@@ -33,6 +33,7 @@ const requiredAuditScripts = [
   "audit:project-model-clip-overlap-policy",
   "audit:project-model-track-hierarchy",
   "audit:project-model-asset-compatibility",
+  "audit:project-model-core-clips",
   "audit:project-model-motion-clips",
   "audit:project-model-ai-plan",
   "audit:project-model-ai-plan-lifecycle",

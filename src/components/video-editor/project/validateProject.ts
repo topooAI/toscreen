@@ -150,6 +150,53 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     if (asset && !isClipCompatibleWithAsset(clip.type, asset.type)) {
       errors.push(`Clip ${clip.id || "(missing id)"} type ${clip.type} cannot reference asset ${asset.id} type ${asset.type}.`);
     }
+    if (clip.type === "screen-recording") {
+      const props = isRecord(clip.props) ? clip.props : undefined;
+      if (!props) {
+        errors.push(`Screen recording clip ${clip.id || "(missing id)"} props are required.`);
+      } else {
+        if (!isOneOf(props.fitMode, ["contain", "cover", "fill"])) {
+          errors.push(`Screen recording clip ${clip.id || "(missing id)"} fitMode is invalid or missing.`);
+        }
+        if (props.freezeAfterEnd !== undefined && typeof props.freezeAfterEnd !== "boolean") {
+          errors.push(`Screen recording clip ${clip.id || "(missing id)"} freezeAfterEnd must be boolean.`);
+        }
+        if (props.showBlackAfterEnd !== undefined && typeof props.showBlackAfterEnd !== "boolean") {
+          errors.push(`Screen recording clip ${clip.id || "(missing id)"} showBlackAfterEnd must be boolean.`);
+        }
+        validateOptionalCropRegion(props.crop, `Screen recording clip ${clip.id || "(missing id)"} crop`, errors);
+        validateOptionalTrimRegions(props.trimRegions, `Screen recording clip ${clip.id || "(missing id)"} trimRegions`, errors);
+        const companionAudioAssetId = typeof props.companionAudioAssetId === "string" ? props.companionAudioAssetId : "";
+        if (companionAudioAssetId) {
+          const companionAudioAsset = assetsById.get(companionAudioAssetId);
+          if (!companionAudioAsset) {
+            errors.push(`Screen recording clip ${clip.id || "(missing id)"} companionAudioAssetId references missing asset ${companionAudioAssetId}.`);
+          } else if (companionAudioAsset.type !== "audio") {
+            errors.push(`Screen recording clip ${clip.id || "(missing id)"} companionAudioAssetId must reference an audio asset.`);
+          }
+        }
+      }
+    }
+    if (clip.type === "audio") {
+      const props = isRecord(clip.props) ? clip.props : undefined;
+      const sourceRegion = isRecord(props?.sourceRegion) ? props.sourceRegion : undefined;
+      if (!props) {
+        errors.push(`Audio clip ${clip.id || "(missing id)"} props are required.`);
+      }
+      if (!sourceRegion) {
+        errors.push(`Audio clip ${clip.id || "(missing id)"} sourceRegion is required.`);
+      } else {
+        validateAudioSourceRegion(sourceRegion, `Audio clip ${clip.id || "(missing id)"} sourceRegion`, errors);
+      }
+    }
+    if (clip.type === "cursor") {
+      const props = isRecord(clip.props) ? clip.props : undefined;
+      if (!props) {
+        errors.push(`Cursor clip ${clip.id || "(missing id)"} props are required.`);
+      } else {
+        validateCursorClipProps(props, `Cursor clip ${clip.id || "(missing id)"}`, errors);
+      }
+    }
     if (clip.type === "camera") {
       const props = isRecord(clip.props) ? clip.props : undefined;
       const mode = props?.mode;
@@ -527,6 +574,168 @@ function validateTimeRange(startMs: unknown, endMs: unknown, label: string, erro
     errors.push(`${label} startMs/endMs must be non-negative.`);
   } else if (endMs < startMs) {
     errors.push(`${label} endMs is before startMs.`);
+  }
+}
+
+function validateOptionalCropRegion(value: unknown, label: string, errors: string[]) {
+  if (value === undefined) return;
+  const crop = isRecord(value) ? value : undefined;
+  if (!crop) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+
+  ["x", "y", "width", "height"].forEach((key) => {
+    const coordinate = crop[key];
+    if (!isFiniteNumber(coordinate)) {
+      errors.push(`${label}.${key} must be finite.`);
+    }
+  });
+  if (isFiniteNumber(crop.x) && (crop.x < 0 || crop.x > 1)) {
+    errors.push(`${label}.x must be a normalized value between 0 and 1.`);
+  }
+  if (isFiniteNumber(crop.y) && (crop.y < 0 || crop.y > 1)) {
+    errors.push(`${label}.y must be a normalized value between 0 and 1.`);
+  }
+  if (isFiniteNumber(crop.width) && (crop.width <= 0 || crop.width > 1)) {
+    errors.push(`${label}.width must be positive and no larger than 1.`);
+  }
+  if (isFiniteNumber(crop.height) && (crop.height <= 0 || crop.height > 1)) {
+    errors.push(`${label}.height must be positive and no larger than 1.`);
+  }
+  if (isFiniteNumber(crop.x) && isFiniteNumber(crop.width) && crop.x + crop.width > 1) {
+    errors.push(`${label}.x + width must be no larger than 1.`);
+  }
+  if (isFiniteNumber(crop.y) && isFiniteNumber(crop.height) && crop.y + crop.height > 1) {
+    errors.push(`${label}.y + height must be no larger than 1.`);
+  }
+}
+
+function validateOptionalTrimRegions(value: unknown, label: string, errors: string[]) {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    errors.push(`${label} must be an array.`);
+    return;
+  }
+
+  value.forEach((trimRegion, index) => {
+    const region = isRecord(trimRegion) ? trimRegion : undefined;
+    if (!region) {
+      errors.push(`${label}[${index}] must be an object.`);
+      return;
+    }
+    if (typeof region.id !== "string" || !region.id.trim()) {
+      errors.push(`${label}[${index}].id is required.`);
+    }
+    validateTimeRange(region.startMs, region.endMs, `${label}[${index}]`, errors);
+  });
+}
+
+function validateAudioSourceRegion(region: Record<string, unknown>, label: string, errors: string[]) {
+  if (typeof region.id !== "string" || !region.id.trim()) {
+    errors.push(`${label}.id is required.`);
+  }
+  validateTimeRange(region.startMs, region.endMs, label, errors);
+
+  const sourceUrl = typeof region.sourceUrl === "string" ? region.sourceUrl.trim() : "";
+  const path = typeof region.path === "string" ? region.path.trim() : "";
+  if (!sourceUrl && !path) {
+    errors.push(`${label} must include sourceUrl or path.`);
+  }
+
+  if (region.sourceStartMs !== undefined || region.sourceEndMs !== undefined) {
+    validateTimeRange(region.sourceStartMs, region.sourceEndMs, `${label} source range`, errors);
+  }
+  if (region.totalDurationMs !== undefined && (!isFiniteNumber(region.totalDurationMs) || region.totalDurationMs < 0)) {
+    errors.push(`${label}.totalDurationMs must be a finite non-negative number.`);
+  }
+  if (!isFiniteNumber(region.volume) || region.volume < 0) {
+    errors.push(`${label}.volume must be a finite non-negative number.`);
+  }
+  if (region.isMuted !== undefined && typeof region.isMuted !== "boolean") {
+    errors.push(`${label}.isMuted must be boolean.`);
+  }
+  if (region.isOriginal !== undefined && typeof region.isOriginal !== "boolean") {
+    errors.push(`${label}.isOriginal must be boolean.`);
+  }
+  if (region.isDetached !== undefined && typeof region.isDetached !== "boolean") {
+    errors.push(`${label}.isDetached must be boolean.`);
+  }
+  if (region.trackIndex !== undefined && (!isFiniteNumber(region.trackIndex) || region.trackIndex < 0)) {
+    errors.push(`${label}.trackIndex must be a finite non-negative number.`);
+  }
+  if (region.audioPeaks !== undefined) {
+    if (!Array.isArray(region.audioPeaks)) {
+      errors.push(`${label}.audioPeaks must be an array.`);
+    } else if (region.audioPeaks.some((peak) => !isFiniteNumber(peak))) {
+      errors.push(`${label}.audioPeaks must contain only finite numbers.`);
+    }
+  }
+  if (region.audioPeaksDurationMs !== undefined && (!isFiniteNumber(region.audioPeaksDurationMs) || region.audioPeaksDurationMs < 0)) {
+    errors.push(`${label}.audioPeaksDurationMs must be a finite non-negative number.`);
+  }
+  if (region.volumeKeyframes !== undefined) {
+    if (!Array.isArray(region.volumeKeyframes)) {
+      errors.push(`${label}.volumeKeyframes must be an array.`);
+    } else {
+      region.volumeKeyframes.forEach((keyframe, index) => {
+        const volumeKeyframe = isRecord(keyframe) ? keyframe : undefined;
+        if (!volumeKeyframe) {
+          errors.push(`${label}.volumeKeyframes[${index}] must be an object.`);
+          return;
+        }
+        if (typeof volumeKeyframe.id !== "string" || !volumeKeyframe.id.trim()) {
+          errors.push(`${label}.volumeKeyframes[${index}].id is required.`);
+        }
+        if (!isFiniteNumber(volumeKeyframe.timeRatio) || volumeKeyframe.timeRatio < 0 || volumeKeyframe.timeRatio > 1) {
+          errors.push(`${label}.volumeKeyframes[${index}].timeRatio must be between 0 and 1.`);
+        }
+        if (!isFiniteNumber(volumeKeyframe.volume) || volumeKeyframe.volume < 0) {
+          errors.push(`${label}.volumeKeyframes[${index}].volume must be a finite non-negative number.`);
+        }
+      });
+    }
+  }
+}
+
+function validateCursorClipProps(props: Record<string, unknown>, label: string, errors: string[]) {
+  if (!Array.isArray(props.points)) {
+    errors.push(`${label} points must be an array.`);
+  } else {
+    props.points.forEach((point, index) => {
+      validateCursorPoint(point, `${label} points[${index}]`, errors);
+    });
+  }
+  if (!isFiniteNumber(props.size) || props.size <= 0) {
+    errors.push(`${label} size must be positive.`);
+  }
+  if (typeof props.smoothing !== "boolean") {
+    errors.push(`${label} smoothing must be boolean.`);
+  }
+  if (typeof props.vectorCursor !== "boolean") {
+    errors.push(`${label} vectorCursor must be boolean.`);
+  }
+  if (!isFiniteNumber(props.offsetMs)) {
+    errors.push(`${label} offsetMs must be finite.`);
+  }
+}
+
+function validateCursorPoint(value: unknown, label: string, errors: string[]) {
+  const point = isRecord(value) ? value : undefined;
+  if (!point) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  ["timestamp", "x", "y", "cx", "cy"].forEach((key) => {
+    if (!isFiniteNumber(point[key])) {
+      errors.push(`${label}.${key} must be finite.`);
+    }
+  });
+  if (point.absoluteTime !== undefined && !isFiniteNumber(point.absoluteTime)) {
+    errors.push(`${label}.absoluteTime must be finite.`);
+  }
+  if (point.isClick !== undefined && typeof point.isClick !== "boolean") {
+    errors.push(`${label}.isClick must be boolean.`);
   }
 }
 

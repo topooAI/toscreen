@@ -40,7 +40,19 @@ const cases: Case[] = [
     trackType: "ui-motion",
     props: { uiSourceId: "ui-source-1", elementId: "button-1", action: "highlight" },
   },
-  { clipType: "audio", trackType: "audio", props: { sourceRegion: {} } },
+  {
+    clipType: "audio",
+    trackType: "audio",
+    props: {
+      sourceRegion: {
+        id: "audio-region",
+        startMs: 0,
+        endMs: 4000,
+        sourceUrl: "file:///audio.wav",
+        volume: 1,
+      },
+    },
+  },
   { clipType: "cursor", trackType: "cursor", props: { points: [], size: 1.5, smoothing: true, vectorCursor: true, offsetMs: 0 } },
 ];
 
