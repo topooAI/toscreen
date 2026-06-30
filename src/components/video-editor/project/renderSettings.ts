@@ -78,3 +78,26 @@ export function getProjectRenderSettings(project: VideoEditorProject): ProjectRe
     },
   };
 }
+
+export function resolveExportAudioRegions(
+  renderSettingsAudioRegions: AudioRegion[],
+  memoryAudioRegions: AudioRegion[],
+): AudioRegion[] {
+  return renderSettingsAudioRegions.map((region) => {
+    const needsMemoryFile = !region.file && region.sourceUrl?.startsWith("blob:");
+    if (!needsMemoryFile) return region;
+
+    const memoryRegion = memoryAudioRegions.find((candidate) => (
+      candidate.id === region.id ||
+      candidate.sourceUrl === region.sourceUrl ||
+      (!!candidate.path && candidate.path === region.path)
+    ));
+
+    if (!memoryRegion?.file) return region;
+
+    return {
+      ...region,
+      file: memoryRegion.file,
+    };
+  });
+}

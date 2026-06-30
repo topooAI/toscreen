@@ -29,6 +29,7 @@ const requiredAuditScripts = [
   "audit:project-model-review-packet",
   "audit:project-model-sidecar-parity",
   "audit:project-model-review-doc",
+  "audit:export-audio-render-settings",
   "audit:phase1-registry",
 ];
 

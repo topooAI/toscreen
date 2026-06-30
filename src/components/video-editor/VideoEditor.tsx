@@ -36,6 +36,7 @@ import { getAssetPath } from "@/lib/assetPath";
 import {
   createProjectFromLegacyEditorState,
   getProjectRenderSettings,
+  resolveExportAudioRegions,
   restoreLegacyEditorStateFromProjectModel,
   validateVideoEditorProject,
 } from "./project";
@@ -1141,6 +1142,10 @@ export default function VideoEditor() {
         console.warn("[ProjectModel] Export render settings source is invalid", exportProjectValidation.errors);
       }
       const renderSettings = currentRenderSettings;
+      const exportAudioRegions = resolveExportAudioRegions(
+        renderSettings.timeline.audioRegions,
+        audioRegions,
+      );
 
       const aspectRatioValue = getAspectRatioValue(renderSettings.canvas.aspectRatio);
       const sourceWidth = video.videoWidth || 1920;
@@ -1193,7 +1198,7 @@ export default function VideoEditor() {
         zoomRegions: renderSettings.timeline.zoomRegions,
         trimRegions: renderSettings.timeline.trimRegions,
         annotationRegions: renderSettings.timeline.annotationRegions,
-        audioRegions,
+        audioRegions: exportAudioRegions,
         showShadow: renderSettings.canvas.shadowIntensity > 0,
         shadowIntensity: renderSettings.canvas.shadowIntensity,
         showBlur: renderSettings.canvas.showBlur,
