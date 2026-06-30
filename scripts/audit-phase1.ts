@@ -143,6 +143,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:project-model-ai-plan"],
   },
   {
+    id: "project-model-ai-plan-lifecycle",
+    command: npmCommand,
+    args: ["run", "audit:project-model-ai-plan-lifecycle"],
+  },
+  {
     id: "project-model-review-packet",
     command: npmCommand,
     args: ["run", "audit:project-model-review-packet"],

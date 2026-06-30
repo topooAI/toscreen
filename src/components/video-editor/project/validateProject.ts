@@ -376,6 +376,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       return;
     }
     const stepIds = new Set<string>();
+    const stepStatuses: string[] = [];
     plan.steps.forEach((step, stepIndex) => {
       if (!isRecord(step)) {
         errors.push(`AI edit plan ${plan.id || "(missing id)"} step at index ${stepIndex} must be an object.`);
@@ -389,6 +390,8 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       }
       if (!isOneOf(step.status, ["draft", "accepted", "rejected", "applied"])) {
         errors.push(`AI edit plan ${plan.id || "(missing id)"} step ${step.id || "(missing id)"} status is invalid or missing.`);
+      } else {
+        stepStatuses.push(step.status);
       }
 
       const target = isRecord(step.target) ? step.target : undefined;
@@ -420,6 +423,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
         }
       });
     });
+    validateAIEditPlanLifecycle(plan.id || "(missing id)", plan.status, stepStatuses, errors);
   });
   if (project.activeAIEditPlanId && !aiEditPlanIds.has(project.activeAIEditPlanId)) {
     errors.push(`Active AI edit plan ${project.activeAIEditPlanId} does not exist.`);
@@ -513,6 +517,51 @@ function validatePositiveSize(value: unknown, label: string, errors: string[]) {
 function validateOpacity(value: unknown, label: string, errors: string[]) {
   if (isFiniteNumber(value) && (value < 0 || value > 1)) {
     errors.push(`${label} must be between 0 and 1.`);
+  }
+}
+
+function validateAIEditPlanLifecycle(
+  planId: string,
+  planStatus: AIEditPlan["status"] | undefined,
+  stepStatuses: string[],
+  errors: string[],
+) {
+  if (!isOneOf(planStatus, ["draft", "reviewed", "applied", "rejected"])) return;
+  if (stepStatuses.length === 0) return;
+
+  const invalidForPlan = (allowed: string[]) => (
+    stepStatuses.filter((status) => !allowed.includes(status))
+  );
+
+  if (planStatus === "draft") {
+    const invalidStatuses = invalidForPlan(["draft"]);
+    if (invalidStatuses.length > 0) {
+      errors.push(`AI edit plan ${planId} draft plan can only contain draft steps.`);
+    }
+  }
+
+  if (planStatus === "reviewed") {
+    const invalidStatuses = invalidForPlan(["accepted", "rejected"]);
+    if (invalidStatuses.length > 0) {
+      errors.push(`AI edit plan ${planId} reviewed plan can only contain accepted or rejected steps.`);
+    }
+  }
+
+  if (planStatus === "applied") {
+    const invalidStatuses = invalidForPlan(["applied", "rejected"]);
+    if (invalidStatuses.length > 0) {
+      errors.push(`AI edit plan ${planId} applied plan can only contain applied or rejected steps.`);
+    }
+    if (!stepStatuses.includes("applied")) {
+      errors.push(`AI edit plan ${planId} applied plan must contain at least one applied step.`);
+    }
+  }
+
+  if (planStatus === "rejected") {
+    const invalidStatuses = invalidForPlan(["rejected"]);
+    if (invalidStatuses.length > 0) {
+      errors.push(`AI edit plan ${planId} rejected plan can only contain rejected steps.`);
+    }
   }
 }
 
