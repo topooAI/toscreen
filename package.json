@@ -20,7 +20,8 @@
     "audit:project-model-restore": "tsx scripts/verify-project-model-restore.ts",
     "audit:project-model-roundtrip": "tsx scripts/verify-project-model-roundtrip.ts",
     "audit:recordings": "tsx scripts/audit-recording-restore.ts",
-    "audit:project-model-future": "tsx scripts/verify-project-model-future-entries.ts"
+    "audit:project-model-future": "tsx scripts/verify-project-model-future-entries.ts",
+    "audit:project-model-multisource": "tsx scripts/verify-project-model-multisource-entries.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

@@ -52,6 +52,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
   }
 
   const assetIds = new Set<string>();
+  const assetsById = new Map<string, ProjectAsset>();
   assets.forEach((asset: ProjectAsset, index) => {
     if (!isRecord(asset)) {
       errors.push(`Asset at index ${index} must be an object.`);
@@ -60,6 +61,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     if (!asset.id) errors.push("Asset id is required.");
     if (assetIds.has(asset.id)) errors.push(`Duplicate asset id: ${asset.id}.`);
     assetIds.add(asset.id);
+    assetsById.set(asset.id, asset);
     if (!asset.type) errors.push(`Asset ${asset.id || "(missing id)"} type is required.`);
     if (!asset.sourceUrl) warnings.push(`Asset ${asset.id || "(missing id)"} has no sourceUrl.`);
   });
@@ -123,6 +125,48 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     }
     if (clip.assetId && !assetIds.has(clip.assetId)) {
       errors.push(`Clip ${clip.id || "(missing id)"} references missing asset ${clip.assetId}.`);
+    }
+    if (clip.type === "presenter") {
+      const props = isRecord(clip.props) ? clip.props : undefined;
+      const sourceKind = props?.sourceKind;
+      const layout = props?.layout;
+      const transform = isRecord(props?.transform) ? props.transform : undefined;
+      if (!isOneOf(sourceKind, ["camera", "digital-human", "video-file", "generated-avatar"])) {
+        errors.push(`Presenter clip ${clip.id || "(missing id)"} sourceKind is invalid or missing.`);
+      }
+      if (!isOneOf(layout, ["picture-in-picture", "corner", "split-screen", "full-frame", "cutaway"])) {
+        errors.push(`Presenter clip ${clip.id || "(missing id)"} layout is invalid or missing.`);
+      }
+      if (!transform) {
+        errors.push(`Presenter clip ${clip.id || "(missing id)"} transform is required.`);
+      } else {
+        const transformKeys = ["x", "y", "width", "height", "opacity"] as const;
+        transformKeys.forEach((key) => {
+          if (!isFiniteNumber(transform[key])) {
+            errors.push(`Presenter clip ${clip.id || "(missing id)"} transform.${key} must be finite.`);
+          }
+        });
+        if (isFiniteNumber(transform.width) && transform.width <= 0) {
+          errors.push(`Presenter clip ${clip.id || "(missing id)"} transform.width must be positive.`);
+        }
+        if (isFiniteNumber(transform.height) && transform.height <= 0) {
+          errors.push(`Presenter clip ${clip.id || "(missing id)"} transform.height must be positive.`);
+        }
+      }
+      const asset = clip.assetId ? assetsById.get(clip.assetId) : undefined;
+      if (sourceKind === "digital-human" && asset && asset.type !== "digital-human") {
+        errors.push(`Presenter clip ${clip.id || "(missing id)"} sourceKind digital-human must reference a digital-human asset.`);
+      }
+      const voiceSync = isRecord(props?.voiceSync) ? props.voiceSync : undefined;
+      const audioAssetId = typeof voiceSync?.audioAssetId === "string" ? voiceSync.audioAssetId : "";
+      if (audioAssetId) {
+        const audioAsset = assetsById.get(audioAssetId);
+        if (!audioAsset) {
+          errors.push(`Presenter clip ${clip.id || "(missing id)"} voiceSync references missing audio asset ${audioAssetId}.`);
+        } else if (audioAsset.type !== "audio") {
+          errors.push(`Presenter clip ${clip.id || "(missing id)"} voiceSync must reference an audio asset.`);
+        }
+      }
     }
     if (clip.type === "ui-element-motion") {
       const props = isRecord(clip.props) ? clip.props : undefined;
@@ -230,4 +274,12 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
+  return typeof value === "string" && allowed.includes(value as T);
 }

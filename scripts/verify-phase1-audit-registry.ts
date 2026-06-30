@@ -19,6 +19,7 @@ const requiredAuditScripts = [
   "audit:preview-export-contract",
   "audit:export-entrypoints",
   "audit:project-model-future",
+  "audit:project-model-multisource",
   "audit:phase1-registry",
 ];
 

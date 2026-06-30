@@ -62,6 +62,11 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:project-model-future"],
   },
+  {
+    id: "multisource-model-entries",
+    command: npmCommand,
+    args: ["run", "audit:project-model-multisource"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];
