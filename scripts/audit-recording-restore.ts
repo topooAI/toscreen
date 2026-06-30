@@ -1,0 +1,137 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import {
+  companionAudioPathCandidatesForMediaPath,
+  projectPathCandidatesForMediaPath,
+} from "../electron/ipc/projectFiles";
+import {
+  restoreLegacyEditorStateFromProjectModel,
+  validateVideoEditorProject,
+} from "../src/components/video-editor/project";
+
+type AuditStatus = "ok" | "warn" | "fail";
+
+const recordingsDir = process.argv[2] || path.join(
+  os.homedir(),
+  "Library/Application Support/toscreen/recordings",
+);
+
+const result = await auditRecordingRestore(recordingsDir);
+
+console.log(JSON.stringify(result, null, 2));
+
+if (result.status === "fail") {
+  process.exit(1);
+}
+
+async function auditRecordingRestore(directory: string) {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  const files = await fs.readdir(directory).catch((error) => {
+    warnings.push(`Recordings directory is not readable: ${String(error)}`);
+    return [] as string[];
+  });
+
+  const videoFiles = files
+    .filter((file) => file.startsWith("recording-") && (file.endsWith(".webm") || file.endsWith(".mov")))
+    .sort()
+    .reverse();
+
+  const latestVideo = videoFiles[0];
+  if (!latestVideo) {
+    return {
+      status: "warn" as AuditStatus,
+      recordingsDir: directory,
+      warnings: [...warnings, "No recording-*.webm or recording-*.mov files found."],
+      errors,
+    };
+  }
+
+  const videoPath = path.join(directory, latestVideo);
+  const parsed = path.parse(videoPath);
+  const proxyPath = path.join(parsed.dir, `${parsed.name}-proxy.mp4`);
+  const hasProxy = await pathExists(proxyPath);
+  const audioCandidates = companionAudioPathCandidatesForMediaPath(videoPath);
+  const audioPath = await findFirstExistingPath(audioCandidates);
+  const projectCandidates = projectPathCandidatesForMediaPath(videoPath);
+  const projectPath = await findFirstExistingPath(projectCandidates);
+
+  let projectModel: {
+    present: boolean;
+    valid?: boolean;
+    errors?: string[];
+    warnings?: string[];
+    durationMs?: number;
+    assets?: number;
+    tracks?: number;
+    clips?: number;
+    restoredCompanionAudioPath?: string | null;
+  } = { present: false };
+
+  if (!projectPath) {
+    warnings.push("No .project.json found for the latest recording.");
+  } else {
+    const rawProject = await fs.readFile(projectPath, "utf8").then(JSON.parse).catch((error) => {
+      errors.push(`Failed to read project JSON: ${String(error)}`);
+      return null;
+    });
+
+    if (rawProject?.projectModel) {
+      const validation = validateVideoEditorProject(rawProject.projectModel);
+      const restored = validation.valid
+        ? restoreLegacyEditorStateFromProjectModel(rawProject.projectModel)
+        : null;
+      projectModel = {
+        present: true,
+        valid: validation.valid,
+        errors: validation.errors,
+        warnings: validation.warnings,
+        durationMs: rawProject.projectModel.durationMs,
+        assets: rawProject.projectModel.assets?.length,
+        tracks: rawProject.projectModel.tracks?.length,
+        clips: rawProject.projectModel.clips?.length,
+        restoredCompanionAudioPath: restored?.companionAudioPath ?? null,
+      };
+      if (!validation.valid) errors.push("ProjectModel sidecar is invalid.");
+    } else {
+      warnings.push("Project file exists but has no projectModel sidecar.");
+    }
+  }
+
+  const status: AuditStatus = errors.length > 0
+    ? "fail"
+    : warnings.length > 0
+      ? "warn"
+      : "ok";
+
+  return {
+    status,
+    recordingsDir: directory,
+    latestVideo: {
+      path: videoPath,
+      proxyPath: hasProxy ? proxyPath : null,
+      audioPath: audioPath ?? null,
+      projectPath: projectPath ?? null,
+    },
+    candidates: {
+      audio: audioCandidates,
+      project: projectCandidates,
+    },
+    projectModel,
+    warnings,
+    errors,
+  };
+}
+
+async function pathExists(filePath: string) {
+  return fs.access(filePath).then(() => true).catch(() => false);
+}
+
+async function findFirstExistingPath(candidates: string[]) {
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) return candidate;
+  }
+  return null;
+}

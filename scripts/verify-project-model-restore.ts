@@ -81,4 +81,27 @@ if (restored.zoomRegions.length !== 1 || restored.zoomRegions[0].id !== "zoom-1"
   process.exit(1);
 }
 
+const legacyProjectWithoutCompanionAsset = {
+  ...project,
+  assets: project.assets.filter((asset) => asset.metadata?.role !== "companion-audio"),
+  clips: project.clips.map((clip) => (
+    clip.type === "screen-recording"
+      ? {
+        ...clip,
+        props: {
+          ...clip.props,
+          companionAudioAssetId: undefined,
+        },
+      }
+      : clip
+  )),
+};
+const restoredLegacyProject = restoreLegacyEditorStateFromProjectModel(legacyProjectWithoutCompanionAsset);
+if (restoredLegacyProject.companionAudioPath !== companionAudioPath) {
+  console.error("[ProjectModel] legacy original audio fallback restore failed.");
+  console.error(`  expected: ${companionAudioPath}`);
+  console.error(`  actual:   ${restoredLegacyProject.companionAudioPath}`);
+  process.exit(1);
+}
+
 console.log("[ProjectModel] Restore checks passed.");

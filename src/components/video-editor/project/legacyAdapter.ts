@@ -400,7 +400,21 @@ function findCompanionAudioPath(
     ? project.assets.find((asset) => asset.id === companionAudioAssetId)
     : project.assets.find((asset) => asset.type === "audio" && asset.metadata?.role === "companion-audio");
 
-  return companionAsset?.filePath || companionAsset?.sourceUrl || null;
+  if (companionAsset) {
+    return companionAsset.filePath || companionAsset.sourceUrl || null;
+  }
+
+  const originalAudioClip = project.clips.find((clip) => (
+    clip.type === "audio" &&
+    clip.props.sourceRegion?.isOriginal &&
+    !clip.props.sourceRegion?.isDetached
+  ));
+
+  if (originalAudioClip?.type === "audio") {
+    return originalAudioClip.props.sourceRegion.path || originalAudioClip.props.sourceRegion.sourceUrl || null;
+  }
+
+  return null;
 }
 
 function fileNameFromPath(path: string) {

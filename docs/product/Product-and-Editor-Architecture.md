@@ -818,7 +818,8 @@ Default Phase 1 execution rule: Codex can independently fix engineering stabilit
 | PH1-10 ProjectModel 恢复验证 / ProjectModel restore verification | ✅ Done | 已新增 `scripts/verify-project-model-restore.ts`，并补齐 `companionAudioPath` 恢复，确保重启后原始伴随音频路径能从 ProjectModel 回到编辑器状态。 / Added `scripts/verify-project-model-restore.ts` and restored `companionAudioPath`, ensuring the original companion audio path returns from ProjectModel into editor state after restart. |
 | PH1-11 TypeScript 门禁恢复 / TypeScript gate restored | ✅ Done | 已清理全仓 `tsc --noEmit` 类型错误，当前 TypeScript 检查通过；这为后续保存/恢复、Timeline 和导出重构提供基础质量门禁。 / Cleared repository-wide `tsc --noEmit` errors; TypeScript now passes, giving save/restore, timeline, and export work a basic quality gate. |
 | PH1-12 重启 fallback 音频发现 / Restart fallback audio discovery | ✅ Done | `get-recorded-video-path` 现在会在最新录屏旁查找 `recording-*-audio.*`、`recording-*.audio.*` 和 `temp_audio_*` 伴随音频，并返回 `audioPath`。 / `get-recorded-video-path` now searches beside the latest recording for `recording-*-audio.*`, `recording-*.audio.*`, and `temp_audio_*` companion audio files, then returns `audioPath`. |
-| PH1-13 用户模型确认 / User model review | ⏳ Pending | 需要用户确认 Project / Asset / Track / Clip 方向是否符合未来产品。 / User should confirm whether the Project / Asset / Track / Clip direction matches the product vision. |
+| PH1-13 实际录制目录恢复审计 / Real recordings restore audit | ✅ Done | 已新增 `npm run audit:recordings`，并验证当前真实最新录制可找到 video、proxy、audio、project，ProjectModel 合法且可恢复 `temp_audio_1782710530746.mov`。 / Added `npm run audit:recordings` and verified the real latest recording resolves video, proxy, audio, project; ProjectModel is valid and restores `temp_audio_1782710530746.mov`. |
+| PH1-14 用户模型确认 / User model review | ⏳ Pending | 需要用户确认 Project / Asset / Track / Clip 方向是否符合未来产品。 / User should confirm whether the Project / Asset / Track / Clip direction matches the product vision. |
 
 ## 14. 决策日志 / Decision Log
 
@@ -846,3 +847,5 @@ Default Phase 1 execution rule: Codex can independently fix engineering stabilit
   Phase 1 quality gate update: cleaned stale test APIs, unused symbols, missing exports, and exporter type mismatches from `tsc --noEmit`; TypeScript now passes.
 - Phase 1 重启 fallback 更新：`get-recorded-video-path` 会在内存态 `currentVideoPath` 丢失后，为最新录屏重新发现旁路伴随音频，降低重启后原声轨丢失概率。
   Phase 1 restart fallback update: after in-memory `currentVideoPath` is lost, `get-recorded-video-path` rediscovers companion audio next to the latest recording, reducing the chance of missing original audio after restart.
+- Phase 1 实际恢复审计更新：新增 `audit:recordings`，并修复老 ProjectModel 没有 companion asset 时无法从原始未分离音频 clip 反推 `companionAudioPath` 的兼容缺口。
+  Phase 1 real restore audit update: added `audit:recordings` and fixed the compatibility gap where old ProjectModels without a companion asset could not infer `companionAudioPath` from the original non-detached audio clip.
