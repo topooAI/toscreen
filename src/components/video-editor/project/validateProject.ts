@@ -303,6 +303,15 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     if (!plan.id) errors.push("AI edit plan id is required.");
     if (aiEditPlanIds.has(plan.id)) errors.push(`Duplicate AI edit plan id: ${plan.id}.`);
     aiEditPlanIds.add(plan.id);
+    if (typeof plan.createdAt !== "string" || !plan.createdAt) {
+      errors.push(`AI edit plan ${plan.id || "(missing id)"} createdAt is required.`);
+    }
+    if (typeof plan.goal !== "string" || !plan.goal.trim()) {
+      errors.push(`AI edit plan ${plan.id || "(missing id)"} goal is required.`);
+    }
+    if (!isOneOf(plan.status, ["draft", "reviewed", "applied", "rejected"])) {
+      errors.push(`AI edit plan ${plan.id || "(missing id)"} status is invalid or missing.`);
+    }
     if (!Array.isArray(plan.steps)) {
       errors.push(`AI edit plan ${plan.id || "(missing id)"} steps must be an array.`);
       return;
@@ -316,8 +325,23 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       if (!step.id) errors.push(`AI edit plan ${plan.id || "(missing id)"} step id is required.`);
       if (stepIds.has(step.id)) errors.push(`AI edit plan ${plan.id || "(missing id)"} has duplicate step id: ${step.id}.`);
       stepIds.add(step.id);
+      if (!isOneOf(step.type, ["cut", "trim", "camera", "caption", "annotation", "lottie", "ui-motion", "audio", "layout", "custom"])) {
+        errors.push(`AI edit plan ${plan.id || "(missing id)"} step ${step.id || "(missing id)"} type is invalid or missing.`);
+      }
+      if (!isOneOf(step.status, ["draft", "accepted", "rejected", "applied"])) {
+        errors.push(`AI edit plan ${plan.id || "(missing id)"} step ${step.id || "(missing id)"} status is invalid or missing.`);
+      }
 
       const target = isRecord(step.target) ? step.target : undefined;
+      const timeRangeMs = isRecord(target?.timeRangeMs) ? target.timeRangeMs : undefined;
+      if (timeRangeMs) {
+        validateTimeRange(
+          timeRangeMs.startMs,
+          timeRangeMs.endMs,
+          `AI edit plan ${plan.id || "(missing id)"} step ${step.id || "(missing id)"} target timeRangeMs`,
+          errors,
+        );
+      }
       const clipIdsTarget = Array.isArray(target?.clipIds) ? target.clipIds : [];
       clipIdsTarget.forEach((clipId) => {
         if (typeof clipId === "string" && !clipIds.has(clipId)) {
@@ -377,6 +401,18 @@ function validateFocus(value: unknown, label: string, errors: string[]) {
       errors.push(`${label}.${key} must be a finite normalized value between 0 and 1.`);
     }
   });
+}
+
+function validateTimeRange(startMs: unknown, endMs: unknown, label: string, errors: string[]) {
+  if (!isFiniteNumber(startMs) || !isFiniteNumber(endMs)) {
+    errors.push(`${label} startMs/endMs must be finite.`);
+    return;
+  }
+  if (startMs < 0 || endMs < 0) {
+    errors.push(`${label} startMs/endMs must be non-negative.`);
+  } else if (endMs < startMs) {
+    errors.push(`${label} endMs is before startMs.`);
+  }
 }
 
 function isClipCompatibleWithTrack(
