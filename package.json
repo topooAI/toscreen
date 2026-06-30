@@ -28,7 +28,8 @@
     "audit:project-model-track-hierarchy": "tsx scripts/verify-project-model-track-hierarchy.ts",
     "audit:project-model-asset-compatibility": "tsx scripts/verify-project-model-asset-compatibility.ts",
     "audit:project-model-ai-plan": "tsx scripts/verify-project-model-ai-plan-structure.ts",
-    "audit:project-model-review-packet": "tsx scripts/verify-project-model-review-packet.ts"
+    "audit:project-model-review-packet": "tsx scripts/verify-project-model-review-packet.ts",
+    "audit:project-model-sidecar-parity": "tsx scripts/verify-project-model-sidecar-parity.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

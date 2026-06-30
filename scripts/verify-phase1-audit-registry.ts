@@ -27,6 +27,7 @@ const requiredAuditScripts = [
   "audit:project-model-asset-compatibility",
   "audit:project-model-ai-plan",
   "audit:project-model-review-packet",
+  "audit:project-model-sidecar-parity",
   "audit:phase1-registry",
 ];
 

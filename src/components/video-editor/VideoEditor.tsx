@@ -414,6 +414,12 @@ export default function VideoEditor() {
     if (project.borderRadius !== undefined) setBorderRadius(project.borderRadius);
     if (project.padding !== undefined) setPadding(project.padding);
     if (project.aspectRatio) setAspectRatio(project.aspectRatio);
+    if (project.exportQuality) setExportQuality(project.exportQuality);
+    if (project.cursorData) setCursorData(project.cursorData);
+    if (project.cursorSize !== undefined) setCursorSize(project.cursorSize);
+    if (project.cursorSmoothing !== undefined) setCursorSmoothing(project.cursorSmoothing);
+    if (project.showVectorCursor !== undefined) setShowVectorCursor(project.showVectorCursor);
+    if (project.cursorOffset !== undefined) setCursorOffset(project.cursorOffset);
     return "legacy";
   }, []);
 
@@ -551,7 +557,13 @@ export default function VideoEditor() {
         motionBlurEnabled,
         borderRadius,
         padding,
-        aspectRatio
+        aspectRatio,
+        exportQuality,
+        cursorData,
+        cursorSize,
+        cursorSmoothing,
+        showVectorCursor,
+        cursorOffset,
       };
       window.electronAPI.saveProject(originalVideoPath, projectData).catch(e => {
         console.error("Auto-save failed", e);
