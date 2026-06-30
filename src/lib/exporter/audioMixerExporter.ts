@@ -1,17 +1,19 @@
 import type { ExportConfig } from './types';
 import type { AudioRegion, TrimRegion } from '@/components/video-editor/types';
 
+type AudioMixerExportConfig = ExportConfig & {
+  audioRegions?: AudioRegion[];
+  trimRegions?: TrimRegion[];
+};
+
 export class AudioMixerExporter {
-  private config: ExportConfig;
   private videoUrl: string;
   private audioRegions: AudioRegion[];
   private trimRegions: TrimRegion[];
   
-  constructor(config: ExportConfig, videoUrl: string) {
-    this.config = config;
+  constructor(config: AudioMixerExportConfig, videoUrl: string) {
     this.videoUrl = videoUrl;
-    // Safely fallback to empty arrays if not present
-    this.audioRegions = (config as any).audioRegions || [];
+    this.audioRegions = config.audioRegions || [];
     this.trimRegions = config.trimRegions || [];
   }
 

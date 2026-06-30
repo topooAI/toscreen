@@ -18,7 +18,6 @@ interface useZoomEngineProps {
   appRef: React.RefObject<Application | null>;
   cameraContainerRef: React.RefObject<Container | null>;
   videoContainerRef: React.RefObject<Container | null>;
-  videoSpriteRef: React.RefObject<any>;
   blurFilterRef: React.RefObject<BlurFilter | null>;
   currentTimeRef: React.RefObject<number>;
   zoomRegionsRef: React.RefObject<ZoomRegion[]>;
@@ -40,7 +39,6 @@ export function useZoomEngine({
   appRef,
   cameraContainerRef,
   videoContainerRef,
-  videoSpriteRef,
   blurFilterRef,
   currentTimeRef,
   zoomRegionsRef,
@@ -79,14 +77,14 @@ export function useZoomEngine({
       applyZoomTransform({
         cameraContainer,
         blurFilter: blurFilterRef.current,
-        stageSize: stageSizeRef.current,
-        baseMask: baseMaskRef.current,
+        stageSize: stageSizeRef.current!,
+        baseMask: baseMaskRef.current!,
         zoomScale: state.scale,
         focusX: state.focusX,
         focusY: state.focusY,
         motionIntensity,
-        isPlaying: isPlayingRef.current,
-        motionBlurEnabled: motionBlurEnabledRef.current,
+        isPlaying: isPlayingRef.current ?? false,
+        motionBlurEnabled: motionBlurEnabledRef.current ?? false,
       });
     };
 
@@ -94,8 +92,8 @@ export function useZoomEngine({
       try {
         if (!app || !app.ticker || !videoReady) return;
 
-        const currentTimeMs = currentTimeRef.current;
-        const { strength, focus, depth } = findInterpolatedTarget(zoomRegionsRef.current, currentTimeMs);
+        const currentTimeMs = currentTimeRef.current || 0;
+        const { strength, focus, depth } = findInterpolatedTarget(zoomRegionsRef.current || [], currentTimeMs);
       
         let targetScaleFactor = 1;
         let targetFocus = DEFAULT_FOCUS;
@@ -104,10 +102,10 @@ export function useZoomEngine({
           const zoomScale = interpolateZoomScale(depth, ZOOM_DEPTH_SCALES);
           const stageFocus = videoFocusToStage(
             focus,
-            stageSizeRef.current,
-            videoSizeRef.current,
-            baseScaleRef.current,
-            baseOffsetRef.current
+            stageSizeRef.current!,
+            videoSizeRef.current!,
+            baseScaleRef.current!,
+            baseOffsetRef.current!
           );
           
           const regionFocus = clampRef.current(stageFocus, Math.round(depth) as ZoomDepth);

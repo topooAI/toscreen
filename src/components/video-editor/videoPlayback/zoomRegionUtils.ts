@@ -1,6 +1,4 @@
 import type { ZoomRegion } from "../types";
-import { smoothStep } from "./mathUtils";
-import { TRANSITION_WINDOW_MS } from "./constants";
 
 export function computeRegionStrength(region: ZoomRegion, timeMs: number) {
   // Add a tiny tolerance (2ms) for floating point time comparison

@@ -816,7 +816,8 @@ Default Phase 1 execution rule: Codex can independently fix engineering stabilit
 | PH1-08 Electron autosave 实机验收 / Electron autosave hands-on verification | ✅ Done | 已新增 `npm run dev:editor` 直达 Editor，并验证真实 `recording-1782710530746.project.json` 写入合法 `projectModel`：4 assets / 5 tracks / 11 clips / 15340ms。 / Added `npm run dev:editor` to launch Editor directly and verified real `recording-1782710530746.project.json` writes a valid `projectModel`: 4 assets / 5 tracks / 11 clips / 15340ms. |
 | PH1-09 Project 文件路径规范化 / Project file path canonicalization | ✅ Done | 已新增 `electron/ipc/projectFiles.ts` 和 `scripts/verify-project-file-paths.ts`，确保原始录屏、`file://` URL、`recording-*-proxy.mp4` 都稳定映射到同一个 `recording-*.project.json`。 / Added `electron/ipc/projectFiles.ts` and `scripts/verify-project-file-paths.ts`, ensuring raw recordings, `file://` URLs, and `recording-*-proxy.mp4` all map to the same `recording-*.project.json`. |
 | PH1-10 ProjectModel 恢复验证 / ProjectModel restore verification | ✅ Done | 已新增 `scripts/verify-project-model-restore.ts`，并补齐 `companionAudioPath` 恢复，确保重启后原始伴随音频路径能从 ProjectModel 回到编辑器状态。 / Added `scripts/verify-project-model-restore.ts` and restored `companionAudioPath`, ensuring the original companion audio path returns from ProjectModel into editor state after restart. |
-| PH1-11 用户模型确认 / User model review | ⏳ Pending | 需要用户确认 Project / Asset / Track / Clip 方向是否符合未来产品。 / User should confirm whether the Project / Asset / Track / Clip direction matches the product vision. |
+| PH1-11 TypeScript 门禁恢复 / TypeScript gate restored | ✅ Done | 已清理全仓 `tsc --noEmit` 类型错误，当前 TypeScript 检查通过；这为后续保存/恢复、Timeline 和导出重构提供基础质量门禁。 / Cleared repository-wide `tsc --noEmit` errors; TypeScript now passes, giving save/restore, timeline, and export work a basic quality gate. |
+| PH1-12 用户模型确认 / User model review | ⏳ Pending | 需要用户确认 Project / Asset / Track / Clip 方向是否符合未来产品。 / User should confirm whether the Project / Asset / Track / Clip direction matches the product vision. |
 
 ## 14. 决策日志 / Decision Log
 
@@ -840,3 +841,5 @@ Default Phase 1 execution rule: Codex can independently fix engineering stabilit
   Phase 1 save/restore path stability update: project file resolution now uses canonical path rules, so proxy paths, raw recording paths, and encoded `file://` URLs no longer create or read different `.project.json` files.
 - Phase 1 ProjectModel 恢复更新：`restoreLegacyEditorStateFromProjectModel` 现在会恢复 `companionAudioPath`，避免重启后原始伴随音频身份丢失。
   Phase 1 ProjectModel restore update: `restoreLegacyEditorStateFromProjectModel` now restores `companionAudioPath`, preventing the original companion audio identity from being lost after restart.
+- Phase 1 质量门禁更新：清理 `tsc --noEmit` 中的过期测试 API、未使用符号、缺失导出和导出器类型不一致问题，当前 TypeScript 检查已通过。
+  Phase 1 quality gate update: cleaned stale test APIs, unused symbols, missing exports, and exporter type mismatches from `tsc --noEmit`; TypeScript now passes.

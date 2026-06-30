@@ -60,27 +60,6 @@ export class VideoExporter {
     return totalDuration - totalTrimDuration;
   }
 
-  private mapEffectiveToSourceTime(effectiveTimeMs: number): number {
-    const trimRegions = this.config.trimRegions || [];
-    // Sort trim regions by start time
-    const sortedTrims = [...trimRegions].sort((a, b) => a.startMs - b.startMs);
-
-    let sourceTimeMs = effectiveTimeMs;
-
-    for (const trim of sortedTrims) {
-      // If the source time hasn't reached this trim region yet, we're done
-      if (sourceTimeMs < trim.startMs) {
-        break;
-      }
-
-      // Add the duration of this trim region to the source time
-      const trimDuration = trim.endMs - trim.startMs;
-      sourceTimeMs += trimDuration;
-    }
-
-    return sourceTimeMs;
-  }
-
   async export(): Promise<ExportResult> {
     try {
       this.cleanup();
@@ -156,15 +135,12 @@ export class VideoExporter {
         await audioEncoder.initialize();
         audioCodec = audioEncoder.getCodec() === 'mp4a.40.2' ? 'aac' : 'opus';
       }
-
       // Initialize muxer with or without audio (now we know the exact audio codec)
       this.muxer = new VideoMuxer(this.config, hasAudio, audioCodec as any);
       await this.muxer.initialize();
       // --- END Audio Setup Phase ---
 
-      const frameDuration = 1 / this.config.frameRate;
       const totalFrames = Math.floor(effectiveDuration * this.config.frameRate);
-      const startTime = 0;
 
       console.log(`[VideoExporter] Original duration: ${totalDuration.toFixed(3)} s`);
       console.log(`[VideoExporter] Effective duration: ${effectiveDuration.toFixed(3)} s`);
@@ -188,7 +164,7 @@ export class VideoExporter {
       let totalFramesExported = 0;
       let isExportingFrames = true;
 
-      const processFrame = async (now: DOMHighResTimeStamp, metadata: VideoFrameCallbackMetadata) => {
+      const processFrame = async (_now: DOMHighResTimeStamp, metadata: VideoFrameCallbackMetadata) => {
         if (this.cancelled) {
           isExportingFrames = false;
           return;
@@ -261,7 +237,7 @@ export class VideoExporter {
             const count = Math.max(1, framesToFill);
             
             for (let i = 0; i < count; i++) {
-              if (this.cancelled || !this.encoder || this.encoder.state === 'closed') break;
+              if (this.cancelled || !this.encoder) break;
               
               const currentExportIndex = totalFramesExported;
               // Calculate the exact intended time for this specific frame
@@ -293,9 +269,8 @@ export class VideoExporter {
             sourceBitmap.close();
 
             // Update UI progress
-            if (totalFramesExported % 5 === 0 && this.config.onProgress) {
-              this.config.onProgress({
-                percent: Math.round((totalFramesExported / totalExpectedFrames) * 100),
+            if (totalFramesExported % 5 === 0) {
+              onProgress({
                 currentFrame: totalFramesExported,
                 totalFrames: totalExpectedFrames,
                 percentage: (totalFramesExported / totalExpectedFrames) * 100,
@@ -342,6 +317,9 @@ export class VideoExporter {
       // --------------------------------------------------------
 
       // Wait for all frames to be encoded
+      if (!this.encoder) {
+        throw new Error('Video encoder was not initialized.');
+      }
       await this.encoder.flush();
       
       if (audioEncoder) {

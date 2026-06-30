@@ -156,7 +156,6 @@ export function useVideoExport({
         borderRadius,
         padding,
         cropRegion,
-        annotationRegions,
         previewWidth,
         previewHeight,
         onProgress: (progress: ExportProgress) => setExportProgress(progress),

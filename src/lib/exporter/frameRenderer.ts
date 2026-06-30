@@ -255,7 +255,7 @@ export class FrameRenderer {
     this.backgroundSprite = bgCanvas as any;
   }
 
-  async renderFrame(videoSource: HTMLVideoElement | VideoFrame, timestamp: number): Promise<void> {
+  async renderFrame(videoSource: HTMLVideoElement | VideoFrame | ImageBitmap, timestamp: number): Promise<void> {
     if (!this.app || !this.videoContainer || !this.cameraContainer) {
       throw new Error('Renderer not initialized');
     }

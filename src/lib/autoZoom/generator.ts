@@ -1,5 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
-import { ZoomRegion, ZoomDepth, DEFAULT_ZOOM_DEPTH, ZoomFocus } from '../../components/video-editor/types';
+import { ZoomRegion, ZoomDepth } from '../../components/video-editor/types';
 
 export interface RawClickEvent {
     timestamp: number;

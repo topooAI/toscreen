@@ -30,7 +30,6 @@ export function useAudioMixer({ audioRegions, isPlaying, currentTime }: UseAudio
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
       audioContextRef.current = new AudioContextClass();
     }
-    const ctx = audioContextRef.current;
 
     // We DO NOT connect the main video to AudioContext via createMediaElementSource anymore.
     // Reason: Local file:// URLs or CORS restrictions will cause the video to output silence when hijacked.

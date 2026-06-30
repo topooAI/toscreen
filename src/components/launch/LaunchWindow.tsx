@@ -18,14 +18,12 @@ import { cn } from "../../lib/utils";
 export function LaunchWindow() {
   const { recording, toggleRecording, isProcessing, processProgress } = useScreenRecorder();
   const [selectedType, setSelectedType] = useState<"Display" | "Window" | "Area" | "Device">("Display");
-  const [selectedSource, setSelectedSource] = useState<string>("Screen");
 
   useEffect(() => {
     const checkSelectedSource = async () => {
       if (window.electronAPI) {
         const source = await window.electronAPI.getSelectedSource();
         if (source) {
-          setSelectedSource(source.name);
           setSelectedType(source.id.startsWith('screen:') ? "Display" : "Window");
         }
       }

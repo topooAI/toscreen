@@ -26,8 +26,6 @@ import PlaybackControls from "../PlaybackControls";
 
 const ZOOM_ROW_ID = "row-zoom";
 const TRIM_ROW_ID = "row-trim";
-const ANNOTATION_ROW_ID = "row-annotation";
-const AUDIO_ROW_ID = "row-audio";
 const VIDEO_ROW_ID = "row-video";
 const FALLBACK_RANGE_MS = 1000;
 const TARGET_MARKER_COUNT = 12;
@@ -486,7 +484,6 @@ function Timeline({
   selectedTrimId,
   selectedAnnotationId,
   onAddZoom,
-  onAddTrim,
   onAddAnnotation,
   selectedAudioId,
   onSelectAudio,
@@ -517,7 +514,6 @@ function Timeline({
   selectedTrimId?: string | null;
   selectedAnnotationId?: string | null;
   onAddZoom?: () => void;
-  onAddTrim?: () => void;
   onAddAnnotation?: () => void;
   selectedAudioId?: string | null;
   onSelectAudio?: (id: string | null) => void;
@@ -1790,7 +1786,6 @@ export default function TimelineEditor({
             onTimelineResizeStart={handleTimelineResizeStart}
             onTimelineResizeEnd={handleTimelineResizeEnd}
             onAddZoom={handleAddZoom}
-            onAddTrim={handleAddTrim}
             onAddAnnotation={handleAddAnnotation}
             videoRef={videoRef}
             mapSourceToEffective={mapSourceToEffective}

@@ -11,7 +11,6 @@ import {
 } from "../types";
 
 interface UseAnnotationHandlersProps {
-  annotationRegions: AnnotationRegion[];
   setAnnotationRegions: (regions: AnnotationRegion[] | ((prev: AnnotationRegion[]) => AnnotationRegion[])) => void;
   setSelectedAnnotationId: (id: string | null) => void;
   setSelectedZoomId: (id: string | null) => void;
@@ -21,7 +20,6 @@ interface UseAnnotationHandlersProps {
 }
 
 export function useAnnotationHandlers({
-  annotationRegions,
   setAnnotationRegions,
   setSelectedAnnotationId,
   setSelectedZoomId,

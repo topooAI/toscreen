@@ -8,7 +8,7 @@
  * 4. Export to JSON file
  */
 
-import { mouseTracker, MouseClickEvent, RecordingBounds } from '../mouseTracker';
+import { mouseTracker, RecordingBounds } from '../mouseTracker';
 import * as assert from 'assert';
 
 console.log('🧪 Testing Mouse Tracker...\n');
@@ -20,7 +20,7 @@ let status = mouseTracker.getStatus();
 assert.strictEqual(status.isTracking, true, 'Should be tracking');
 assert.strictEqual(status.eventCount, 0, 'Should have 0 events');
 
-const events1 = mouseTracker.stop();
+const { events: events1 } = mouseTracker.stop();
 status = mouseTracker.getStatus();
 assert.strictEqual(status.isTracking, false, 'Should not be tracking');
 assert.strictEqual(events1.length, 0, 'Should have returned 0 events');
@@ -38,12 +38,12 @@ const bounds: RecordingBounds = {
 mouseTracker.start(bounds);
 
 // Simulate clicks
-mouseTracker.addClickEvent(960, 540);   // Center: should be (0.5, 0.5)
-mouseTracker.addClickEvent(0, 0);       // Top-left: should be (0, 0)
-mouseTracker.addClickEvent(1920, 1080); // Bottom-right: should be (1, 1)
-mouseTracker.addClickEvent(480, 270);   // Quarter: should be (0.25, 0.25)
+mouseTracker.addEvent(960, 540, 'click');   // Center: should be (0.5, 0.5)
+mouseTracker.addEvent(0, 0, 'click');       // Top-left: should be (0, 0)
+mouseTracker.addEvent(1920, 1080, 'click'); // Bottom-right: should be (1, 1)
+mouseTracker.addEvent(480, 270, 'click');   // Quarter: should be (0.25, 0.25)
 
-const events2 = mouseTracker.stop();
+const { events: events2 } = mouseTracker.stop();
 assert.strictEqual(events2.length, 4, 'Should have 4 events');
 
 // Verify normalization
@@ -66,15 +66,15 @@ console.log('Test 3: Timestamp accuracy');
 mouseTracker.start();
 
 setTimeout(() => {
-    mouseTracker.addClickEvent(100, 100);
+    mouseTracker.addEvent(100, 100, 'click');
 }, 100);
 
 setTimeout(() => {
-    mouseTracker.addClickEvent(200, 200);
+    mouseTracker.addEvent(200, 200, 'click');
 }, 200);
 
 setTimeout(() => {
-    const events3 = mouseTracker.stop();
+    const { events: events3 } = mouseTracker.stop();
     assert.strictEqual(events3.length, 2, 'Should have 2 events');
 
     assert.ok(events3[0].timestamp >= 100 && events3[0].timestamp < 150,

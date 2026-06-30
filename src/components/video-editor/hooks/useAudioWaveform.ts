@@ -32,10 +32,10 @@ export function useAudioWaveform(url: string | null, isRealDecode = false, sampl
         if (isRealDecode) {
           // Decode real audio file (safe for short audio tracks)
           let fetchUrl = url;
+          if (!fetchUrl) return;
           if (fetchUrl.startsWith('file://')) {
             fetchUrl = fetchUrl.replace('file://', 'toscreen://');
           }
-          if (!fetchUrl) return;
           const response = await fetch(fetchUrl + '?t=' + Date.now(), { cache: 'no-store' });
           const arrayBuffer = await response.arrayBuffer();
           

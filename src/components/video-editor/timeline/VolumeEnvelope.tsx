@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { VolumeKeyframe } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 

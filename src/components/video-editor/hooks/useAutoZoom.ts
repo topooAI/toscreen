@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import { useCallback } from "react";
 import { toast } from "sonner";
 import { generateAutoZooms } from "../../../lib/autoZoom/generator";
 import { type ZoomRegion } from "../types";

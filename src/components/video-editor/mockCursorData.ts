@@ -36,9 +36,11 @@ for (let i = 0; i <= 600; i++) {
   const isClick = (i === 120 || i === 230 || i === 450);
 
   MOCK_CURSOR_DATA.push({
-    timestampMs,
+    timestamp: timestampMs,
     x: Math.max(0, Math.min(1, currentX)),
     y: Math.max(0, Math.min(1, currentY)),
+    cx: Math.max(0, Math.min(1, currentX)),
+    cy: Math.max(0, Math.min(1, currentY)),
     isClick
   });
 }
