@@ -53,6 +53,7 @@ export interface LegacyEditorProjectInput {
 }
 
 export interface LegacyEditorRestoredState {
+  companionAudioPath?: string | null;
   zoomRegions: ZoomRegion[];
   trimRegions: TrimRegion[];
   annotationRegions: AnnotationRegion[];
@@ -324,6 +325,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
 export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorProject): LegacyEditorRestoredState {
   const screenClip = project.clips.find((clip) => clip.type === "screen-recording");
   const cursorClip = project.clips.find((clip) => clip.type === "cursor");
+  const companionAudioPath = findCompanionAudioPath(project, screenClip);
   const legacyTrimRegions = Array.isArray(project.legacyState?.trimRegions)
     ? project.legacyState.trimRegions as TrimRegion[]
     : [];
@@ -332,6 +334,7 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
     : undefined;
 
   return {
+    companionAudioPath,
     zoomRegions: project.clips.flatMap((clip): ZoomRegion[] => {
       if (clip.type !== "camera" || clip.props.mode !== "zoom") return [];
       if (clip.props.sourceRegion) return [clip.props.sourceRegion];
@@ -384,6 +387,20 @@ function restoreAudioSourceUrl(region: Omit<AudioRegion, "file">): AudioRegion {
     isOriginal: region.isOriginal !== undefined ? region.isOriginal : true,
     isDetached: region.isDetached !== undefined ? region.isDetached : false,
   };
+}
+
+function findCompanionAudioPath(
+  project: VideoEditorProject,
+  screenClip: ProjectClip | undefined,
+): string | null {
+  const companionAudioAssetId = screenClip?.type === "screen-recording"
+    ? screenClip.props.companionAudioAssetId
+    : undefined;
+  const companionAsset = companionAudioAssetId
+    ? project.assets.find((asset) => asset.id === companionAudioAssetId)
+    : project.assets.find((asset) => asset.type === "audio" && asset.metadata?.role === "companion-audio");
+
+  return companionAsset?.filePath || companionAsset?.sourceUrl || null;
 }
 
 function fileNameFromPath(path: string) {

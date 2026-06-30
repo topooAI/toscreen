@@ -323,6 +323,9 @@ export default function VideoEditor() {
         setPadding(restored.padding);
         setAspectRatio(restored.aspectRatio);
         setExportQuality(restored.exportQuality);
+        if (restored.companionAudioPath !== undefined) {
+          setCompanionAudioPath(restored.companionAudioPath);
+        }
         if (restored.cursorData) setCursorData(restored.cursorData);
         if (restored.cursorSize !== undefined) setCursorSize(restored.cursorSize);
         if (restored.cursorSmoothing !== undefined) setCursorSmoothing(restored.cursorSmoothing);
@@ -344,6 +347,8 @@ export default function VideoEditor() {
         isDetached: ar.isDetached !== undefined ? ar.isDetached : false,
       }));
       setAudioRegions(restoredAudio);
+      const originalAudioPath = restoredAudio.find((ar: any) => ar.isOriginal && !ar.isDetached)?.path;
+      if (originalAudioPath) setCompanionAudioPath(originalAudioPath);
     }
     if (project.cropRegion) setCropRegion(project.cropRegion);
     if (project.wallpaper) setWallpaper(project.wallpaper);
