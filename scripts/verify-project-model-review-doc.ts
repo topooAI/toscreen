@@ -24,8 +24,12 @@ const requiredPhrases = [
   "Presenter",
   "UI Motion",
   "Does this model support the Phase 1 Screen Studio-grade foundation?",
+  "Execution Ownership Checklist",
+  "OWN-05",
+  "black tail",
   "Does Camera Clip leave enough room for future 3D camera work?",
   "Should multi-source composition stay model-only in Phase 1 or enter real UI/editing capability?",
+  "npm run audit:phase1-ownership-list",
   "npm run audit:project-model-review-packet",
   "npm run audit:phase1",
 ];
