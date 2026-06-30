@@ -1170,6 +1170,7 @@ export default function VideoEditor() {
 
       const exporter = new VideoExporter({
         videoUrl: originalVideoPath ? toFileUrl(originalVideoPath) : (videoPath ? toFileUrl(videoPath) : ''),
+        projectDurationMs: renderSettings.durationMs,
         width: exportWidth,
         height: exportHeight,
         frameRate: 30, // Optimized for speed

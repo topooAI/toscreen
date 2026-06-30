@@ -1,27 +1,32 @@
 import type { ExportConfig } from './types';
+import { resolveExportDurationSeconds } from './duration';
 import type { AudioRegion, TrimRegion } from '@/components/video-editor/types';
 
 type AudioMixerExportConfig = ExportConfig & {
   audioRegions?: AudioRegion[];
   trimRegions?: TrimRegion[];
+  projectDurationMs?: number;
 };
 
 export class AudioMixerExporter {
+  private config: AudioMixerExportConfig;
   private videoUrl: string;
   private audioRegions: AudioRegion[];
   private trimRegions: TrimRegion[];
   
   constructor(config: AudioMixerExportConfig, videoUrl: string) {
+    this.config = config;
     this.videoUrl = videoUrl;
     this.audioRegions = config.audioRegions || [];
     this.trimRegions = config.trimRegions || [];
   }
 
   private getEffectiveDuration(totalDuration: number): number {
-    const totalTrimDuration = this.trimRegions.reduce((sum, region) => {
-      return sum + (region.endMs - region.startMs) / 1000;
-    }, 0);
-    return Math.max(0, totalDuration - totalTrimDuration);
+    return resolveExportDurationSeconds({
+      sourceDurationSeconds: totalDuration,
+      trimRegions: this.trimRegions,
+      projectDurationMs: this.config.projectDurationMs,
+    });
   }
 
   public async renderAudio(

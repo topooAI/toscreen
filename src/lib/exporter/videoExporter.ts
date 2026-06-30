@@ -4,10 +4,12 @@ import { FrameRenderer } from './frameRenderer';
 import { VideoMuxer } from './muxer';
 import { AudioMixerExporter } from './audioMixerExporter';
 import { AudioEncoderWrapper } from './audioEncoder';
+import { resolveExportDurationSeconds } from './duration';
 import type { ZoomRegion, CropRegion, TrimRegion, AnnotationRegion, AudioRegion } from '@/components/video-editor/types';
 
 interface VideoExporterConfig extends ExportConfig {
   videoUrl: string;
+  projectDurationMs?: number;
   wallpaper: string;
   zoomRegions: ZoomRegion[];
   trimRegions?: TrimRegion[];
@@ -51,13 +53,12 @@ export class VideoExporter {
     this.config = config;
   }
 
-  // Calculate the total duration excluding trim regions (in seconds)
   private getEffectiveDuration(totalDuration: number): number {
-    const trimRegions = this.config.trimRegions || [];
-    const totalTrimDuration = trimRegions.reduce((sum, region) => {
-      return sum + (region.endMs - region.startMs) / 1000;
-    }, 0);
-    return totalDuration - totalTrimDuration;
+    return resolveExportDurationSeconds({
+      sourceDurationSeconds: totalDuration,
+      trimRegions: this.config.trimRegions,
+      projectDurationMs: this.config.projectDurationMs,
+    });
   }
 
   async export(): Promise<ExportResult> {
@@ -164,6 +165,79 @@ export class VideoExporter {
       let totalFramesExported = 0;
       let isExportingFrames = true;
 
+      const reportFrameProgress = () => {
+        if (totalFramesExported % 5 === 0) {
+          onProgress({
+            currentFrame: totalFramesExported,
+            totalFrames: totalExpectedFrames,
+            percentage: (totalFramesExported / totalExpectedFrames) * 100,
+            estimatedTimeRemaining: 0,
+          });
+        }
+      };
+
+      const waitForEncoderBackpressure = async () => {
+        if (this.encodeQueue < this.MAX_ENCODE_QUEUE) return;
+        while (this.encodeQueue >= this.MAX_ENCODE_QUEUE && !this.cancelled) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      };
+
+      const encodeRenderedFrame = async (source: ImageBitmap | HTMLVideoElement, frameIndex: number) => {
+        if (this.cancelled || !this.encoder || this.encoder.state === 'closed') return false;
+
+        await this.renderer!.renderFrame(source, frameIndex * (1000000 / this.config.frameRate));
+
+        const canvas = this.renderer!.getCanvas();
+        const exportBitmap = await createImageBitmap(canvas);
+        const timestampMicro = frameIndex * (1000000 / this.config.frameRate);
+        const durationMicro = 1000000 / this.config.frameRate;
+
+        const exportFrame = new VideoFrame(exportBitmap, {
+          timestamp: Math.round(timestampMicro),
+          duration: Math.round(durationMicro),
+        });
+
+        this.encoder.encode(exportFrame, { keyFrame: frameIndex === 0 });
+        exportFrame.close();
+        exportBitmap.close();
+        this.encodeQueue++;
+        return true;
+      };
+
+      const renderBlackTailFrames = async () => {
+        if (totalFramesExported >= totalExpectedFrames) return;
+
+        const blackCanvas = document.createElement('canvas');
+        blackCanvas.width = videoInfo.width;
+        blackCanvas.height = videoInfo.height;
+        const blackCtx = blackCanvas.getContext('2d');
+        if (!blackCtx) return;
+        blackCtx.fillStyle = '#000000';
+        blackCtx.fillRect(0, 0, blackCanvas.width, blackCanvas.height);
+
+        const blackBitmap = await createImageBitmap(blackCanvas);
+        try {
+          while (!this.cancelled && totalFramesExported < totalExpectedFrames) {
+            if (audioEncoder) {
+              try {
+                await audioEncoder.encodeUpTo(totalFramesExported / this.config.frameRate);
+              } catch (e) {
+                console.error("Audio encode tail step error:", e);
+              }
+            }
+
+            await waitForEncoderBackpressure();
+            const encoded = await encodeRenderedFrame(blackBitmap, totalFramesExported);
+            if (!encoded) break;
+            totalFramesExported++;
+            reportFrameProgress();
+          }
+        } finally {
+          blackBitmap.close();
+        }
+      };
+
       const processFrame = async (_now: DOMHighResTimeStamp, metadata: VideoFrameCallbackMetadata) => {
         if (this.cancelled) {
           isExportingFrames = false;
@@ -216,11 +290,7 @@ export class VideoExporter {
           }
 
           // Backpressure: wait if encoder queue is getting too full
-          if (this.encodeQueue >= this.MAX_ENCODE_QUEUE) {
-            while (this.encodeQueue >= this.MAX_ENCODE_QUEUE && !this.cancelled) {
-              await new Promise(resolve => setTimeout(resolve, 10));
-            }
-          }
+          await waitForEncoderBackpressure();
 
           if (this.cancelled || !this.encoder || this.encoder.state === 'closed') {
             isExportingFrames = false;
@@ -240,43 +310,16 @@ export class VideoExporter {
               if (this.cancelled || !this.encoder) break;
               
               const currentExportIndex = totalFramesExported;
-              // Calculate the exact intended time for this specific frame
-              const targetEffectiveTimeSec = currentExportIndex / this.config.frameRate;
-              const virtualTimestampMs = targetEffectiveTimeSec * 1000000;
-              
-              // Re-render PIXI scene with the SAME source image but a PROGRESSED animation timestamp!
-              await this.renderer!.renderFrame(sourceBitmap, virtualTimestampMs);
-              
-              const canvas = this.renderer!.getCanvas();
-              const exportBitmap = await createImageBitmap(canvas);
-              
-              const timestampMicro = currentExportIndex * (1000000 / this.config.frameRate);
-              const durationMicro = 1000000 / this.config.frameRate;
-
-              const exportFrame = new VideoFrame(exportBitmap, {
-                timestamp: Math.round(timestampMicro),
-                duration: Math.round(durationMicro),
-              });
-
-              this.encoder.encode(exportFrame, { keyFrame: currentExportIndex === 0 });
-              exportFrame.close();
-              exportBitmap.close();
+              const encoded = await encodeRenderedFrame(sourceBitmap, currentExportIndex);
+              if (!encoded) break;
 
               totalFramesExported++;
-              this.encodeQueue++;
             }
             
             sourceBitmap.close();
 
             // Update UI progress
-            if (totalFramesExported % 5 === 0) {
-              onProgress({
-                currentFrame: totalFramesExported,
-                totalFrames: totalExpectedFrames,
-                percentage: (totalFramesExported / totalExpectedFrames) * 100,
-                estimatedTimeRemaining: 0,
-              });
-            }
+            reportFrameProgress();
           } catch (e) {
             console.error("Frame processing error:", e);
           }
@@ -309,6 +352,7 @@ export class VideoExporter {
       }
 
       videoElement.pause();
+      await renderBlackTailFrames();
       
       if (this.cancelled) {
         return { success: false, error: 'Export cancelled' };

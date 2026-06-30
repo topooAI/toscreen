@@ -18,6 +18,7 @@ const requiredAuditScripts = [
   "audit:recordings",
   "audit:preview-export-contract",
   "audit:project-duration",
+  "audit:export-duration-render-settings",
   "audit:export-entrypoints",
   "audit:project-model-future",
   "audit:project-model-multisource",
