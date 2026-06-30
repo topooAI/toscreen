@@ -49,6 +49,22 @@ Use this list while iterating: by default, Codex can keep moving on deterministi
 | UA-07 | AI 自动剪辑真实用例确认 / AI auto-editing use-case review | AI 应该自动做哪些剪辑决策，哪些必须生成计划后由用户确认。 / Which edit decisions AI should automate, and which must stay as reviewable plans. | AI 先生成可审阅计划，再应用到时间轴的原则被确认。 / The reviewable-plan-before-apply principle is confirmed. | [ ] Pending | 参考 AI Edit Plan 结构。 / See AI Edit Plan structure. |
 | UA-08 | 阶段放行 / Phase gate | 当前阶段是否可以关闭，并进入下一阶段。 / Whether the current phase can close and the next phase can start. | UA-01 到 UA-07 全部通过，且用户明确同意进入下一阶段。 / UA-01 through UA-07 all pass, and the user explicitly approves moving forward. | [ ] Pending | `audit:phase1-readiness` 在放行前仍应输出 `phaseComplete: false`。 / `audit:phase1-readiness` should still report `phaseComplete: false` before release. |
 
+### 3.1 实机验收步骤 / Hands-On Acceptance Steps
+
+先运行 `npm run audit:phase1-handoff`，确认它输出 `status: "ready"`、最新录制路径、ProjectModel 恢复摘要和 UA-01 到 UA-08 的待验收列表。然后启动 `npm run dev:editor`，用同一个真实录制项目逐项验证。
+Run `npm run audit:phase1-handoff` first and confirm it reports `status: "ready"`, the latest recording path, ProjectModel restore summary, and pending UA-01 through UA-08. Then start `npm run dev:editor` and use the same real recording for the checks below.
+
+| ID | 实机步骤 / Hands-On Step | 失败记录 / Failure Note |
+|---|---|---|
+| UA-01 | 打开 `ProjectModel-Review-Packet.md`，确认 Project / Asset / Track / Clip / Scene / UI Source / AI Edit Plan 能承接 Screen Studio 底座、AI 剪辑、3D 运镜、Lottie、UI-aware motion 和多源画面。 / Open `ProjectModel-Review-Packet.md` and confirm Project / Asset / Track / Clip / Scene / UI Source / AI Edit Plan can support the Screen Studio-grade foundation, AI editing, 3D camera, Lottie, UI-aware motion, and multi-source composition. | 如果模型方向不对，写明缺少的实体或错误边界。 / If the model direction is wrong, note the missing entity or incorrect boundary. |
+| UA-02 | 完全退出并重启 Electron，检查预览画面、音频、Zoom/Focus、背景、光标设置、导出质量和时间轴片段是否恢复。 / Fully quit and restart Electron, then check preview picture, audio, Zoom/Focus, background, cursor settings, export quality, and timeline clips. | 记录丢失的是画面、音频、Zoom、背景、光标还是项目状态。 / Note whether picture, audio, Zoom, background, cursor, or project state is missing. |
+| UA-03 | 在真实时间轴上拖拽、拉伸、磁吸、滚轮缩放、移动游标，并测试重叠片段是否换到同类型子轨。 / On the real timeline, drag, resize, snap, wheel-zoom, move the playhead, and test whether overlapping clips wrap onto same-type child lanes. | 记录是否不跟手、闪烁、跳动、误改游标或片段错位。 / Note any non-following, flicker, jump, incorrect playhead movement, or clip misplacement. |
+| UA-04 | 播放真实录制，检查系统光标模拟、Zoom/Focus、背景虚化、黑屏尾部、基础播放和基础剪辑是否能组成一条软件宣传视频。 / Play the real recording and check system cursor simulation, Zoom/Focus, background blur, black tail, basic playback, and basic editing as one product-demo video. | 记录不达标的模块和具体时间点。 / Note the failing module and timestamp. |
+| UA-05 | 导出同一个项目，和预览对比画面、节奏、缩放、光标、背景、音频和主视频结束后的尾部。 / Export the same project and compare picture, timing, zoom, cursor, background, audio, and the tail after main-video end against preview. | 记录预览和导出分叉的位置。 / Note where preview and export diverge. |
+| UA-06 | 在当前 UI 中确认 Focus/Zoom 的操作语言是否仍然清楚，并判断未来是否应该命名为 Camera Clip。 / In the current UI, confirm whether Focus/Zoom interactions remain clear and decide whether the future name should become Camera Clip. | 记录需要改名、保留旧名或拆分概念的理由。 / Note whether to rename, keep the old name, or split the concept. |
+| UA-07 | 用一个真实宣传视频场景描述 AI 应该自动做的剪辑决策，并确认这些决策是否必须先进入可审阅计划。 / Describe one real product-demo scenario and identify which edit decisions AI should make, then confirm whether they must enter a reviewable plan first. | 记录 AI 可以自动执行和必须用户确认的边界。 / Note what AI may apply automatically and what requires user confirmation. |
+| UA-08 | 只有 UA-01 到 UA-07 全部通过后，才把对应状态改为 `[x] Accepted`，并将阶段结论改为 `Released / 已放行`。 / Only after UA-01 through UA-07 pass, change their states to `[x] Accepted` and change the phase conclusion to `Released / 已放行`. | 如果任一项失败，保持 `Not released / 未放行`。 / If any item fails, keep `Not released / 未放行`. |
+
 ## 4. 机器门禁记录 / Machine Gate Record
 
 | 命令 / Command | 目的 / Purpose | 当前要求 / Current Requirement |

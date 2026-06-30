@@ -34,6 +34,15 @@ const requiredPhrases = [
   "UA-06 | Camera/Focus 操作语言确认",
   "UA-07 | AI 自动剪辑真实用例确认",
   "UA-08 | 阶段放行",
+  "实机验收步骤 / Hands-On Acceptance Steps",
+  "status: \"ready\"",
+  "完全退出并重启 Electron",
+  "拖拽、拉伸、磁吸、滚轮缩放、移动游标",
+  "系统光标模拟、Zoom/Focus、背景虚化、黑屏尾部",
+  "导出同一个项目，和预览对比",
+  "未来是否应该命名为 Camera Clip",
+  "真实宣传视频场景",
+  "[x] Accepted",
   "Current phase status: **Not released / 未放行**",
 ];
 
