@@ -22,6 +22,7 @@ const requiredAuditScripts = [
   "audit:timeline-duration-domains",
   "audit:preview-project-time",
   "audit:export-black-tail-rendering",
+  "audit:screenstudio-core-contract",
   "audit:export-entrypoints",
   "audit:project-model-future",
   "audit:project-model-multisource",

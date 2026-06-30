@@ -78,6 +78,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:export-black-tail-rendering"],
   },
   {
+    id: "screenstudio-core-contract",
+    command: npmCommand,
+    args: ["run", "audit:screenstudio-core-contract"],
+  },
+  {
     id: "export-entrypoints",
     command: npmCommand,
     args: ["run", "audit:export-entrypoints"],
