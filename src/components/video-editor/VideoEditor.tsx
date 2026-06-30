@@ -37,6 +37,7 @@ import {
   createProjectFromLegacyEditorState,
   getProjectRenderSettings,
   resolveExportAudioRegions,
+  resolveRuntimeAudioRegions,
   restoreLegacyEditorStateFromProjectModel,
   validateVideoEditorProject,
 } from "./project";
@@ -272,6 +273,11 @@ export default function VideoEditor() {
     [currentProjectModel],
   );
 
+  const runtimeAudioRegions = useMemo(
+    () => resolveRuntimeAudioRegions(currentRenderSettings.timeline.audioRegions, audioRegions),
+    [currentRenderSettings.timeline.audioRegions, audioRegions],
+  );
+
   const currentTimeStateRef = useRef(currentTime);
   const timelineResizeLockRef = useRef(0);
   const projectClockRef = useRef<number | null>(null);
@@ -338,7 +344,7 @@ export default function VideoEditor() {
 
   // Web Audio Mixer for additional audio tracks
   useAudioMixer({ 
-    audioRegions, 
+    audioRegions: runtimeAudioRegions,
     isPlaying, 
     currentTime 
   });
@@ -1144,7 +1150,7 @@ export default function VideoEditor() {
       const renderSettings = currentRenderSettings;
       const exportAudioRegions = resolveExportAudioRegions(
         renderSettings.timeline.audioRegions,
-        audioRegions,
+        runtimeAudioRegions,
       );
 
       const aspectRatioValue = getAspectRatioValue(renderSettings.canvas.aspectRatio);
@@ -1253,7 +1259,7 @@ export default function VideoEditor() {
       setIsExporting(false);
       exporterRef.current = null;
     }
-  }, [videoPath, originalVideoPath, audioRegions, isPlaying, currentProjectModel, currentRenderSettings]);
+  }, [videoPath, originalVideoPath, runtimeAudioRegions, isPlaying, currentProjectModel, currentRenderSettings]);
 
   const handleCancelExport = useCallback(() => {
     if (exporterRef.current) {

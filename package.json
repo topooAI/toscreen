@@ -31,7 +31,8 @@
     "audit:project-model-review-packet": "tsx scripts/verify-project-model-review-packet.ts",
     "audit:project-model-sidecar-parity": "tsx scripts/verify-project-model-sidecar-parity.ts",
     "audit:project-model-review-doc": "tsx scripts/verify-project-model-review-doc.ts",
-    "audit:export-audio-render-settings": "tsx scripts/verify-export-audio-render-settings.ts"
+    "audit:export-audio-render-settings": "tsx scripts/verify-export-audio-render-settings.ts",
+    "audit:preview-audio-render-settings": "tsx scripts/verify-preview-audio-render-settings.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

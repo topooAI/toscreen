@@ -79,7 +79,7 @@ export function getProjectRenderSettings(project: VideoEditorProject): ProjectRe
   };
 }
 
-export function resolveExportAudioRegions(
+export function resolveRuntimeAudioRegions(
   renderSettingsAudioRegions: AudioRegion[],
   memoryAudioRegions: AudioRegion[],
 ): AudioRegion[] {
@@ -100,4 +100,11 @@ export function resolveExportAudioRegions(
       file: memoryRegion.file,
     };
   });
+}
+
+export function resolveExportAudioRegions(
+  renderSettingsAudioRegions: AudioRegion[],
+  memoryAudioRegions: AudioRegion[],
+): AudioRegion[] {
+  return resolveRuntimeAudioRegions(renderSettingsAudioRegions, memoryAudioRegions);
 }

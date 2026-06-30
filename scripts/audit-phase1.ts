@@ -117,6 +117,11 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:export-audio-render-settings"],
   },
+  {
+    id: "preview-audio-render-settings",
+    command: npmCommand,
+    args: ["run", "audit:preview-audio-render-settings"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];
