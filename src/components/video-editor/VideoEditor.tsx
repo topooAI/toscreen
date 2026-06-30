@@ -394,7 +394,9 @@ export default function VideoEditor() {
           if (projectResult.success && projectResult.project) {
             const restoredFrom = applyLoadedProject(projectResult.project);
             toast.success("工程已自动恢复");
-            console.info(`[ProjectModel] Auto-restored project via ${restoredFrom}`);
+            console.info(`[ProjectModel] Auto-restored project via ${restoredFrom}`, {
+              projectPath: projectResult.projectPath,
+            });
           } else {
             // New recording project! Auto-load the companion recorded audio track if available
             if ((result as any).audioPath) {
@@ -1333,7 +1335,9 @@ export default function VideoEditor() {
           const projectResult = await window.electronAPI.loadProject(path);
           if (projectResult.success && projectResult.project) {
             const restoredFrom = applyLoadedProject(projectResult.project);
-            console.info(`[ProjectModel] Drop-restored project via ${restoredFrom}`);
+            console.info(`[ProjectModel] Drop-restored project via ${restoredFrom}`, {
+              projectPath: projectResult.projectPath,
+            });
           }
         } else if (isAudio) {
           toast.success("成功识别音频", {

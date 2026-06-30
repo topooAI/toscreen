@@ -52,7 +52,7 @@ interface Window {
     generateProxyVideo: (inputPath: string) => Promise<{ success: boolean; proxyPath?: string; error?: string }>;
     onProxyGenerationProgress: (callback: (percent: number) => void) => () => void;
     saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean; error?: string; message?: string }>;
-    loadProject: (videoPath: string) => Promise<{ success: boolean; project?: any; message?: string }>;
+    loadProject: (videoPath: string) => Promise<{ success: boolean; project?: any; projectPath?: string; message?: string }>;
   }
 }
 

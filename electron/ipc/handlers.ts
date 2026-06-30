@@ -12,6 +12,11 @@ import {
 } from '../nativeRecorder'
 
 import { generateProxyVideo } from './proxyGenerator'
+import {
+  normalizeMediaPath,
+  projectPathCandidatesForMediaPath,
+  projectPathForMediaPath,
+} from './projectFiles'
 
 let selectedSource: any = null
 
@@ -437,21 +442,7 @@ export function registerIpcHandlers(
   // Read clicks.json for a given video path
   ipcMain.handle('read-clicks-json', async (_, videoPath: string) => {
     try {
-      // Robust path decoding for both encoded file:// URLs and raw paths
-      let normalizedPath = videoPath.replace(/^file:\/\/\//, '/').replace(/^file:\/\//, '');
-      
-      // Decode segments individually to be safe
-      normalizedPath = normalizedPath.split('/').map(part => {
-        try {
-          return decodeURIComponent(part);
-        } catch (e) {
-          return part;
-        }
-      }).join('/');
-      
-      // If it's a Windows absolute path that lost its slash, add it back if needed
-      // (though usually normalize handles this)
-      
+      const normalizedPath = normalizeMediaPath(videoPath);
       const clicksPath = normalizedPath + '.clicks.json';
 
       const content = await fs.readFile(clicksPath, 'utf-8');
@@ -471,9 +462,7 @@ export function registerIpcHandlers(
   ipcMain.handle('save-project', async (_, videoPath: string, projectData: any) => {
     try {
       if (!videoPath) return { success: false, message: 'No video path provided' };
-      const normalizedPath = videoPath.replace(/^file:\/\/\//, '/').replace(/^file:\/\//, '');
-      const parsed = path.parse(decodeURIComponent(normalizedPath));
-      const projectPath = path.join(parsed.dir, `${parsed.name}.project.json`);
+      const projectPath = projectPathForMediaPath(videoPath);
       await fs.writeFile(projectPath, JSON.stringify(projectData, null, 2), 'utf8');
       return { success: true };
     } catch (error) {
@@ -485,23 +474,29 @@ export function registerIpcHandlers(
   ipcMain.handle('load-project', async (_, videoPath: string) => {
     try {
       if (!videoPath) return { success: false, message: 'No video path provided' };
-      const normalizedPath = videoPath.replace(/^file:\/\/\//, '/').replace(/^file:\/\//, '');
-      const parsed = path.parse(decodeURIComponent(normalizedPath));
-      const projectPath = path.join(parsed.dir, `${parsed.name}.project.json`);
-      const rawData = await fs.readFile(projectPath, 'utf8');
-      return { success: true, project: JSON.parse(rawData) };
-    } catch (error) {
-      // Normal if project doesn't exist yet
+      const candidates = projectPathCandidatesForMediaPath(videoPath);
+
+      for (const projectPath of candidates) {
+        try {
+          const rawData = await fs.readFile(projectPath, 'utf8');
+          return { success: true, project: JSON.parse(rawData), projectPath };
+        } catch (error) {
+          const code = typeof error === 'object' && error && 'code' in error ? (error as { code?: string }).code : undefined;
+          if (code && code !== 'ENOENT') throw error;
+        }
+      }
+
       return { success: false, message: 'No project file found' };
+    } catch (error) {
+      console.error('[IPC] Failed to load project:', error);
+      return { success: false, message: 'Failed to load project', error: String(error) };
     }
   });
 
   // Proxy Generation API
   ipcMain.handle('generate-proxy-video', async (event, inputPath: string) => {
     try {
-      // Decode the URL if it comes from the frontend (file://)
-      let normalizedPath = inputPath.replace(/^file:\/\/\//, '/').replace(/^file:\/\//, '');
-      normalizedPath = decodeURIComponent(normalizedPath);
+      const normalizedPath = normalizeMediaPath(inputPath);
 
       // We'll send progress back through a specific IPC event
       const result = await generateProxyVideo(normalizedPath, (progressPercent) => {
