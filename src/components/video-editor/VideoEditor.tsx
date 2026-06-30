@@ -35,6 +35,7 @@ import { type AspectRatio, getAspectRatioValue } from "@/utils/aspectRatioUtils"
 import { getAssetPath } from "@/lib/assetPath";
 import {
   createProjectFromLegacyEditorState,
+  getProjectRenderSettings,
   restoreLegacyEditorStateFromProjectModel,
   validateVideoEditorProject,
 } from "./project";
@@ -1091,7 +1092,38 @@ export default function VideoEditor() {
         return;
       }
 
-      const aspectRatioValue = getAspectRatioValue(aspectRatio);
+      const exportProjectModel = createProjectFromLegacyEditorState({
+        videoPath,
+        originalVideoPath,
+        companionAudioPath,
+        durationSeconds: duration,
+        projectDurationSeconds: projectDuration,
+        zoomRegions,
+        trimRegions,
+        annotationRegions,
+        audioRegions,
+        cursorData,
+        cursorSize,
+        cursorSmoothing,
+        showVectorCursor,
+        cursorOffset,
+        cropRegion,
+        wallpaper,
+        shadowIntensity,
+        showBlur,
+        motionBlurEnabled,
+        borderRadius,
+        padding,
+        aspectRatio,
+        exportQuality,
+      });
+      const exportProjectValidation = validateVideoEditorProject(exportProjectModel);
+      if (!exportProjectValidation.valid) {
+        console.warn("[ProjectModel] Export render settings source is invalid", exportProjectValidation.errors);
+      }
+      const renderSettings = getProjectRenderSettings(exportProjectModel);
+
+      const aspectRatioValue = getAspectRatioValue(renderSettings.canvas.aspectRatio);
       const sourceWidth = video.videoWidth || 1920;
       const sourceHeight = video.videoHeight || 1080;
 
@@ -1099,14 +1131,14 @@ export default function VideoEditor() {
       let exportHeight: number;
       let bitrate: number;
 
-      if (exportQuality === 'source') {
+      if (renderSettings.exportSettings.quality === 'source') {
         // Use source resolution
         exportWidth = sourceWidth;
         exportHeight = sourceHeight;
         bitrate = 30_000_000;
       } else {
         // Use quality-based target resolution
-        const targetHeight = exportQuality === 'medium' ? 720 : 1080;
+        const targetHeight = renderSettings.exportSettings.quality === 'medium' ? 720 : 1080;
 
         // Calculate dimensions maintaining aspect ratio
         exportHeight = Math.floor(targetHeight / 2) * 2; // Ensure even
@@ -1138,25 +1170,25 @@ export default function VideoEditor() {
         height: exportHeight,
         frameRate: 30, // Optimized for speed
         bitrate: Math.min(bitrate, 15_000_000),
-        wallpaper,
-        zoomRegions,
-        trimRegions,
-        annotationRegions,
+        wallpaper: renderSettings.canvas.wallpaper,
+        zoomRegions: renderSettings.timeline.zoomRegions,
+        trimRegions: renderSettings.timeline.trimRegions,
+        annotationRegions: renderSettings.timeline.annotationRegions,
         audioRegions,
-        showShadow: shadowIntensity > 0,
-        shadowIntensity,
-        showBlur,
-        motionBlurEnabled,
-        borderRadius,
-        padding,
-        cropRegion,
+        showShadow: renderSettings.canvas.shadowIntensity > 0,
+        shadowIntensity: renderSettings.canvas.shadowIntensity,
+        showBlur: renderSettings.canvas.showBlur,
+        motionBlurEnabled: renderSettings.effects.motionBlurEnabled,
+        borderRadius: renderSettings.canvas.borderRadius,
+        padding: renderSettings.canvas.padding,
+        cropRegion: renderSettings.canvas.cropRegion,
         previewWidth,
         previewHeight,
-        cursorData,
-        cursorSize,
-        cursorSmoothing,
-        showVectorCursor,
-        cursorOffset,
+        cursorData: renderSettings.cursor.data,
+        cursorSize: renderSettings.cursor.size,
+        cursorSmoothing: renderSettings.cursor.smoothing,
+        showVectorCursor: renderSettings.cursor.showVectorCursor,
+        cursorOffset: renderSettings.cursor.offsetMs,
         onProgress: (progress: ExportProgress) => {
           setExportProgress(progress);
         },
@@ -1197,7 +1229,7 @@ export default function VideoEditor() {
       setIsExporting(false);
       exporterRef.current = null;
     }
-  }, [videoPath, wallpaper, zoomRegions, trimRegions, shadowIntensity, showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, annotationRegions, isPlaying, aspectRatio, exportQuality, originalVideoPath, cursorData, cursorSize, cursorSmoothing, showVectorCursor, cursorOffset, audioRegions]);
+  }, [videoPath, originalVideoPath, companionAudioPath, duration, projectDuration, zoomRegions, trimRegions, annotationRegions, audioRegions, cursorData, cursorSize, cursorSmoothing, showVectorCursor, cursorOffset, cropRegion, wallpaper, shadowIntensity, showBlur, motionBlurEnabled, borderRadius, padding, aspectRatio, exportQuality, isPlaying]);
 
   const handleCancelExport = useCallback(() => {
     if (exporterRef.current) {
