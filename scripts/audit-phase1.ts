@@ -107,6 +107,11 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:project-model-sidecar-parity"],
   },
+  {
+    id: "project-model-review-doc",
+    command: npmCommand,
+    args: ["run", "audit:project-model-review-doc"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];
