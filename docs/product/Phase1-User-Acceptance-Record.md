@@ -90,7 +90,7 @@ Run `npm run audit:phase1-handoff` first and confirm it reports `status: "ready"
 | 命令 / Command | 目的 / Purpose | 当前要求 / Current Requirement |
 |---|---|---|
 | `npm run audit:phase1` | Phase 1 聚合机器门禁。 / Aggregate Phase 1 machine gate. | 必须通过。 / Must pass. |
-| `npm run audit:phase1-readiness` | 输出机器已验证项和剩余用户验收项。 / Reports machine-verified items and remaining user checkpoints. | 放行前必须输出 `phaseComplete: false`；全部验收并改为 `Released / 已放行` 后才允许输出 `phaseComplete: true`。 / Must output `phaseComplete: false` before release; it may output `phaseComplete: true` only after every item is accepted and the status is changed to `Released / 已放行`. |
+| `npm run audit:phase1-readiness` | 输出机器已验证项、剩余用户验收项和 `acceptancePlan`。 / Reports machine-verified items, remaining user checkpoints, and `acceptancePlan`. | 放行前必须输出 `phaseComplete: false`；全部验收并改为 `Released / 已放行` 后才允许输出 `phaseComplete: true`；`acceptancePlan.machineEvidence` 必须引用真实 npm scripts。 / Must output `phaseComplete: false` before release; it may output `phaseComplete: true` only after every item is accepted and the status is changed to `Released / 已放行`; `acceptancePlan.machineEvidence` must reference real npm scripts. |
 | `npm run audit:recordings` | 检查真实最新录制项目恢复证据。 / Checks restore evidence for the latest real recording. | 必须通过，并输出 `coreRestore`。 / Must pass and output `coreRestore`. |
 | `npm run audit:phase1-handoff` | 输出实机验收前预检包。 / Outputs the hands-on acceptance handoff packet. | 必须能找到最新真实录制、合法 ProjectModel sidecar、待验收 UA 列表、`handsOnSteps` 和 `acceptancePlan`；`acceptancePlan.machineEvidence` 必须引用真实 npm scripts。 / Must find the latest real recording, valid ProjectModel sidecar, pending UA list, `handsOnSteps`, and `acceptancePlan`; `acceptancePlan.machineEvidence` must reference real npm scripts. |
 

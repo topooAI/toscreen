@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parsePhase1AcceptanceState } from "./phase1AcceptanceState";
+import {
+  buildAcceptancePlan,
+  parseHandsOnSteps,
+  validateAcceptancePlanEvidence,
+} from "./phase1AcceptancePlan";
 
 const repoRoot = process.cwd();
 const packageJsonPath = path.join(repoRoot, "package.json");
@@ -32,6 +37,8 @@ const architectureDoc = fs.readFileSync(architectureDocPath, "utf8");
 const reviewPacket = fs.readFileSync(reviewPacketPath, "utf8");
 const userAcceptance = fs.readFileSync(userAcceptancePath, "utf8");
 const userAcceptanceState = parsePhase1AcceptanceState(userAcceptance);
+const handsOnSteps = parseHandsOnSteps(userAcceptance);
+const acceptancePlan = buildAcceptancePlan(userAcceptanceState.checkedIds, handsOnSteps);
 
 const requiredMachineGates = [
   "audit:phase1",
@@ -113,6 +120,10 @@ const missingUserCheckpoints = requiredUserCheckpoints.filter(
 const missingUserAcceptanceItems = requiredUserCheckpoints.filter(
   (phrase) => !userAcceptance.includes(phrase),
 );
+const acceptancePlanEvidenceErrors = validateAcceptancePlanEvidence(
+  acceptancePlan,
+  packageScripts,
+);
 
 const failures = {
   missingPackageScripts,
@@ -121,6 +132,7 @@ const failures = {
   missingReviewPacketPhrases,
   missingUserCheckpoints,
   missingUserAcceptanceItems,
+  acceptancePlanEvidenceErrors,
 };
 
 const hasFailures = Object.values(failures).some((items) => items.length > 0);
@@ -151,6 +163,7 @@ console.log(JSON.stringify({
     currentPhaseStatus: userAcceptanceState.currentPhaseStatus,
     phaseReleased: userAcceptanceState.phaseReleased,
   },
+  acceptancePlan,
   phaseComplete: userAcceptanceState.phaseReleased,
   reason: userAcceptanceState.phaseReleased
     ? "Phase 1 user acceptance is complete and the acceptance record is marked released."
