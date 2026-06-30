@@ -198,6 +198,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:phase1-user-acceptance-doc"],
   },
   {
+    id: "phase1-handoff",
+    command: npmCommand,
+    args: ["run", "audit:phase1-handoff"],
+  },
+  {
     id: "export-audio-render-settings",
     command: npmCommand,
     args: ["run", "audit:export-audio-render-settings"],

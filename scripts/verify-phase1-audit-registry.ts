@@ -46,6 +46,7 @@ const requiredAuditScripts = [
   "audit:phase1-readiness",
   "audit:phase1-acceptance-state",
   "audit:phase1-user-acceptance-doc",
+  "audit:phase1-handoff",
   "audit:export-audio-render-settings",
   "audit:preview-audio-render-settings",
   "audit:phase1-registry",

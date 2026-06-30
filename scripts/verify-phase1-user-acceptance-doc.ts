@@ -16,6 +16,7 @@ const requiredPhrases = [
   "npm run audit:phase1",
   "npm run audit:phase1-readiness",
   "npm run audit:recordings",
+  "npm run audit:phase1-handoff",
   "phaseComplete: false",
   "phaseComplete: true",
   "coreRestore",
