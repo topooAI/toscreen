@@ -818,12 +818,13 @@ export default function TimelineEditor({
   onTimelineResizeEnd,
   videoPath,
 }: TimelineEditorProps) {
-  const totalMs = useMemo(() => Math.max(0, Math.round((sourceVideoDuration ?? videoDuration) * 1000)), [sourceVideoDuration, videoDuration]);
   const projectTotalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
+  const sourceTotalMs = useMemo(() => Math.max(0, Math.round((sourceVideoDuration ?? videoDuration) * 1000)), [sourceVideoDuration, videoDuration]);
+  const totalMs = projectTotalMs;
   const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
 
   const isTrimTrackVisible = false; // 用户强制要求删除 Trim UI
-  const { effectiveDurationMs, mapSourceToEffective, mapEffectiveToSource } = useTimeMap(trimRegions, totalMs);
+  const { effectiveDurationMs, mapSourceToEffective, mapEffectiveToSource } = useTimeMap(trimRegions, sourceTotalMs);
   
   const activeDurationMs = isTrimTrackVisible ? projectTotalMs : Math.max(projectTotalMs, effectiveDurationMs);
   const activeCurrentTimeMs = isTrimTrackVisible ? currentTimeMs : mapSourceToEffective(currentTimeMs);
@@ -904,11 +905,11 @@ export default function TimelineEditor({
     }
 
     zoomRegions.forEach((region) => {
-      const clampedStart = Math.max(0, Math.min(region.startMs, totalMs));
+      const clampedStart = Math.max(0, Math.min(region.startMs, projectTotalMs));
       const minEnd = clampedStart + safeMinDurationMs;
-      const clampedEnd = Math.min(totalMs, Math.max(minEnd, region.endMs));
-      const normalizedStart = Math.max(0, Math.min(clampedStart, totalMs - safeMinDurationMs));
-      const normalizedEnd = Math.max(minEnd, Math.min(clampedEnd, totalMs));
+      const clampedEnd = Math.min(projectTotalMs, Math.max(minEnd, region.endMs));
+      const normalizedStart = Math.max(0, Math.min(clampedStart, projectTotalMs - safeMinDurationMs));
+      const normalizedEnd = Math.max(minEnd, Math.min(clampedEnd, projectTotalMs));
 
       if (normalizedStart !== region.startMs || normalizedEnd !== region.endMs) {
         onZoomSpanChange(region.id, { start: normalizedStart, end: normalizedEnd });
@@ -916,17 +917,17 @@ export default function TimelineEditor({
     });
 
     trimRegions.forEach((region) => {
-      const clampedStart = Math.max(0, Math.min(region.startMs, totalMs));
+      const clampedStart = Math.max(0, Math.min(region.startMs, sourceTotalMs));
       const minEnd = clampedStart + safeMinDurationMs;
-      const clampedEnd = Math.min(totalMs, Math.max(minEnd, region.endMs));
-      const normalizedStart = Math.max(0, Math.min(clampedStart, totalMs - safeMinDurationMs));
-      const normalizedEnd = Math.max(minEnd, Math.min(clampedEnd, totalMs));
+      const clampedEnd = Math.min(sourceTotalMs, Math.max(minEnd, region.endMs));
+      const normalizedStart = Math.max(0, Math.min(clampedStart, sourceTotalMs - safeMinDurationMs));
+      const normalizedEnd = Math.max(minEnd, Math.min(clampedEnd, sourceTotalMs));
 
       if (normalizedStart !== region.startMs || normalizedEnd !== region.endMs) {
         onTrimSpanChange?.(region.id, { start: normalizedStart, end: normalizedEnd });
       }
     });
-  }, [zoomRegions, trimRegions, annotationRegions, totalMs, safeMinDurationMs, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange]);
+  }, [zoomRegions, trimRegions, projectTotalMs, sourceTotalMs, safeMinDurationMs, onZoomSpanChange, onTrimSpanChange]);
 
   const hasOverlap = useCallback((newSpan: Span, excludeId?: string, targetRowId?: string): boolean => {
     const mapTime = (time: number) => (isTrimTrackVisible || !mapSourceToEffective) ? time : mapSourceToEffective(time);
@@ -1294,7 +1295,7 @@ export default function TimelineEditor({
     const videos: TimelineRenderItem[] = [{
       id: 'video-track',
       rowId: VIDEO_ROW_ID,
-      span: { start: 0, end: mapTime(totalMs) },
+      span: { start: 0, end: mapTime(sourceTotalMs) },
       label: 'Main Track',
       variant: 'video',
       sourceUrl: videoPath,
@@ -1302,7 +1303,7 @@ export default function TimelineEditor({
       associatedAudio: originalAudio ? {
         ...originalAudio,
         sourceStartMs: 0,
-        sourceEndMs: totalMs,
+        sourceEndMs: sourceTotalMs,
       } : undefined,
     }];
     
@@ -1413,21 +1414,21 @@ export default function TimelineEditor({
         }
         currentSourceStart = trim.endMs;
       });
-      if (currentSourceStart < totalMs) {
+      if (currentSourceStart < sourceTotalMs) {
          mainClips.push({
              id: `main-clip-final`,
              rowId: VIDEO_ROW_ID,
-             span: { start: mapTime(currentSourceStart), end: mapTime(totalMs) },
+             span: { start: mapTime(currentSourceStart), end: mapTime(sourceTotalMs) },
              label: 'Main Clip',
              variant: 'video',
              sourceUrl: videoPath,
              sourceStartMs: currentSourceStart,
-             sourceEndMs: totalMs,
-             totalDurationMs: totalMs - currentSourceStart,
+             sourceEndMs: sourceTotalMs,
+             totalDurationMs: sourceTotalMs - currentSourceStart,
              associatedAudio: originalAudio ? {
                ...originalAudio,
                sourceStartMs: currentSourceStart,
-               sourceEndMs: totalMs,
+               sourceEndMs: sourceTotalMs,
              } : undefined,
          });
       }
@@ -1436,7 +1437,7 @@ export default function TimelineEditor({
     const videoItems = isTrimTrackVisible ? videos : mainClips;
     return [...videoItems, ...zooms, ...trims, ...annotations, ...audios];
   }, [
-    isTrimTrackVisible, mapSourceToEffective, totalMs, zoomRegions, 
+    isTrimTrackVisible, mapSourceToEffective, sourceTotalMs, zoomRegions,
     trimRegions, annotationRegions, audioRegions, totalMs, waveformCache, videoPath
   ]);
 

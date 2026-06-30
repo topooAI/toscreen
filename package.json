@@ -18,6 +18,7 @@
     "audit:preview-export-contract": "tsx scripts/verify-preview-export-contract.ts",
     "audit:project-duration": "tsx scripts/verify-project-duration-contract.ts",
     "audit:export-duration-render-settings": "tsx scripts/verify-export-duration-render-settings.ts",
+    "audit:timeline-duration-domains": "tsx scripts/verify-timeline-duration-domains.ts",
     "audit:project-model-smoke": "tsx scripts/audit-project-model-smoke.ts",
     "audit:project-model-restore": "tsx scripts/verify-project-model-restore.ts",
     "audit:project-model-roundtrip": "tsx scripts/verify-project-model-roundtrip.ts",

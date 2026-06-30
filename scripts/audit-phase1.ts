@@ -63,6 +63,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:export-duration-render-settings"],
   },
   {
+    id: "timeline-duration-domains",
+    command: npmCommand,
+    args: ["run", "audit:timeline-duration-domains"],
+  },
+  {
     id: "export-entrypoints",
     command: npmCommand,
     args: ["run", "audit:export-entrypoints"],

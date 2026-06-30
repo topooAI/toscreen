@@ -19,6 +19,7 @@ const requiredAuditScripts = [
   "audit:preview-export-contract",
   "audit:project-duration",
   "audit:export-duration-render-settings",
+  "audit:timeline-duration-domains",
   "audit:export-entrypoints",
   "audit:project-model-future",
   "audit:project-model-multisource",
