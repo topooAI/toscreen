@@ -823,7 +823,8 @@ Default Phase 1 execution rule: Codex can independently move engineering stabili
 | PH1-13 实际录制目录恢复审计 / Real recordings restore audit | ✅ Done | 已新增 `npm run audit:recordings`，并验证当前真实最新录制可找到 video、proxy、audio、project，ProjectModel 合法且可恢复 `temp_audio_1782710530746.mov`。 / Added `npm run audit:recordings` and verified the real latest recording resolves video, proxy, audio, project; ProjectModel is valid and restores `temp_audio_1782710530746.mov`. |
 | PH1-14 Electron 恢复日志证据 / Electron restore log evidence | ✅ Done | 自动恢复和拖入恢复现在会输出 `restoredFrom`、`projectPath`、`companionAudioPath`，便于重启后确认 ProjectModel 是否真的恢复原始伴随音频。 / Auto-restore and drop-restore now log `restoredFrom`, `projectPath`, and `companionAudioPath`, making restart recovery evidence visible in Electron. |
 | PH1-15 未来能力模型入口 / Future capability model entries | ✅ Done | ProjectModel 现在包含 `uiSources`、`ui-element-motion`、`aiEditPlans`，并新增 `npm run audit:project-model-future` 验证 UI-aware motion 和 AI Edit Plan 的最小可用结构。 / ProjectModel now includes `uiSources`, `ui-element-motion`, and `aiEditPlans`, with `npm run audit:project-model-future` validating the minimal UI-aware motion and AI Edit Plan structure. |
-| PH1-16 用户模型确认 / User model review | ⏳ Pending | 需要用户确认 Project / Asset / Track / Clip / UI Source / AI Edit Plan 方向是否符合未来产品。 / User should confirm whether the Project / Asset / Track / Clip / UI Source / AI Edit Plan direction matches the product vision. |
+| PH1-16 Phase 1 聚合审计 / Phase 1 aggregate audit | ✅ Done | 已新增 `npm run audit:phase1`，统一执行 TypeScript 门禁、真实录制恢复审计和未来模型入口审计。 / Added `npm run audit:phase1` to run TypeScript, real recording restore, and future model entry audits together. |
+| PH1-17 用户模型确认 / User model review | ⏳ Pending | 需要用户确认 Project / Asset / Track / Clip / UI Source / AI Edit Plan 方向是否符合未来产品。 / User should confirm whether the Project / Asset / Track / Clip / UI Source / AI Edit Plan direction matches the product vision. |
 
 ## 14. 决策日志 / Decision Log
 
@@ -857,3 +858,5 @@ Default Phase 1 execution rule: Codex can independently move engineering stabili
   Phase 1 Electron restore observability update: auto-restore and drop-restore logs now include restore source, project path, and `companionAudioPath`, making companion-audio recovery easier to verify after restart.
 - Phase 1 未来能力入口更新：ProjectModel 增加 `uiSources`、`ui-element-motion` 和 `aiEditPlans`，让 UI 源文件衔接动画、AI 自动剪辑计划先以可校验数据结构存在，暂不进入 UI 实现。
   Phase 1 future capability entry update: ProjectModel now includes `uiSources`, `ui-element-motion`, and `aiEditPlans`, so UI-source-driven motion and AI edit plans exist as validatable data structures before UI implementation.
+- Phase 1 聚合审计更新：新增 `audit:phase1`，把 TypeScript、真实录制恢复和未来模型入口审计合并成一条命令，作为后续小步迭代的基础门禁。
+  Phase 1 aggregate audit update: added `audit:phase1`, combining TypeScript, real recording restore, and future model entry audits into one baseline gate for later iterations.

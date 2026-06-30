@@ -1,0 +1,64 @@
+import { spawnSync } from "node:child_process";
+import path from "node:path";
+
+interface AuditStep {
+  id: string;
+  command: string;
+  args: string[];
+}
+
+const isWindows = process.platform === "win32";
+const npmCommand = isWindows ? "npm.cmd" : "npm";
+const tscCommand = path.join(
+  process.cwd(),
+  "node_modules",
+  ".bin",
+  isWindows ? "tsc.cmd" : "tsc",
+);
+
+const steps: AuditStep[] = [
+  {
+    id: "typescript",
+    command: tscCommand,
+    args: ["--noEmit"],
+  },
+  {
+    id: "recording-restore",
+    command: npmCommand,
+    args: ["run", "audit:recordings"],
+  },
+  {
+    id: "future-model-entries",
+    command: npmCommand,
+    args: ["run", "audit:project-model-future"],
+  },
+];
+
+const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];
+
+for (const step of steps) {
+  console.log(`\n[phase1-audit] ${step.id}: ${step.command} ${step.args.join(" ")}`);
+  const result = spawnSync(step.command, step.args, {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: "inherit",
+  });
+
+  const exitCode = result.status;
+  if (exitCode !== 0) {
+    results.push({ id: step.id, status: "failed", exitCode });
+    console.error(JSON.stringify({
+      status: "failed",
+      failedStep: step.id,
+      results,
+    }, null, 2));
+    process.exit(exitCode ?? 1);
+  }
+
+  results.push({ id: step.id, status: "ok", exitCode });
+}
+
+console.log(JSON.stringify({
+  status: "ok",
+  results,
+}, null, 2));
