@@ -67,6 +67,11 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:project-model-multisource"],
   },
+  {
+    id: "camera-model-entries",
+    command: npmCommand,
+    args: ["run", "audit:project-model-camera"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];

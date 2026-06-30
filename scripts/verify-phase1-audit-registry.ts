@@ -20,6 +20,7 @@ const requiredAuditScripts = [
   "audit:export-entrypoints",
   "audit:project-model-future",
   "audit:project-model-multisource",
+  "audit:project-model-camera",
   "audit:phase1-registry",
 ];
 

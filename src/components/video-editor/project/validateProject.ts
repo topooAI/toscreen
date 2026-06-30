@@ -126,6 +126,44 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     if (clip.assetId && !assetIds.has(clip.assetId)) {
       errors.push(`Clip ${clip.id || "(missing id)"} references missing asset ${clip.assetId}.`);
     }
+    if (clip.type === "camera") {
+      const props = isRecord(clip.props) ? clip.props : undefined;
+      const mode = props?.mode;
+      if (!isOneOf(mode, ["zoom", "pan", "focus", "three-d"])) {
+        errors.push(`Camera clip ${clip.id || "(missing id)"} mode is invalid or missing.`);
+      }
+      if (props?.easing !== undefined && !isOneOf(props.easing, ["linear", "smooth", "spring", "catmull-rom"])) {
+        errors.push(`Camera clip ${clip.id || "(missing id)"} easing is invalid.`);
+      }
+      if (mode === "zoom") {
+        if (!isZoomDepth(props?.depth)) {
+          errors.push(`Camera clip ${clip.id || "(missing id)"} zoom depth is invalid or missing.`);
+        }
+        validateFocus(props?.focus, `Camera clip ${clip.id || "(missing id)"} zoom focus`, errors);
+      }
+      if (mode === "pan" || mode === "focus") {
+        validateFocus(props?.focus, `Camera clip ${clip.id || "(missing id)"} ${mode} focus`, errors);
+      }
+      if (mode === "three-d") {
+        const threeD = isRecord(props?.threeD) ? props.threeD : undefined;
+        if (!threeD) {
+          errors.push(`Camera clip ${clip.id || "(missing id)"} threeD settings are required.`);
+        } else {
+          const threeDKeys = ["rotateX", "rotateY", "rotateZ", "translateZ", "perspective"] as const;
+          threeDKeys.forEach((key) => {
+            if (!isFiniteNumber(threeD[key])) {
+              errors.push(`Camera clip ${clip.id || "(missing id)"} threeD.${key} must be finite.`);
+            }
+          });
+          if (isFiniteNumber(threeD.perspective) && threeD.perspective <= 0) {
+            errors.push(`Camera clip ${clip.id || "(missing id)"} threeD.perspective must be positive.`);
+          }
+          if (threeD.depthOfField !== undefined && !isFiniteNumber(threeD.depthOfField)) {
+            errors.push(`Camera clip ${clip.id || "(missing id)"} threeD.depthOfField must be finite.`);
+          }
+        }
+      }
+    }
     if (clip.type === "presenter") {
       const props = isRecord(clip.props) ? clip.props : undefined;
       const sourceKind = props?.sourceKind;
@@ -282,4 +320,22 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
   return typeof value === "string" && allowed.includes(value as T);
+}
+
+function isZoomDepth(value: unknown): boolean {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 6;
+}
+
+function validateFocus(value: unknown, label: string, errors: string[]) {
+  const focus = isRecord(value) ? value : undefined;
+  if (!focus) {
+    errors.push(`${label} is required.`);
+    return;
+  }
+  ["cx", "cy"].forEach((key) => {
+    const coordinate = focus[key];
+    if (!isFiniteNumber(coordinate) || coordinate < 0 || coordinate > 1) {
+      errors.push(`${label}.${key} must be a finite normalized value between 0 and 1.`);
+    }
+  });
 }
