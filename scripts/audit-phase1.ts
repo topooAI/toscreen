@@ -133,6 +133,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:project-model-asset-compatibility"],
   },
   {
+    id: "project-model-motion-clips",
+    command: npmCommand,
+    args: ["run", "audit:project-model-motion-clips"],
+  },
+  {
     id: "project-model-ai-plan",
     command: npmCommand,
     args: ["run", "audit:project-model-ai-plan"],

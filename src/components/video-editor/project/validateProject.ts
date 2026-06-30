@@ -231,6 +231,9 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       const props = isRecord(clip.props) ? clip.props : undefined;
       const uiSourceId = typeof props?.uiSourceId === "string" ? props.uiSourceId : "";
       const elementId = typeof props?.elementId === "string" ? props.elementId : "";
+      if (!props) {
+        errors.push(`Clip ${clip.id || "(missing id)"} props are required.`);
+      }
       if (!uiSourceId) {
         errors.push(`Clip ${clip.id || "(missing id)"} uiSourceId is required.`);
       } else if (!uiSourceIds.has(uiSourceId)) {
@@ -240,6 +243,62 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
         errors.push(`Clip ${clip.id || "(missing id)"} elementId is required.`);
       } else if (uiSourceId && uiElementIdsBySource.has(uiSourceId) && !uiElementIdsBySource.get(uiSourceId)?.has(elementId)) {
         errors.push(`Clip ${clip.id || "(missing id)"} references missing UI element ${elementId}.`);
+      }
+      if (props) {
+        if (!isOneOf(props.action, ["highlight", "move", "scale", "fade", "morph", "click", "scroll", "custom"])) {
+          errors.push(`Clip ${clip.id || "(missing id)"} UI motion action is invalid or missing.`);
+        }
+        if (props.easing !== undefined && !isOneOf(props.easing, ["linear", "smooth", "spring", "catmull-rom"])) {
+          errors.push(`Clip ${clip.id || "(missing id)"} UI motion easing is invalid.`);
+        }
+        validateOptionalMotionBounds(props.from, `Clip ${clip.id || "(missing id)"} UI motion from`, errors);
+        validateOptionalMotionBounds(props.to, `Clip ${clip.id || "(missing id)"} UI motion to`, errors);
+        const generatedFrom = isRecord(props.generatedFrom) ? props.generatedFrom : undefined;
+        if (generatedFrom) {
+          if (generatedFrom.recordingEventId !== undefined && typeof generatedFrom.recordingEventId !== "string") {
+            errors.push(`Clip ${clip.id || "(missing id)"} generatedFrom.recordingEventId must be a string.`);
+          }
+          if (generatedFrom.aiPlanStepId !== undefined && typeof generatedFrom.aiPlanStepId !== "string") {
+            errors.push(`Clip ${clip.id || "(missing id)"} generatedFrom.aiPlanStepId must be a string.`);
+          }
+        }
+      }
+    }
+    if (clip.type === "lottie") {
+      const props = isRecord(clip.props) ? clip.props : undefined;
+      if (!props) {
+        errors.push(`Lottie clip ${clip.id || "(missing id)"} props are required.`);
+      } else {
+        const playback = isRecord(props.playback) ? props.playback : undefined;
+        if (!playback) {
+          errors.push(`Lottie clip ${clip.id || "(missing id)"} playback is required.`);
+        } else {
+          if (typeof playback.loop !== "boolean") {
+            errors.push(`Lottie clip ${clip.id || "(missing id)"} playback.loop must be boolean.`);
+          }
+          if (!isFiniteNumber(playback.speed) || playback.speed <= 0) {
+            errors.push(`Lottie clip ${clip.id || "(missing id)"} playback.speed must be positive.`);
+          }
+          if (playback.direction !== 1 && playback.direction !== -1) {
+            errors.push(`Lottie clip ${clip.id || "(missing id)"} playback.direction must be 1 or -1.`);
+          }
+        }
+
+        const transform = isRecord(props.transform) ? props.transform : undefined;
+        if (!transform) {
+          errors.push(`Lottie clip ${clip.id || "(missing id)"} transform is required.`);
+        } else {
+          validateRequiredTransform(transform, `Lottie clip ${clip.id || "(missing id)"} transform`, errors);
+        }
+
+        const colorOverrides = isRecord(props.colorOverrides) ? props.colorOverrides : undefined;
+        if (colorOverrides) {
+          Object.entries(colorOverrides).forEach(([key, value]) => {
+            if (typeof value !== "string") {
+              errors.push(`Lottie clip ${clip.id || "(missing id)"} colorOverrides.${key} must be a string.`);
+            }
+          });
+        }
       }
     }
     if (!Number.isFinite(clip.startMs) || !Number.isFinite(clip.endMs)) {
@@ -412,6 +471,48 @@ function validateTimeRange(startMs: unknown, endMs: unknown, label: string, erro
     errors.push(`${label} startMs/endMs must be non-negative.`);
   } else if (endMs < startMs) {
     errors.push(`${label} endMs is before startMs.`);
+  }
+}
+
+function validateRequiredTransform(value: Record<string, unknown>, label: string, errors: string[]) {
+  const transformKeys = ["x", "y", "width", "height", "rotation", "opacity"] as const;
+  transformKeys.forEach((key) => {
+    if (!isFiniteNumber(value[key])) {
+      errors.push(`${label}.${key} must be finite.`);
+    }
+  });
+  validatePositiveSize(value.width, `${label}.width`, errors);
+  validatePositiveSize(value.height, `${label}.height`, errors);
+  validateOpacity(value.opacity, `${label}.opacity`, errors);
+}
+
+function validateOptionalMotionBounds(value: unknown, label: string, errors: string[]) {
+  if (value === undefined) return;
+  const bounds = isRecord(value) ? value : undefined;
+  if (!bounds) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+
+  ["x", "y", "width", "height", "opacity", "rotation"].forEach((key) => {
+    if (bounds[key] !== undefined && !isFiniteNumber(bounds[key])) {
+      errors.push(`${label}.${key} must be finite.`);
+    }
+  });
+  if (bounds.width !== undefined) validatePositiveSize(bounds.width, `${label}.width`, errors);
+  if (bounds.height !== undefined) validatePositiveSize(bounds.height, `${label}.height`, errors);
+  if (bounds.opacity !== undefined) validateOpacity(bounds.opacity, `${label}.opacity`, errors);
+}
+
+function validatePositiveSize(value: unknown, label: string, errors: string[]) {
+  if (isFiniteNumber(value) && value <= 0) {
+    errors.push(`${label} must be positive.`);
+  }
+}
+
+function validateOpacity(value: unknown, label: string, errors: string[]) {
+  if (isFiniteNumber(value) && (value < 0 || value > 1)) {
+    errors.push(`${label} must be between 0 and 1.`);
   }
 }
 
