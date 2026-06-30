@@ -133,6 +133,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
   const [videoReady, setVideoReady] = useState(false);
   const videoSpriteRef = useRef<Sprite | null>(null);
   const maskGraphicsRef = useRef<Graphics | null>(null);
+  const blackTailGraphicsRef = useRef<Graphics | null>(null);
   const blurFilterRef = useRef<BlurFilter | null>(null);
 
   const {
@@ -280,6 +281,19 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
       baseMaskRef.current = result.maskRect;
       cropBoundsRef.current = result.cropBounds;
 
+      const blackTailGraphics = blackTailGraphicsRef.current;
+      if (blackTailGraphics) {
+        blackTailGraphics.clear();
+        blackTailGraphics.roundRect(
+          result.maskRect.x,
+          result.maskRect.y,
+          result.maskRect.width,
+          result.maskRect.height,
+          borderRadius,
+        );
+        blackTailGraphics.fill({ color: 0x000000 });
+      }
+
       cameraContainer.scale.set(1);
       cameraContainer.position.set(0, 0);
 
@@ -425,7 +439,19 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
     };
 
     const ticker = () => {
-      const { strength, focus, depth } = findInterpolatedTarget(zoomRegionsRef.current, (videoRef.current?.currentTime || 0) * 1000);
+      const video = videoRef.current;
+      const projectTimeMs = Number.isFinite(currentTimeRef.current)
+        ? currentTimeRef.current
+        : (video?.currentTime || 0) * 1000;
+      const sourceDurationMs = Number.isFinite(video?.duration)
+        ? (video?.duration || 0) * 1000
+        : 0;
+      const isPastSourceVideoEnd = sourceDurationMs > 0 && projectTimeMs >= sourceDurationMs - 50;
+      if (blackTailGraphicsRef.current) {
+        blackTailGraphicsRef.current.visible = isPastSourceVideoEnd;
+      }
+
+      const { strength, focus, depth } = findInterpolatedTarget(zoomRegionsRef.current, projectTimeMs);
       
       const defaultFocus = DEFAULT_FOCUS;
       let targetScaleFactor = 1;
@@ -510,6 +536,27 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
       }
     };
   }, [pixiReady, videoReady, clampFocusToStage]);
+
+  useEffect(() => {
+    if (!pixiReady || !videoReady) return;
+
+    const videoContainer = videoContainerRef.current;
+    if (!videoContainer || blackTailGraphicsRef.current) return;
+
+    const blackTailGraphics = new Graphics();
+    blackTailGraphics.visible = false;
+    blackTailGraphicsRef.current = blackTailGraphics;
+    videoContainer.addChild(blackTailGraphics);
+    layoutVideoContent();
+
+    return () => {
+      if (videoContainer.children.includes(blackTailGraphics)) {
+        videoContainer.removeChild(blackTailGraphics);
+      }
+      blackTailGraphics.destroy(true);
+      blackTailGraphicsRef.current = null;
+    };
+  }, [pixiReady, videoReady, layoutVideoContent]);
 
   // 7. UI Lifecycle
   useEffect(() => {
