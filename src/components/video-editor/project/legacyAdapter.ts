@@ -11,6 +11,7 @@ import type {
 import type {
   ProjectAsset,
   ProjectClip,
+  ProjectScene,
   ProjectTrack,
   VideoEditorProject,
 } from "./types";
@@ -328,6 +329,12 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
     });
   }
 
+  const scenes = createDefaultScenes({
+    projectId,
+    projectDurationMs,
+    clips,
+  });
+
   return {
     id: projectId,
     schemaVersion: 1,
@@ -351,7 +358,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
     assets,
     tracks,
     clips,
-    scenes: [],
+    scenes,
     exportSettings: {
       quality: input.exportQuality,
     },
@@ -360,6 +367,23 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
       motionBlurEnabled: input.motionBlurEnabled,
     },
   };
+}
+
+function createDefaultScenes(input: {
+  projectId: string;
+  projectDurationMs: number;
+  clips: ProjectClip[];
+}): ProjectScene[] {
+  if (input.projectDurationMs <= 0 || input.clips.length === 0) return [];
+  return [{
+    id: stableId("scene-demo", input.projectId),
+    name: "Main product demo",
+    startMs: 0,
+    endMs: input.projectDurationMs,
+    purpose: "demo",
+    clipIds: input.clips.map((clip) => clip.id),
+    aiSummary: "Default scene generated from the current editor timeline for Phase 1 product-demo review.",
+  }];
 }
 
 export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorProject): LegacyEditorRestoredState {

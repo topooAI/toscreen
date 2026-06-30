@@ -44,6 +44,7 @@
     "audit:project-model-review-packet": "tsx scripts/verify-project-model-review-packet.ts",
     "audit:project-model-sidecar-parity": "tsx scripts/verify-project-model-sidecar-parity.ts",
     "audit:project-model-scenes": "tsx scripts/verify-project-model-scene-contract.ts",
+    "audit:project-model-default-scene": "tsx scripts/verify-project-model-default-scene.ts",
     "audit:project-model-review-doc": "tsx scripts/verify-project-model-review-doc.ts",
     "audit:phase1-ownership-list": "tsx scripts/verify-phase1-ownership-list.ts",
     "audit:phase1-readiness": "tsx scripts/verify-phase1-readiness.ts",
