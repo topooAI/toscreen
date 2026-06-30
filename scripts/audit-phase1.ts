@@ -97,6 +97,11 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:project-model-ai-plan"],
   },
+  {
+    id: "project-model-review-packet",
+    command: npmCommand,
+    args: ["run", "audit:project-model-review-packet"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];
