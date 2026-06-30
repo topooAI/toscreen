@@ -23,6 +23,11 @@ const steps: AuditStep[] = [
     args: ["--noEmit"],
   },
   {
+    id: "project-model-restore",
+    command: npmCommand,
+    args: ["run", "audit:project-model-restore"],
+  },
+  {
     id: "recording-restore",
     command: npmCommand,
     args: ["run", "audit:recordings"],

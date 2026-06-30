@@ -16,8 +16,8 @@ const project = createProjectFromLegacyEditorState({
     id: "zoom-1",
     startMs: 1000,
     endMs: 3000,
-    depth: "2.0x",
-    focus: { x: 0.5, y: 0.5 },
+    depth: 3,
+    focus: { cx: 0.5, cy: 0.5 },
   }],
   trimRegions: [],
   annotationRegions: [],
@@ -75,7 +75,13 @@ if (!restoredOriginalAudio || restoredOriginalAudio.path !== companionAudioPath)
   process.exit(1);
 }
 
-if (restored.zoomRegions.length !== 1 || restored.zoomRegions[0].id !== "zoom-1") {
+if (
+  restored.zoomRegions.length !== 1 ||
+  restored.zoomRegions[0].id !== "zoom-1" ||
+  restored.zoomRegions[0].depth !== 3 ||
+  restored.zoomRegions[0].focus.cx !== 0.5 ||
+  restored.zoomRegions[0].focus.cy !== 0.5
+) {
   console.error("[ProjectModel] zoom region restore failed.");
   console.error(restored.zoomRegions);
   process.exit(1);
@@ -104,4 +110,10 @@ if (restoredLegacyProject.companionAudioPath !== companionAudioPath) {
   process.exit(1);
 }
 
-console.log("[ProjectModel] Restore checks passed.");
+console.log(JSON.stringify({
+  status: "ok",
+  companionAudioPath: restored.companionAudioPath,
+  zoomRegions: restored.zoomRegions.length,
+  audioRegions: restored.audioRegions.length,
+  legacyFallbackCompanionAudioPath: restoredLegacyProject.companionAudioPath,
+}, null, 2));
