@@ -5,6 +5,12 @@ import fs from 'node:fs/promises'
 import { createHudOverlayWindow, createEditorWindow, createSourceSelectorWindow } from './windows'
 import { registerIpcHandlers } from './ipc/handlers'
 
+// Electron 30 + macOS Metal/ANGLE can intermittently lose the GPU context after
+// ScreenCaptureKit recording. Prefer the GL ANGLE backend in development so the
+// Pixi preview does not disappear after an app restart or recording stop.
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('use-angle', 'gl')
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -63,6 +69,10 @@ const defaultTrayIcon = getTrayIcon('openscreen.png');
 const recordingTrayIcon = getTrayIcon('rec-button.png');
 
 function createWindow() {
+  if (VITE_DEV_SERVER_URL && process.env.TOSCREEN_DEV_WINDOW_TYPE === 'editor') {
+    mainWindow = createEditorWindow()
+    return
+  }
   mainWindow = createHudOverlayWindow()
 }
 

@@ -33,6 +33,11 @@ import { generateAutoZooms } from "@/lib/autoZoom/generator";
 import { VideoExporter, type ExportProgress, type ExportQuality } from "@/lib/exporter";
 import { type AspectRatio, getAspectRatioValue } from "@/utils/aspectRatioUtils";
 import { getAssetPath } from "@/lib/assetPath";
+import {
+  createProjectFromLegacyEditorState,
+  restoreLegacyEditorStateFromProjectModel,
+  validateVideoEditorProject,
+} from "./project";
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -300,6 +305,57 @@ export default function VideoEditor() {
     return encodeURI(full);
   };
 
+  const applyLoadedProject = useCallback((project: any) => {
+    if (project.projectModel) {
+      const validation = validateVideoEditorProject(project.projectModel);
+      if (validation.valid) {
+        const restored = restoreLegacyEditorStateFromProjectModel(project.projectModel);
+        setZoomRegions(restored.zoomRegions);
+        setTrimRegions(restored.trimRegions);
+        setAnnotationRegions(restored.annotationRegions);
+        setAudioRegions(restored.audioRegions);
+        setCropRegion(restored.cropRegion);
+        setWallpaper(restored.wallpaper);
+        setShadowIntensity(restored.shadowIntensity);
+        setShowBlur(restored.showBlur);
+        if (restored.motionBlurEnabled !== undefined) setMotionBlurEnabled(restored.motionBlurEnabled);
+        setBorderRadius(restored.borderRadius);
+        setPadding(restored.padding);
+        setAspectRatio(restored.aspectRatio);
+        setExportQuality(restored.exportQuality);
+        if (restored.cursorData) setCursorData(restored.cursorData);
+        if (restored.cursorSize !== undefined) setCursorSize(restored.cursorSize);
+        if (restored.cursorSmoothing !== undefined) setCursorSmoothing(restored.cursorSmoothing);
+        if (restored.showVectorCursor !== undefined) setShowVectorCursor(restored.showVectorCursor);
+        if (restored.cursorOffset !== undefined) setCursorOffset(restored.cursorOffset);
+        return "projectModel";
+      }
+      console.warn("[ProjectModel] Invalid saved sidecar; falling back to legacy project fields", validation.errors);
+    }
+
+    if (project.zoomRegions) setZoomRegions(project.zoomRegions);
+    if (project.trimRegions) setTrimRegions(project.trimRegions);
+    if (project.annotationRegions) setAnnotationRegions(project.annotationRegions);
+    if (project.audioRegions) {
+      const restoredAudio = project.audioRegions.map((ar: any) => ({
+        ...ar,
+        sourceUrl: ar.path ? `file://${ar.path.replace(/\\/g, '/')}` : ar.sourceUrl,
+        isOriginal: ar.isOriginal !== undefined ? ar.isOriginal : true,
+        isDetached: ar.isDetached !== undefined ? ar.isDetached : false,
+      }));
+      setAudioRegions(restoredAudio);
+    }
+    if (project.cropRegion) setCropRegion(project.cropRegion);
+    if (project.wallpaper) setWallpaper(project.wallpaper);
+    if (project.shadowIntensity !== undefined) setShadowIntensity(project.shadowIntensity);
+    if (project.showBlur !== undefined) setShowBlur(project.showBlur);
+    if (project.motionBlurEnabled !== undefined) setMotionBlurEnabled(project.motionBlurEnabled);
+    if (project.borderRadius !== undefined) setBorderRadius(project.borderRadius);
+    if (project.padding !== undefined) setPadding(project.padding);
+    if (project.aspectRatio) setAspectRatio(project.aspectRatio);
+    return "legacy";
+  }, []);
+
   useEffect(() => {
     async function loadVideo() {
       try {
@@ -336,29 +392,9 @@ export default function VideoEditor() {
           // Try to load auto-saved project
           const projectResult = await window.electronAPI.loadProject(result.path);
           if (projectResult.success && projectResult.project) {
-            const p = projectResult.project;
-            if (p.zoomRegions) setZoomRegions(p.zoomRegions);
-            if (p.trimRegions) setTrimRegions(p.trimRegions);
-            if (p.annotationRegions) setAnnotationRegions(p.annotationRegions);
-            if (p.audioRegions) {
-              // Restore sourceUrls for audio regions from saved absolute paths
-              const restoredAudio = p.audioRegions.map((ar: any) => ({
-                ...ar,
-                sourceUrl: ar.path ? `file://${ar.path.replace(/\\/g, '/')}` : ar.sourceUrl,
-                isOriginal: ar.isOriginal !== undefined ? ar.isOriginal : true,
-                isDetached: ar.isDetached !== undefined ? ar.isDetached : false,
-              }));
-              setAudioRegions(restoredAudio);
-            }
-            if (p.cropRegion) setCropRegion(p.cropRegion);
-            if (p.wallpaper) setWallpaper(p.wallpaper);
-            if (p.shadowIntensity !== undefined) setShadowIntensity(p.shadowIntensity);
-            if (p.showBlur !== undefined) setShowBlur(p.showBlur);
-            if (p.motionBlurEnabled !== undefined) setMotionBlurEnabled(p.motionBlurEnabled);
-            if (p.borderRadius !== undefined) setBorderRadius(p.borderRadius);
-            if (p.padding !== undefined) setPadding(p.padding);
-            if (p.aspectRatio) setAspectRatio(p.aspectRatio);
+            const restoredFrom = applyLoadedProject(projectResult.project);
             toast.success("工程已自动恢复");
+            console.info(`[ProjectModel] Auto-restored project via ${restoredFrom}`);
           } else {
             // New recording project! Auto-load the companion recorded audio track if available
             if ((result as any).audioPath) {
@@ -398,7 +434,7 @@ export default function VideoEditor() {
       }
     }
     loadVideo();
-  }, []);
+  }, [applyLoadedProject]);
 
   // Initialize default wallpaper with resolved asset path
   useEffect(() => {
@@ -429,11 +465,43 @@ export default function VideoEditor() {
         const { file, ...rest } = ar;
         return rest;
       });
+      const projectModel = createProjectFromLegacyEditorState({
+        videoPath,
+        originalVideoPath,
+        companionAudioPath,
+        durationSeconds: duration,
+        projectDurationSeconds: projectDuration,
+        zoomRegions,
+        trimRegions,
+        annotationRegions,
+        audioRegions,
+        cursorData,
+        cursorSize,
+        cursorSmoothing,
+        showVectorCursor,
+        cursorOffset,
+        cropRegion,
+        wallpaper,
+        shadowIntensity,
+        showBlur,
+        motionBlurEnabled,
+        borderRadius,
+        padding,
+        aspectRatio,
+        exportQuality,
+      });
+      const projectModelValidation = validateVideoEditorProject(projectModel);
+      if (!projectModelValidation.valid) {
+        console.warn("[ProjectModel] Generated invalid sidecar model", projectModelValidation.errors);
+      } else if (projectModelValidation.warnings.length > 0) {
+        console.info("[ProjectModel] Sidecar model warnings", projectModelValidation.warnings);
+      }
       const projectData = {
         zoomRegions,
         trimRegions,
         annotationRegions,
         audioRegions: serializedAudioRegions,
+        projectModel,
         cropRegion,
         wallpaper,
         shadowIntensity,
@@ -449,9 +517,11 @@ export default function VideoEditor() {
     }, 1000); // 1s debounce
     return () => clearTimeout(timeout);
   }, [
-    originalVideoPath, zoomRegions, trimRegions, audioRegions, annotationRegions,
+    videoPath, originalVideoPath, companionAudioPath, duration, projectDuration,
+    zoomRegions, trimRegions, audioRegions, annotationRegions, cursorData,
+    cursorSize, cursorSmoothing, showVectorCursor, cursorOffset,
     cropRegion, wallpaper, shadowIntensity, showBlur, motionBlurEnabled,
-    borderRadius, padding, aspectRatio
+    borderRadius, padding, aspectRatio, exportQuality
   ]);
 
   const handleDurationChange = useCallback((dur: number) => {
@@ -1262,17 +1332,8 @@ export default function VideoEditor() {
           // Try to load auto-saved project if any
           const projectResult = await window.electronAPI.loadProject(path);
           if (projectResult.success && projectResult.project) {
-            const p = projectResult.project;
-            if (p.zoomRegions) setZoomRegions(p.zoomRegions);
-            if (p.trimRegions) setTrimRegions(p.trimRegions);
-            if (p.annotationRegions) setAnnotationRegions(p.annotationRegions);
-            if (p.audioRegions) {
-              const restoredAudio = p.audioRegions.map((ar: any) => ({
-                ...ar,
-                sourceUrl: ar.path ? `file://${ar.path.replace(/\\/g, '/')}` : ar.sourceUrl
-              }));
-              setAudioRegions(restoredAudio);
-            }
+            const restoredFrom = applyLoadedProject(projectResult.project);
+            console.info(`[ProjectModel] Drop-restored project via ${restoredFrom}`);
           }
         } else if (isAudio) {
           toast.success("成功识别音频", {

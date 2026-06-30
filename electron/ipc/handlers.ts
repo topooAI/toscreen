@@ -138,7 +138,10 @@ export function registerIpcHandlers(
   ipcMain.handle('get-recorded-video-path', async () => {
     try {
       const files = await fs.readdir(RECORDINGS_DIR)
-      const videoFiles = files.filter(file => file.endsWith('.webm') || file.endsWith('.mov'))
+      const videoFiles = files.filter(file => (
+        file.startsWith('recording-') &&
+        (file.endsWith('.webm') || file.endsWith('.mov'))
+      ))
 
       if (videoFiles.length === 0) {
         return { success: false, message: 'No recorded video found' }
