@@ -785,7 +785,8 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
       <video
         ref={videoRef}
         src={videoPath}
-        className="hidden"
+        className={pixiReady && videoReady ? "hidden" : "absolute inset-0 h-full w-full object-contain pointer-events-none"}
+        style={pixiReady && videoReady ? undefined : { zIndex: 1 }}
         preload="metadata"
         playsInline
         onLoadedMetadata={handleLoadedMetadata}

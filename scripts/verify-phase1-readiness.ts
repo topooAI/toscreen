@@ -47,6 +47,7 @@ const requiredMachineGates = [
   "audit:preview-project-time",
   "audit:export-black-tail-rendering",
   "audit:screenstudio-core-contract",
+  "audit:electron-editor-runtime",
   "audit:project-model-camera-migration",
   "audit:project-model-lane-wrapping",
   "audit:project-model-clip-overlap-policy",
@@ -136,7 +137,7 @@ console.log(JSON.stringify({
   status: "ok",
   machineVerified: [
     "ProjectModel smoke, restore, roundtrip, sidecar parity, and real recording restore gates are registered.",
-    "Preview/export render settings, project duration, black tail, and Screen Studio core contracts are registered.",
+    "Preview/export render settings, project duration, black tail, Screen Studio core, and Electron runtime contracts are registered.",
     "Camera migration, lane wrapping, core clip and annotation contracts, track hierarchy, asset compatibility, and AI plan model gates are registered.",
     "Phase 1 handoff packet is registered for Electron hands-on acceptance.",
   ],

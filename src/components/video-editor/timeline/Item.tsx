@@ -116,6 +116,7 @@ interface ItemProps {
   onVolumeChange?: (vol: number) => void;
   onVolumeKeyframesChange?: (keyframes: VolumeKeyframe[]) => void;
   onDirectSpanChange?: (id: string, span: Span) => void;
+  onDirectSpanPreview?: (id: string, span: Span | null) => void;
   onDirectResizeStart?: () => void;
   onDirectResizeEnd?: () => void;
   zoomRegions?: ZoomRegion[];
@@ -155,6 +156,7 @@ function ItemComponent({
   volumeKeyframes,
   onVolumeKeyframesChange,
   onDirectSpanChange,
+  onDirectSpanPreview,
   onDirectResizeStart,
   onDirectResizeEnd,
   zoomRegions = [],
@@ -267,6 +269,7 @@ function ItemComponent({
           };
 
       directResizeSpanRef.current = nextSpan;
+      onDirectSpanPreview?.(id, nextSpan);
 
       if (direction === 'start') {
         const nextLeftPx = initialLeftPx + ((nextSpan.start - initialSpan.start) * pxPerMs);
@@ -291,6 +294,7 @@ function ItemComponent({
       if (directResizeSpanRef.current) {
         onDirectSpanChange(id, directResizeSpanRef.current);
       }
+      onDirectSpanPreview?.(id, null);
       node.style.opacity = previousOpacity;
       ghost.remove();
       directResizeSpanRef.current = null;
@@ -309,7 +313,7 @@ function ItemComponent({
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp, { once: true });
-  }, [baseLeftPx, baseWidthPx, id, isTrim, isZoom, onDirectResizeEnd, onDirectResizeStart, onDirectSpanChange, onSelect, pxPerMs, span]);
+  }, [baseLeftPx, baseWidthPx, id, isTrim, isZoom, onDirectResizeEnd, onDirectResizeStart, onDirectSpanChange, onDirectSpanPreview, onSelect, pxPerMs, span]);
 
   // 使用 MutationObserver 在 dnd-timeline 内部不触发 React 渲染的拖拽过程中，实时修正波形的物理偏移并设置拖拽物理墙
   React.useEffect(() => {
@@ -372,7 +376,7 @@ function ItemComponent({
         ref={handleNodeRef}
         style={{ 
           ...itemStyle, 
-          height: isAudioSelected ? 138 : 120,
+          height: isAudioSelected ? 110 : 92,
           marginTop: 3,
           marginBottom: 3,
           minWidth: 24 
@@ -463,7 +467,7 @@ function ItemComponent({
                 "w-full overflow-hidden flex items-center justify-between cursor-grab active:cursor-grabbing relative transition-all duration-300 ease-in-out flex-shrink-0",
                 isSelected && "selected"
               )}
-              style={{ color: '#fff', margin: 0, height: 84, width: 'calc(100% - 3px)' }}
+              style={{ color: '#fff', margin: 0, height: 56, width: 'calc(100% - 3px)' }}
               onPointerDown={(event) => {
                 event.stopPropagation();
                 onSelect?.();
@@ -564,7 +568,7 @@ function ItemComponent({
             isSelected && "selected"
           )}
           style={{ 
-            height: isNestedTrim ? '100%' : (isVideo ? '116px' : 'calc(100% - 6px)'), 
+            height: isNestedTrim ? '100%' : (isVideo ? '77px' : 'calc(100% - 6px)'), 
             margin: isNestedTrim ? 0 : '3px 0', 
             color: '#fff', 
             width: 'calc(100% - 3px)' 
@@ -667,7 +671,10 @@ export default React.memo(ItemComponent, (prev, next) => {
     prev.volume === next.volume &&
     prev.volumeKeyframes === next.volumeKeyframes &&
     prev.audioPeaks === next.audioPeaks &&
+    prev.zoomRegions === next.zoomRegions &&
+    prev.zoomBoundaryRegions === next.zoomBoundaryRegions &&
     prev.onDirectSpanChange === next.onDirectSpanChange &&
+    prev.onDirectSpanPreview === next.onDirectSpanPreview &&
     prev.onDirectResizeStart === next.onDirectResizeStart &&
     prev.onDirectResizeEnd === next.onDirectResizeEnd
   );

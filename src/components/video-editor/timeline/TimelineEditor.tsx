@@ -490,6 +490,7 @@ function Timeline({
   waveformCache,
   onAudioVolumeKeyframesChange,
   onItemSpanChange,
+  onItemResizePreview,
   onTimelineResizeStart,
   onTimelineResizeEnd,
   videoRef,
@@ -520,6 +521,7 @@ function Timeline({
   waveformCache?: any;
   onAudioVolumeKeyframesChange?: (id: string, keyframes: any[]) => void;
   onItemSpanChange?: (id: string, span: Span) => void;
+  onItemResizePreview?: (id: string, span: Span | null) => void;
   onTimelineResizeStart?: () => void;
   onTimelineResizeEnd?: () => void;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
@@ -534,7 +536,7 @@ function Timeline({
   const trackRenderer = useMemo(() => {
     const hasAssociatedAudio = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio);
     const isAssociatedAudioSelected = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio?.id === selectedAudioId);
-    const videoRowHeight = isAssociatedAudioSelected ? 144 : (hasAssociatedAudio ? 126 : 122);
+    const videoRowHeight = isAssociatedAudioSelected ? 112 : (hasAssociatedAudio ? 96 : 82);
 
     return (
        <>
@@ -608,6 +610,7 @@ function Timeline({
             variant="zoom"
             zoomDepth={item.zoomDepth}
             onDirectSpanChange={onItemSpanChange}
+            onDirectSpanPreview={onItemResizePreview}
             onDirectResizeStart={onTimelineResizeStart}
             onDirectResizeEnd={onTimelineResizeEnd}
           >
@@ -676,7 +679,7 @@ function Timeline({
       })()}
     </>
   );
-}, [items, zoomRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange]);
+}, [items, zoomRegions, zoomBoundaryRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange, onItemSpanChange, onItemResizePreview, onTimelineResizeStart, onTimelineResizeEnd]);
 
 const { setTimelineRef, style, range, pixelsToValue, setSidebarRef } = useTimelineContext();
   const localTimelineRef = useRef<HTMLDivElement | null>(null);

@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { ipcMain, screen, BrowserWindow, desktopCapturer, shell, app, dialog, nativeImage, session, Tray, Menu } from "electron";
+import { ipcMain, BrowserWindow, screen, desktopCapturer, shell, app, dialog, nativeImage, protocol, session, Tray, Menu } from "electron";
 import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
 import fs$2 from "node:fs/promises";
@@ -14,7 +14,7 @@ import * as path from "path";
 import * as fs$1 from "fs";
 const __dirname$1 = path$1.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path$1.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL$1 = process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5173";
+const VITE_DEV_SERVER_URL$1 = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
 path$1.join(APP_ROOT, "dist");
 let hudOverlayWindow = null;
 ipcMain.on("hud-overlay-hide", () => {
@@ -518,13 +518,16 @@ function registerIpcHandlers(createEditorWindow2, createSourceSelectorWindow2, g
   ipcMain.handle("get-recorded-video-path", async () => {
     try {
       const files = await fs$2.readdir(RECORDINGS_DIR);
-      const videoFiles = files.filter((file) => file.endsWith(".webm") || file.endsWith(".mov"));
+      const videoFiles = files.filter((file) => file.startsWith("recording-") && (file.endsWith(".webm") || file.endsWith(".mov")));
       if (videoFiles.length === 0) {
         return { success: false, message: "No recorded video found" };
       }
       const latestVideo = videoFiles.sort().reverse()[0];
       const videoPath = path$1.join(RECORDINGS_DIR, latestVideo);
-      return { success: true, path: videoPath };
+      const parsed = path$1.parse(videoPath);
+      const proxyPath = path$1.join(parsed.dir, `${parsed.name}-proxy.mp4`);
+      const hasProxy = await fs$2.access(proxyPath).then(() => true).catch(() => false);
+      return { success: true, path: videoPath, proxyPath: hasProxy ? proxyPath : void 0 };
     } catch (error) {
       console.error("Failed to get video path:", error);
       return { success: false, message: "Failed to get video path", error: String(error) };
@@ -824,6 +827,9 @@ const handlers = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProp
   getSelectedSourceForMediaRequest,
   registerIpcHandlers
 }, Symbol.toStringTag, { value: "Module" }));
+if (process.platform === "darwin") {
+  app.commandLine.appendSwitch("use-angle", "gl");
+}
 const __dirname = path$1.dirname(fileURLToPath(import.meta.url));
 const wrapConsole = (method) => {
   const original = console[method];
@@ -857,6 +863,10 @@ let selectedSourceName = "";
 const defaultTrayIcon = getTrayIcon("openscreen.png");
 const recordingTrayIcon = getTrayIcon("rec-button.png");
 function createWindow() {
+  if (VITE_DEV_SERVER_URL && process.env.TOSCREEN_DEV_WINDOW_TYPE === "editor") {
+    mainWindow = createEditorWindow();
+    return;
+  }
   mainWindow = createHudOverlayWindow();
 }
 function createTray() {
@@ -925,10 +935,25 @@ app.on("activate", () => {
     createWindow();
   }
 });
+protocol.registerSchemesAsPrivileged([
+  { scheme: "toscreen", privileges: { supportFetchAPI: true, bypassCSP: true, secure: true, corsEnabled: true } }
+]);
 app.whenReady().then(async () => {
   const { ipcMain: ipcMain2 } = await import("electron");
   ipcMain2.on("hud-overlay-close", () => {
     app.quit();
+  });
+  protocol.registerFileProtocol("toscreen", (request, callback) => {
+    let url = request.url.substring(11);
+    const queryIndex = url.indexOf("?");
+    if (queryIndex !== -1) {
+      url = url.substring(0, queryIndex);
+    }
+    try {
+      callback({ path: decodeURIComponent(url) });
+    } catch (error) {
+      callback({ error: -2 });
+    }
   });
   createTray();
   updateTrayMenu();

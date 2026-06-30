@@ -14,6 +14,7 @@ export function usePixiApp(containerRef: React.RefObject<HTMLDivElement>) {
 
     let mounted = true;
     let app: Application | null = null;
+    let handleContextLost: ((event: Event) => void) | null = null;
 
     (async () => {
       try {
@@ -50,6 +51,15 @@ export function usePixiApp(containerRef: React.RefObject<HTMLDivElement>) {
       app.canvas.style.width = '100%';
       app.canvas.style.height = '100%';
 
+      handleContextLost = (event: Event) => {
+        event.preventDefault();
+        console.warn('[usePixiApp] WebGL context lost; falling back to native video preview.');
+        app!.canvas.style.display = 'none';
+        setPixiReady(false);
+      };
+
+      app.canvas.addEventListener('webglcontextlost', handleContextLost);
+
       container.appendChild(app.canvas);
 
       // Camera container - this will be scaled/positioned for zoom
@@ -71,6 +81,9 @@ export function usePixiApp(containerRef: React.RefObject<HTMLDivElement>) {
       
       const app = appRef.current;
       if (app) {
+        if (handleContextLost) {
+          app.canvas.removeEventListener('webglcontextlost', handleContextLost);
+        }
         // Destroy the app only if it's still healthy
         if (app.renderer) {
           app.destroy(true, { children: true, texture: true, textureSource: true });

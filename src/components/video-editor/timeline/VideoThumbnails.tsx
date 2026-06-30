@@ -14,7 +14,7 @@ interface VideoThumbnailsProps {
 }
 
 const THUMBNAIL_WIDTH = 64; // px
-const THUMBNAIL_HEIGHT = 96; // px, matches enlarged main clip height
+const THUMBNAIL_HEIGHT = 64; // px, matches compressed main clip height
 const MAX_THUMBNAILS = 30; // Limit to prevent crashing
 
 type ThumbnailSegment = {
@@ -250,9 +250,9 @@ export function VideoThumbnails({ id, src, sourceStartMs, effTotalDuration, svgO
           className="absolute pointer-events-none"
           style={{
             left: `${percent}%`,
-            top: '23%',
-            height: '54%',
-            borderLeft: '2px dashed rgba(255,255,255,0.9)',
+            top: '15%',
+            height: '70%',
+            borderLeft: '1px dashed rgba(255,255,255,0.86)',
             zIndex: 25,
           }}
         />

@@ -54,6 +54,7 @@ export interface AudioRegion {
   volumeKeyframes?: VolumeKeyframe[]; // Volume envelope keyframes
   isOriginal?: boolean; // True if this is the original recorded companion audio
   isDetached?: boolean; // True if separated from video into independent track
+  trackIndex?: number;  // The physical track row this audio region belongs to
 }
 
 export type AnnotationType = 'text' | 'image' | 'figure';

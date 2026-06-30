@@ -35,7 +35,7 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
 
   return (
     <div
-      className="border-b border-white/5 bg-[#09090b] group/row hover:bg-white/[0.01] transition-all duration-300 ease-in-out w-full flex items-stretch relative overflow-hidden"
+      className="border-b border-white/5 bg-[#09090b] group/row hover:bg-white/[0.01] transition-all duration-300 ease-in-out w-full flex items-stretch relative"
       style={{ height, marginBottom: 4 }}
     >
       {/* Sidebar Track Control Header */}
@@ -45,6 +45,17 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
         title="长按拖拽排序"
       >
         <div className="flex items-center overflow-hidden flex-1">
+          {id !== "row-video" && (
+            <svg 
+              width="10" 
+              height="10" 
+              viewBox="0 0 10 10" 
+              className="mr-1.5 ml-1 text-white/30 flex-shrink-0"
+              fill="none"
+            >
+              <path d="M2 0 L2 6 Q2 8 4 8 L10 8" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          )}
           <span className="text-[12px] font-medium text-slate-300 group-hover/row:text-white transition-colors truncate tracking-wide">
             {meta.label}
           </span>
@@ -66,6 +77,7 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
 
       {/* Row Timeline Items Area */}
       <div 
+        data-timeline-track-area="true"
         ref={setNodeRef} 
         style={{ ...rowStyle, position: 'relative', flex: 1, height: '100%', marginLeft: 16 }}
       >
