@@ -16,6 +16,7 @@ const requiredAuditScripts = [
   "audit:project-model-restore",
   "audit:project-model-roundtrip",
   "audit:recordings",
+  "audit:recording-asset-files",
   "audit:preview-export-contract",
   "audit:export-background-parity",
   "audit:project-duration",

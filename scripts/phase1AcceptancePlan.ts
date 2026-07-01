@@ -19,6 +19,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
   ],
   "UA-02": [
     "npm run audit:recordings",
+    "npm run audit:recording-asset-files",
     "npm run audit:project-model-restore",
     "npm run audit:project-model-sidecar-parity",
     "npm run audit:original-audio-accordion",

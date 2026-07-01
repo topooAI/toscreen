@@ -48,6 +48,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:recordings"],
   },
   {
+    id: "recording-asset-files",
+    command: npmCommand,
+    args: ["run", "audit:recording-asset-files"],
+  },
+  {
     id: "preview-export-contract",
     command: npmCommand,
     args: ["run", "audit:preview-export-contract"],
