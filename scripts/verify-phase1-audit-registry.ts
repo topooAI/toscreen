@@ -31,6 +31,7 @@ const requiredAuditScripts = [
   "audit:timeline-waveform-layout",
   "audit:original-audio-accordion",
   "audit:main-video-thumbnails",
+  "audit:timeline-trim-row-hidden",
   "audit:main-clip-segmentation",
   "audit:preview-project-time",
   "audit:export-black-tail-rendering",

@@ -23,6 +23,7 @@ const requiredPhrases = [
   "npm run audit:timeline-seek-mapping",
   "npm run audit:timeline-playhead-time",
   "npm run audit:timeline-waveform-layout",
+  "npm run audit:timeline-trim-row-hidden",
   "npm run audit:phase1-handoff",
   "phaseComplete: false",
   "phaseComplete: true",

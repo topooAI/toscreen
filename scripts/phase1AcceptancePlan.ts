@@ -41,6 +41,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:timeline-clip-style",
     "npm run audit:timeline-waveform-layout",
     "npm run audit:main-clip-segmentation",
+    "npm run audit:timeline-trim-row-hidden",
     "npm run audit:original-audio-accordion",
     "npm run audit:main-video-thumbnails",
     "npm run audit:screenstudio-core-contract",

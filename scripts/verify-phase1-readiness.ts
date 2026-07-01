@@ -79,6 +79,7 @@ const requiredMachineGates = [
   "audit:timeline-resize-handles",
   "audit:timeline-clip-style",
   "audit:timeline-waveform-layout",
+  "audit:timeline-trim-row-hidden",
   "audit:phase1-handoff",
 ];
 

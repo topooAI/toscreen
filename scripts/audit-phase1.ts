@@ -123,6 +123,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:main-video-thumbnails"],
   },
   {
+    id: "timeline-trim-row-hidden",
+    command: npmCommand,
+    args: ["run", "audit:timeline-trim-row-hidden"],
+  },
+  {
     id: "main-clip-segmentation",
     command: npmCommand,
     args: ["run", "audit:main-clip-segmentation"],
