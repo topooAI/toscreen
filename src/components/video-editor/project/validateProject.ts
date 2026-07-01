@@ -74,6 +74,15 @@ const VALID_UI_ELEMENT_ROLES = [
   "custom",
 ] as const;
 
+const VALID_LEGACY_REGION_TYPES = [
+  "zoom",
+  "trim",
+  "annotation",
+  "audio",
+  "screen-recording",
+  "cursor",
+] as const;
+
 export function validateVideoEditorProject(projectInput: unknown): ProjectValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -255,17 +264,34 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       errors.push(`Clip ${clip.id || "(missing id)"} type is invalid or missing.`);
     }
 
-    if (!trackIds.has(clip.trackId)) {
-      errors.push(`Clip ${clip.id || "(missing id)"} references missing track ${clip.trackId}.`);
+    const clipLabel = `Clip ${clip.id || "(missing id)"}`;
+    if (clip.name !== undefined && typeof clip.name !== "string") {
+      errors.push(`${clipLabel} name must be a string.`);
     }
-    const track = tracksById.get(clip.trackId);
+    validateOptionalClipSourceRange(clip, clipLabel, errors);
+    validateOptionalClipLegacy(clip, clipLabel, errors);
+
+    let track: ProjectTrack | undefined;
+    if (typeof clip.trackId !== "string" || !clip.trackId.trim()) {
+      errors.push(`${clipLabel} trackId is required.`);
+    } else {
+      if (!trackIds.has(clip.trackId)) {
+        errors.push(`${clipLabel} references missing track ${clip.trackId}.`);
+      }
+      track = tracksById.get(clip.trackId);
+    }
     if (track && !isClipCompatibleWithTrack(clip.type, track.type)) {
       errors.push(`Clip ${clip.id || "(missing id)"} type ${clip.type} cannot be placed on track ${track.id} type ${track.type}.`);
     }
-    if (clip.assetId && !assetIds.has(clip.assetId)) {
-      errors.push(`Clip ${clip.id || "(missing id)"} references missing asset ${clip.assetId}.`);
+    let asset: ProjectAsset | undefined;
+    if (clip.assetId !== undefined && typeof clip.assetId !== "string") {
+      errors.push(`${clipLabel} assetId must be a string.`);
+    } else if (clip.assetId) {
+      if (!assetIds.has(clip.assetId)) {
+        errors.push(`Clip ${clip.id || "(missing id)"} references missing asset ${clip.assetId}.`);
+      }
+      asset = assetsById.get(clip.assetId);
     }
-    const asset = clip.assetId ? assetsById.get(clip.assetId) : undefined;
     if (asset && !isClipCompatibleWithAsset(clip.type, asset.type)) {
       errors.push(`Clip ${clip.id || "(missing id)"} type ${clip.type} cannot reference asset ${asset.id} type ${asset.type}.`);
     }
@@ -801,6 +827,39 @@ function validateTimeRange(startMs: unknown, endMs: unknown, label: string, erro
     errors.push(`${label} startMs/endMs must be non-negative.`);
   } else if (endMs < startMs) {
     errors.push(`${label} endMs is before startMs.`);
+  }
+}
+
+function validateOptionalClipSourceRange(clip: ProjectClip, label: string, errors: string[]) {
+  const hasSourceStart = clip.sourceStartMs !== undefined;
+  const hasSourceEnd = clip.sourceEndMs !== undefined;
+  if (!hasSourceStart && !hasSourceEnd) return;
+
+  if (hasSourceStart !== hasSourceEnd) {
+    errors.push(`${label} sourceStartMs/sourceEndMs must be provided together.`);
+    return;
+  }
+
+  validateTimeRange(clip.sourceStartMs, clip.sourceEndMs, `${label} source range`, errors);
+}
+
+function validateOptionalClipLegacy(clip: ProjectClip, label: string, errors: string[]) {
+  if (clip.legacy === undefined) return;
+
+  const legacy = isRecord(clip.legacy) ? clip.legacy : undefined;
+  if (!legacy) {
+    errors.push(`${label} legacy must be an object.`);
+    return;
+  }
+
+  if (legacy.source !== "VideoEditor") {
+    errors.push(`${label} legacy.source is invalid or missing.`);
+  }
+  if (legacy.regionId !== undefined && typeof legacy.regionId !== "string") {
+    errors.push(`${label} legacy.regionId must be a string.`);
+  }
+  if (legacy.regionType !== undefined && !isOneOf(legacy.regionType, VALID_LEGACY_REGION_TYPES)) {
+    errors.push(`${label} legacy.regionType is invalid.`);
   }
 }
 

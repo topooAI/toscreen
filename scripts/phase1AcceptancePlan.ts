@@ -18,6 +18,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:project-model-review-packet",
     "npm run audit:project-model-entity-schema",
     "npm run audit:project-model-ui-source-schema",
+    "npm run audit:project-model-clip-source",
   ],
   "UA-02": [
     "npm run audit:recordings",
@@ -25,6 +26,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:project-model-restore",
     "npm run audit:project-model-sidecar-parity",
     "npm run audit:project-model-canvas-settings",
+    "npm run audit:project-model-clip-source",
     "npm run audit:original-audio-accordion",
   ],
   "UA-03": [
@@ -55,6 +57,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
   "UA-05": [
     "npm run audit:preview-export-contract",
     "npm run audit:project-model-canvas-settings",
+    "npm run audit:project-model-clip-source",
     "npm run audit:export-background-parity",
     "npm run audit:export-duration-render-settings",
     "npm run audit:export-black-tail-rendering",

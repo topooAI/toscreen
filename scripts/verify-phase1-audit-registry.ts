@@ -18,6 +18,7 @@ const requiredAuditScripts = [
   "audit:project-model-canvas-settings",
   "audit:project-model-entity-schema",
   "audit:project-model-ui-source-schema",
+  "audit:project-model-clip-source",
   "audit:recordings",
   "audit:recording-asset-files",
   "audit:preview-export-contract",
