@@ -32,6 +32,7 @@ Machine gates prove that key wiring is intact, but they do not replace hands-on 
 | RULE-02 工程总长 / Project duration | `npm run audit:project-duration`, `npm run audit:timeline-duration-domains`, `npm run audit:preview-project-time`, `npm run audit:export-duration-render-settings` | 时间轴、预览、导出都以工程总长合同为基础。 / Timeline, preview, and export are based on the project-duration contract. |
 | RULE-03 拉伸把手 / Resize handles | `npm run audit:electron-editor-runtime` | Focus resize preview 和片段端点结构仍被保护。 / Focus resize preview and clip endpoint structure are guarded. |
 | RULE-04 / CLIP-04 / CLIP-05 片段选中视觉 / Clip selected visual style | `npm run audit:electron-editor-runtime` | 所有 clip 基类保持 6px 圆角，selected 状态使用 inset box-shadow 且不通过 background 改变尺寸感。 / All clip base classes keep a 6px radius, and selected states use inset box-shadow without background-based size perception changes. |
+| DEV-02A 调试信号接线 / Debug-signal wiring | `npm run audit:timeline-debug-signal` | 时间轴点击调试日志必须经过统一 seek helper，并输出 raw/effective/source 时间；resize 期间必须拦截合成 seek。 / Timeline click debug logs must route through the unified seek helper and emit raw/effective/source time; synthetic seek must be blocked while resizing. |
 | TL-01A 轨道起点坐标合同 / Track origin contract | `npm run audit:timeline-track-origin` | Sidebar 宽度、16px 呼吸留白、fallback trackStartPx、真实 track area 测量，以及 Axis/Cursor/Seek 共用 trackStartPx 的连接点被保护。 / Sidebar width, the 16px breathing gap, fallback trackStartPx, real track-area measurement, and Axis/Cursor/Seek shared trackStartPx wiring are guarded. |
 | TL-02A / TL-03A / TL-05A 点击映射合同 / Seek mapping contract | `npm run audit:timeline-seek-mapping` | 点击坐标统一从 trackStartPx 后开始计算，左侧呼吸区归零，range offset、工程时长 clamp 和 Trim 折叠 effective->source 映射被保护。 / Click coordinates are measured from trackStartPx, the left breathing area resets to zero, and range offset, project-duration clamp, and Trim-folded effective-to-source mapping are guarded. |
 | DRAG-01A / DRAG-03 / DRAG-04 可视分轨 / Visual lane wrapping | `npm run audit:timeline-lane-wrapping`, `npm run audit:project-model-lane-wrapping` | Timeline 可视层会把重叠 Audio、Zoom/Focus、Annotation 分到不同同类型 lane，并检查 Audio 跨轨 wiring；ProjectModel 层也保护同类型 lane wrapping。 / Timeline visual layout wraps overlapping Audio, Zoom/Focus, and annotation clips onto separate same-type lanes and checks Audio cross-lane wiring; ProjectModel also guards same-type lane wrapping. |
@@ -75,7 +76,8 @@ These rules affect several implementation choices. Confirm them before broad ref
 | ID | 验收项 / Acceptance Item | 验收方法 / Acceptance Method | 预期结果 / Expected Result | Current Status | Code Area |
 |---|---|---|---|---|---|
 | DEV-01 | Electron renderer 热更新 / Electron renderer hot update | 修改 renderer 文件后，刷新或观察当前 Electron 编辑器窗口的 HMR。 / Change a renderer file, then refresh or observe HMR in the current Electron editor window. | 不需要重新录制，即可看到最新 renderer 代码。 / Latest renderer code is visible without recording again. | 🔒 Machine-Guarded | `vite.config.ts`, `electron/windows.ts`, `audit:electron-editor-runtime` |
-| DEV-02 | 当前时间轴代码调试信号 / Debug signal for current timeline code | 刷新 Electron，点击时间轴，查看 DevTools Console。 / Refresh Electron, click timeline, inspect DevTools Console. | 调试阶段点击时间轴时输出 `[TimelineSeek] ...`。 / Console logs `[TimelineSeek] ...` on timeline clicks during debugging. | 🟡 Needs Verification | `src/components/video-editor/timeline/TimelineEditor.tsx` |
+| DEV-02A | 当前时间轴调试信号接线合同 / Current timeline debug-signal wiring contract | 静态检查时间轴点击仍经过统一 seek helper，并输出 `[TimelineSeek]` 的 raw/effective/source 时间。 / Statically check timeline clicks still route through the unified seek helper and emit raw/effective/source `[TimelineSeek]` timing. | 调试日志接线不能绕开 `resolveTimelineSeekFromClientX`，resize 中不能触发合成 seek。 / Debug logging cannot bypass `resolveTimelineSeekFromClientX`, and resizing cannot trigger synthetic seek. | 🔒 Machine-Guarded | `TimelineEditor.tsx`, `audit:timeline-debug-signal` |
+| DEV-02B | 当前时间轴调试信号实机确认 / Current timeline debug signal hands-on confirmation | 刷新 Electron，点击时间轴，查看 DevTools Console。 / Refresh Electron, click timeline, inspect DevTools Console. | 调试阶段点击时间轴时输出 `[TimelineSeek] ...`。 / Console logs `[TimelineSeek] ...` on timeline clicks during debugging. | 🟡 Needs Verification | `src/components/video-editor/timeline/TimelineEditor.tsx` |
 
 ### P1：修复时间轴点击与播放指针精度 / Fix Timeline Click And Playhead Accuracy
 
@@ -181,8 +183,8 @@ These are high-risk claims from the old checklist; `Resolved` items must be re-a
 
 - 从旧的非正式验收清单整理出本文档。  
   Created this acceptance plan from the previous informal checklist.
-- 当前最高优先级：`DEV-01`, `DEV-02`, `TL-02`, `TL-03`, `TL-04`, `TL-05`。  
-  Current highest priority: `DEV-01`, `DEV-02`, `TL-02`, `TL-03`, `TL-04`, `TL-05`.
+- 当前最高优先级：`DEV-01`, `DEV-02B`, `TL-02`, `TL-03`, `TL-04`, `TL-05`。
+  Current highest priority: `DEV-01`, `DEV-02B`, `TL-02`, `TL-03`, `TL-04`, `TL-05`.
 - 已知风险：Vite/Electron dev URL 对齐后，当前 Electron 窗口可能需要重启一次开发进程，才能确保加载最新 renderer。  
   Known risk: current Electron window may need one dev-process restart after Vite/Electron dev URL alignment before it reliably loads the latest renderer.
 - 产品规则更新：所有片段都不允许同轨重叠，包括 Annotation；发生重叠时应新增轨道或换行显示。  

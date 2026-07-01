@@ -75,6 +75,7 @@ const requiredMachineGates = [
   "audit:phase1-user-acceptance-doc",
   "audit:phase1-user-review-packet",
   "audit:timeline-acceptance-doc",
+  "audit:timeline-debug-signal",
   "audit:phase1-handoff",
 ];
 

@@ -63,6 +63,7 @@
     "audit:phase1-user-acceptance-doc": "tsx scripts/verify-phase1-user-acceptance-doc.ts",
     "audit:phase1-user-review-packet": "tsx scripts/verify-phase1-user-review-packet.ts",
     "audit:timeline-acceptance-doc": "tsx scripts/verify-timeline-acceptance-doc.ts",
+    "audit:timeline-debug-signal": "tsx scripts/verify-timeline-debug-signal.ts",
     "audit:phase1-handoff": "tsx scripts/verify-phase1-handoff-packet.ts",
     "audit:export-audio-render-settings": "tsx scripts/verify-export-audio-render-settings.ts",
     "audit:preview-audio-render-settings": "tsx scripts/verify-preview-audio-render-settings.ts"

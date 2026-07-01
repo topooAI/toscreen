@@ -273,6 +273,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:timeline-acceptance-doc"],
   },
   {
+    id: "timeline-debug-signal",
+    command: npmCommand,
+    args: ["run", "audit:timeline-debug-signal"],
+  },
+  {
     id: "phase1-handoff",
     command: npmCommand,
     args: ["run", "audit:phase1-handoff"],
