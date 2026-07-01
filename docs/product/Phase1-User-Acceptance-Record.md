@@ -24,6 +24,9 @@ Use this list while iterating: by default, Codex can keep moving on deterministi
 这就是“Codex 能否独立完成、哪些节点需要用户介入”的主对照表；日常迭代时优先看本节，阶段放行时再看第 3 节 UA-01 到 UA-08。
 This is the main checklist for what Codex can complete independently and where the user must step in; use this section during daily iteration, then use UA-01 through UA-08 in Section 3 for phase release.
 
+建议实际工作时把本节放在旁边对照：2.1 是最短速查表，2.2 是我必须停下来问你的触发器，2.3 是完整执行列表。
+When working, keep this section open: 2.1 is the shortest reference table, 2.2 lists the triggers where I must stop and ask, and 2.3 is the full execution list.
+
 ### 2.1 快速对照清单 / Quick Reference Checklist
 
 这张清单是工作时放在旁边看的最短版本：左边是 Codex 可以直接推进的工程闭环，右边是必须由用户验收或拍板的节点。
@@ -60,6 +63,11 @@ Use this list to decide when I must stop and ask you. If none of these checkpoin
 | [ ] | Camera/Focus 命名与镜头语言 / Camera/Focus language | Focus/Zoom 是否升级为 Camera Clip，以及未来 3D 运镜的操作语言是否合理。 / Whether Focus/Zoom becomes Camera Clip and whether the future 3D camera interaction language is right. | 先做模型迁移和兼容层，不强改当前 UI 语言。 / Build model migration and compatibility first without forcing UI terminology changes. |
 | [ ] | AI 自动剪辑边界 / AI auto-editing boundary | AI 哪些剪辑决策可以自动应用，哪些必须先生成可审阅计划。 / Which AI edit decisions may apply automatically and which must stay as reviewable plans first. | 建立 AI Edit Plan、可回滚应用路径和审计合同。 / Build AI Edit Plan, reversible apply path, and audit contracts. |
 | [ ] | Phase 1 阶段放行 / Phase 1 release | 是否关闭 Phase 1 并进入下一阶段。 / Whether to close Phase 1 and move to the next stage. | 跑完机器门禁、列风险、整理剩余问题并同步 GitHub。 / Run machine gates, list risks, summarize remaining issues, and sync GitHub. |
+
+### 2.3 详细执行列表 / Detailed Execution List
+
+这张表用于逐项执行和复盘：每一行都说明 Codex 可以先做到哪里、什么时候必须让用户介入，以及你验收时要看什么。
+Use this table for step-by-step execution and review: each row states what Codex can do first, when the user must step in, and what should be checked during acceptance.
 
 | ID | 工作域 / Area | Codex 可以独立推进 / Codex Can Continue | 用户需要介入 / User Must Step In | 对照标准 / What To Check |
 |---|---|---|---|---|
