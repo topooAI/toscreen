@@ -28,6 +28,21 @@ Use this order during real iteration so the working checklist stays in one place
 | 3 | `2.3 详细执行列表 / Detailed Execution List` | 每个工作域的执行边界、用户介入条件和验收标准。 / The execution boundary, user checkpoint, and acceptance standard for each work area. |
 | 4 | `3. 用户验收清单 / User Acceptance Checklist` | Phase 1 是否可以关闭，是否进入下一阶段。 / Whether Phase 1 can close and move to the next stage. |
 
+### 1.2 阶段工作分工列表 / Phase Work Ownership List
+
+这张列表是日常最短对照版：我可以独立做到“工程闭环”；你只在“产品判断、真实体验、阶段放行”处介入。
+Use this as the shortest daily reference: I can independently close engineering loops; you step in for product judgment, real hands-on UX, and phase release.
+
+| 分类 / Category | 我可以独立完成 / Codex Can Complete | 必须你介入 / User Must Step In | 对照结果 / Review Result |
+|---|---|---|---|
+| 1. 工程修复 / Engineering fixes | 代码定位、修 bug、补类型、补脚本、跑门禁、提交同步 GitHub。 / Trace code, fix bugs, add types, add scripts, run gates, commit, and sync GitHub. | 修复会改变产品方向、删除既有能力或改变核心交互时。 / When the fix changes product direction, removes an existing capability, or changes core interaction. | 默认我继续推进。 / Codex continues by default. |
+| 2. ProjectModel 底座 / ProjectModel foundation | 类型、adapter、validator、autosave、`.project.json`、旧项目兼容和恢复审计。 / Types, adapters, validators, autosave, `.project.json`, legacy compatibility, and restore audits. | 模型语义影响 AI、3D、Lottie、多源画面或数字人结构时。 / When model semantics affect AI, 3D, Lottie, multi-source video, or digital-human structure. | 方向需你确认。 / Direction needs user confirmation. |
+| 3. Timeline 手感 / Timeline feel | 定位拖拽、拉伸、磁吸、滚轮、游标、换轨和不重叠的事件链路。 / Trace drag, resize, snap, wheel, playhead, lane wrapping, and no-overlap event paths. | 每次交互手感变化后，你需要在 Electron 实机验收。 / After each interaction-feel change, you test hands-on in Electron. | 必须实机确认。 / Hands-on confirmation required. |
+| 4. Screen Studio 底座 / Screen Studio-grade foundation | 恢复录屏预览、系统光标、Zoom/Focus、背景虚化、播放和基础导出。 / Restore recording preview, system cursor, Zoom/Focus, background blur, playback, and basic export. | 每个体验模块是否达到产品级观感，需要你验收。 / You review whether each UX module reaches product-grade quality. | 分模块验收。 / Review module by module. |
+| 5. Preview/Export 一致性 / Preview/export parity | 统一预览和导出的画面、时长、Zoom/Camera、光标、背景、音频和黑屏尾部规则。 / Unify preview/export picture, duration, Zoom/Camera, cursor, background, audio, and black-tail rules. | 完整导出真实项目后，你判断成片是否可接受。 / After a real project exports end to end, you judge whether the output is acceptable. | 成片由你放行。 / Final video is user-gated. |
+| 6. 未来大能力 / Future major capabilities | 先保留 AI 自动剪辑、3D 运镜、Lottie、UI-aware motion、多源画面、数字人的模型入口。 / Preserve model hooks for AI editing, 3D camera, Lottie, UI-aware motion, multi-source video, and digital human first. | 任何大能力从模型入口进入真实 UI 前，必须你拍板。 / Before any major capability moves from model hook into real UI, you decide. | 先模型，后 UI。 / Model first, UI later. |
+| 7. 阶段放行 / Phase gate | 汇总风险、跑完整门禁、整理剩余问题和下一阶段建议。 / Summarize risks, run full gates, organize remaining issues and next-phase suggestions. | 是否关闭 Phase 1、进入下一阶段，必须由你明确确认。 / Closing Phase 1 and entering the next phase requires your explicit confirmation. | 用户最终放行。 / Final release is user-gated. |
+
 ## 2. 开发对照列表 / Development Ownership Checklist
 
 这个列表用于一边开发一边对照：默认 Codex 可以继续推进确定性的工程工作；只有进入“必须用户判断”的节点时才停下来。
