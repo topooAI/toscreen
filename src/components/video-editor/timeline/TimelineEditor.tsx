@@ -11,6 +11,7 @@ import Row from "./Row";
 import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
 import { partitionIntoTimelineLanes } from "./lanePartition";
+import { getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
 import type { Range, Span } from "dnd-timeline";
 import type { ZoomRegion, TrimRegion, AnnotationRegion, AudioRegion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
@@ -1436,96 +1437,14 @@ export default function TimelineEditor({
     activeItemId: string,
     targetSpan: Span
   ): Span => {
-    const baseExcludeId = activeItemId.split('-part-')[0];
-    
-    // 1. 找到当前操作的 item，获取它的 rowId 以及它对应的旧 span
-    const itemInRender = timelineItems.find(item => item.id === activeItemId);
-    if (!itemInRender) return targetSpan;
-
-    const rowId = itemInRender.rowId;
-    const oldSpan = itemInRender.span;
-
-    // 2. 收集同行所有兄弟片段以及视频主轨（VIDEO_ROW_ID）在时间轴上的有效边缘 (start, end)
-    const peerSpans = timelineItems
-      .filter(item => 
-        item.id !== activeItemId && 
-        item.id.split('-part-')[0] !== baseExcludeId &&
-        (item.rowId === rowId || item.rowId === VIDEO_ROW_ID)
-      )
-      .map(item => item.span);
-
-    // 3. 收集吸附目标点 (Snap Points)
-    // 除了这些 peerSpans 的 start 和 end 之外，还有播放头 activeCurrentTimeMs
-    const snapTargets: number[] = [activeCurrentTimeMs];
-    for (const peer of peerSpans) {
-      snapTargets.push(peer.start);
-      snapTargets.push(peer.end);
-    }
-
-    // 4. 计算磁吸阈值
-    const SNAP_THRESHOLD_MS = Math.max(50, Math.min(300, timelineScale.intervalMs / 5));
-
-    // 5. 区分是拖拽 (drag) 还是拉伸 (resize)
-    const duration = targetSpan.end - targetSpan.start;
-    const oldDuration = oldSpan.end - oldSpan.start;
-    const isTrimming = Math.abs(duration - oldDuration) > 1; // 时长变化大于 1ms 即为拉伸
-
-    let closestDelta = Infinity;
-    let snapOffset = 0;
-
-    if (isTrimming) {
-      // 拉伸状态：区分是拉左边缘还是拉右边缘
-      const isResizingLeft = Math.abs(targetSpan.end - oldSpan.end) <= 2; // 右边缘基本没变，说明拉左边缘
-      const isResizingRight = Math.abs(targetSpan.start - oldSpan.start) <= 2; // 左边缘基本没变，说明拉右边缘
-
-      if (isResizingLeft) {
-        // 磁吸 targetSpan.start
-        for (const t of snapTargets) {
-          const diff = t - targetSpan.start;
-          if (Math.abs(diff) < Math.abs(closestDelta) && Math.abs(diff) <= SNAP_THRESHOLD_MS) {
-            closestDelta = diff;
-            snapOffset = diff;
-          }
-        }
-        if (closestDelta !== Infinity) {
-          return { start: targetSpan.start + snapOffset, end: targetSpan.end };
-        }
-      } else if (isResizingRight) {
-        // 磁吸 targetSpan.end
-        for (const t of snapTargets) {
-          const diff = t - targetSpan.end;
-          if (Math.abs(diff) < Math.abs(closestDelta) && Math.abs(diff) <= SNAP_THRESHOLD_MS) {
-            closestDelta = diff;
-            snapOffset = diff;
-          }
-        }
-        if (closestDelta !== Infinity) {
-          return { start: targetSpan.start, end: targetSpan.end + snapOffset };
-        }
-      }
-    } else {
-      // 拖拽状态：整体平移
-      for (const t of snapTargets) {
-        // 检查 start 是否接近吸附点
-        const diffStart = t - targetSpan.start;
-        if (Math.abs(diffStart) < Math.abs(closestDelta) && Math.abs(diffStart) <= SNAP_THRESHOLD_MS) {
-          closestDelta = diffStart;
-          snapOffset = diffStart;
-        }
-        // 检查 end 是否接近吸附点
-        const diffEnd = t - targetSpan.end;
-        if (Math.abs(diffEnd) < Math.abs(closestDelta) && Math.abs(diffEnd) <= SNAP_THRESHOLD_MS) {
-          closestDelta = diffEnd;
-          snapOffset = diffEnd;
-        }
-      }
-
-      if (closestDelta !== Infinity) {
-        return { start: targetSpan.start + snapOffset, end: targetSpan.end + snapOffset };
-      }
-    }
-
-    return targetSpan;
+    return getTimelineMagneticSnapSpan({
+      activeItemId,
+      targetSpan,
+      items: timelineItems,
+      currentTimeMs: activeCurrentTimeMs,
+      intervalMs: timelineScale.intervalMs,
+      videoRowId: VIDEO_ROW_ID,
+    });
   }, [timelineItems, activeCurrentTimeMs, timelineScale.intervalMs]);
 
   const previewZoomRegions = useMemo(() => {

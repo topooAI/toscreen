@@ -78,6 +78,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:timeline-drag-safety"],
   },
   {
+    id: "timeline-magnetic-snap",
+    command: npmCommand,
+    args: ["run", "audit:timeline-magnetic-snap"],
+  },
+  {
     id: "preview-project-time",
     command: npmCommand,
     args: ["run", "audit:preview-project-time"],

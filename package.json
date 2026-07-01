@@ -21,6 +21,7 @@
     "audit:timeline-duration-domains": "tsx scripts/verify-timeline-duration-domains.ts",
     "audit:timeline-lane-wrapping": "tsx scripts/verify-timeline-lane-wrapping.ts",
     "audit:timeline-drag-safety": "tsx scripts/verify-timeline-drag-safety.ts",
+    "audit:timeline-magnetic-snap": "tsx scripts/verify-timeline-magnetic-snap.ts",
     "audit:preview-project-time": "tsx scripts/verify-preview-project-time.ts",
     "audit:export-black-tail-rendering": "tsx scripts/verify-export-black-tail-rendering.ts",
     "audit:screenstudio-core-contract": "tsx scripts/verify-screenstudio-core-contract.ts",
