@@ -23,6 +23,7 @@ const requiredPhrases = [
   "npm run audit:timeline-range-zoom",
   "npm run audit:timeline-seek-mapping",
   "npm run audit:timeline-debug-signal",
+  "npm run audit:timeline-resize-handles",
   "npm run audit:timeline-playhead-time",
   "npm run audit:audio-resize-bounds",
   "npm run audit:original-audio-accordion",
@@ -42,6 +43,7 @@ const requiredPhrases = [
   "RULE-04 | 片段选中样式",
   "DEV-02A | 当前时间轴调试信号接线合同",
   "DEV-02B | 当前时间轴调试信号实机确认",
+  "CLIP-06 | 统一竖向拉伸把手",
   "TL-01A | 轨道起点坐标合同",
   "TL-01B | 轨道起点视觉对齐",
   "TL-07 | Main Track 到头后继续播放其他轨道",
@@ -85,6 +87,8 @@ const requiredPhrases = [
 const forbiddenPhrases = [
   "Last updated / 最后更新：2026-06-07",
   "0:20 之后画面可保持最后帧/空画面",
+  "只有 Video/Audio 是竖向把手",
+  "Only Video/Audio use vertical handles",
 ];
 
 const missing = requiredPhrases.filter((phrase) => !content.includes(phrase));

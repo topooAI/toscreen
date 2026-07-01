@@ -62,6 +62,7 @@ const requiredAuditScripts = [
   "audit:phase1-user-review-packet",
   "audit:timeline-acceptance-doc",
   "audit:timeline-debug-signal",
+  "audit:timeline-resize-handles",
   "audit:phase1-handoff",
   "audit:export-audio-render-settings",
   "audit:preview-audio-render-settings",
