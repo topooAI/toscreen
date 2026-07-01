@@ -10,6 +10,7 @@ import TimelineWrapper from "./TimelineWrapper";
 import Row from "./Row";
 import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
+import { partitionIntoTimelineLanes } from "./lanePartition";
 import type { Range, Span } from "dnd-timeline";
 import type { ZoomRegion, TrimRegion, AnnotationRegion, AudioRegion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
@@ -941,6 +942,7 @@ export default function TimelineEditor({
     const isAudioItem = (audioRegions || []).some(r => r.id === baseExcludeId);
 
     if (isAnnotationItem) {
+      // Annotation overlap is resolved by visual lane wrapping instead of collision rejection.
       return false;
     }
 
@@ -998,8 +1000,8 @@ export default function TimelineEditor({
     const isAnnotationItem = (annotationRegions || []).some(r => r.id === excludeId);
     const isAudioItem = (audioRegions || []).some(r => r.id === baseExcludeId);
 
-    // 对于注解，允许自由重叠覆盖
     if (isAnnotationItem) {
+      // Annotation overlap is resolved by visual lane wrapping instead of collision rejection.
       return newSpan;
     }
 
@@ -1327,31 +1329,7 @@ export default function TimelineEditor({
       variant: 'trim',
     })) : [];
 
-    const partitionIntoTracks = <T extends { startMs: number; endMs: number }>(regions: T[]) => {
-      const sorted = [...regions].sort((a, b) => a.startMs - b.startMs);
-      const tracks: number[][] = []; // store endMs of items in each track
-      const result: { item: T; trackIndex: number }[] = [];
-      
-      for (const item of sorted) {
-        let assignedTrack = -1;
-        for (let i = 0; i < tracks.length; i++) {
-          const lastEnd = tracks[i][tracks[i].length - 1];
-          if (item.startMs >= lastEnd) {
-            assignedTrack = i;
-            tracks[i].push(item.endMs);
-            break;
-          }
-        }
-        if (assignedTrack === -1) {
-          assignedTrack = tracks.length;
-          tracks.push([item.endMs]);
-        }
-        result.push({ item, trackIndex: assignedTrack });
-      }
-      return result;
-    };
-
-    const partitionedAnnotations = partitionIntoTracks(annotationRegions || []);
+    const partitionedAnnotations = partitionIntoTimelineLanes(annotationRegions || []);
     const annotations: TimelineRenderItem[] = partitionedAnnotations.map(({ item: region, trackIndex }) => {
       let label: string;
       
@@ -1374,7 +1352,7 @@ export default function TimelineEditor({
     });
 
     const filteredAudios = (audioRegions || []).filter(region => !region.isOriginal || region.isDetached);
-    const partitionedAudios = partitionIntoTracks(filteredAudios);
+    const partitionedAudios = partitionIntoTimelineLanes(filteredAudios);
     const audios: TimelineRenderItem[] = partitionedAudios.map(({ item: region, trackIndex }) => ({
       id: region.id,
       rowId: `row-audio-${trackIndex}`,

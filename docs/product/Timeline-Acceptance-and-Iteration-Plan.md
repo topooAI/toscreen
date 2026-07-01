@@ -32,6 +32,7 @@ Machine gates prove that key wiring is intact, but they do not replace hands-on 
 | RULE-02 工程总长 / Project duration | `npm run audit:project-duration`, `npm run audit:timeline-duration-domains`, `npm run audit:preview-project-time`, `npm run audit:export-duration-render-settings` | 时间轴、预览、导出都以工程总长合同为基础。 / Timeline, preview, and export are based on the project-duration contract. |
 | RULE-03 拉伸把手 / Resize handles | `npm run audit:electron-editor-runtime` | Focus resize preview 和片段端点结构仍被保护。 / Focus resize preview and clip endpoint structure are guarded. |
 | RULE-04 / CLIP-04 / CLIP-05 片段选中视觉 / Clip selected visual style | `npm run audit:electron-editor-runtime` | 所有 clip 基类保持 6px 圆角，selected 状态使用 inset box-shadow 且不通过 background 改变尺寸感。 / All clip base classes keep a 6px radius, and selected states use inset box-shadow without background-based size perception changes. |
+| DRAG-04 Annotation 分轨 / Annotation lane wrapping | `npm run audit:timeline-lane-wrapping`, `npm run audit:project-model-lane-wrapping` | Timeline 可视层和 ProjectModel 层都会把重叠 Annotation 分到不同同类型 lane。 / Both timeline visual layout and ProjectModel wrap overlapping annotations onto separate same-type lanes. |
 | UA-04 核心体验连接点 / Core UX wiring | `npm run audit:screenstudio-core-contract`, `npm run audit:electron-editor-runtime` | 背景、Zoom/Camera、Annotation、系统光标、fallback 预览和主轨样式连接点仍存在。 / Background, Zoom/Camera, annotation, system cursor, fallback preview, and main-track styling wiring still exist. |
 
 ## 状态说明 / Status Legend
@@ -96,7 +97,7 @@ These rules affect several implementation choices. Confirm them before broad ref
 | DRAG-01 | 同音轨音频碰撞 / Audio same-track collision | 将一个音频片段拖到同一音轨的另一个音频片段上。 / Drag one audio clip onto another in the same audio row. | 不允许同轨重叠；应贴边避让或换到新的空闲音轨，且没有突兀跳动。 / Same-track overlap is not allowed; the clip should snap to an available edge or move to another available audio row without visual jump surprises. | 🟠 Partial | `TimelineWrapper.tsx`, `TimelineEditor.tsx` |
 | DRAG-02 | 音频跨轨拖拽 / Audio cross-track drag | 将音频片段拖到不同音频轨道。 / Drag audio between audio rows. | trackIndex 正确更新，不能误落到非音频轨。 / Track index updates correctly; audio cannot drop into invalid non-audio rows. | 🟡 Needs Verification | `TimelineWrapper.tsx`, `TimelineEditor.tsx` |
 | DRAG-03 | Zoom 碰撞处理 / Zoom collision handling | 将 Zoom 区域拖拽或拉伸到另一个 Zoom 区域上。 / Drag or resize Zoom regions into each other. | 不允许同轨重叠；应贴边避让或换到新的空闲 Focus/Zoom 子轨。 / Same-track overlap is not allowed; the region should snap to an available edge or move to another available Focus/Zoom sub-track. | 🟠 Partial | `TimelineEditor.tsx` |
-| DRAG-04 | Annotation 自动分轨 / Annotation automatic lane wrapping | 创建多个时间重叠的 Annotation，或将 Annotation 拖到同轨已有 Annotation 上。 / Create overlapping annotations, or drag one annotation onto another annotation in the same row. | 不允许同轨重叠；重叠时自动新增 Annotation 轨道/换行显示。 / Same-track overlap is not allowed; overlapping annotations should automatically use another annotation row. | ❌ Not Complete | `TimelineEditor.tsx` |
+| DRAG-04 | Annotation 自动分轨 / Annotation automatic lane wrapping | 创建多个时间重叠的 Annotation，或将 Annotation 拖到同轨已有 Annotation 上。 / Create overlapping annotations, or drag one annotation onto another annotation in the same row. | 不允许同轨重叠；重叠时自动新增 Annotation 轨道/换行显示。 / Same-track overlap is not allowed; overlapping annotations should automatically use another annotation row. | 🔒 Machine-Guarded | `TimelineEditor.tsx`, `lanePartition.ts`, `audit:timeline-lane-wrapping`, `audit:project-model-lane-wrapping` |
 | DRAG-05 | 磁吸 / Magnetic snap | 将片段拖拽/拉伸到相邻片段边缘或播放指针附近。 / Drag/resize clips near adjacent clip edges or playhead. | 仅在阈值内吸附，不因自身原始位置产生粘连拉扯。 / Clip edge snaps only within threshold; no sticky pull from its own original position. | 🟡 Needs Verification | `TimelineEditor.tsx` |
 | DRAG-06 | 无 NaN 拖拽死锁 / No NaN drag lock | 激进拖拽和拉伸很短的片段。 / Aggressively drag and resize small clips. | 不出现一格一卡、NaN 跳动或拖拽冻结。 / No one-grid stutter, NaN jump, or frozen drag state. | 🟡 Needs Verification | `TimelineWrapper.tsx`, `Item.tsx` |
 
@@ -133,7 +134,7 @@ These are high-risk claims from the old checklist; `Resolved` items must be re-a
 | 所有片段已经是 6px 圆角。 / All clips already use 6px radius. | Resolved / 已修正 | `ItemGlass.module.css` 已统一为 6px，并由 `audit:electron-editor-runtime` 守住。 / `ItemGlass.module.css` now uses 6px consistently and is guarded by `audit:electron-editor-runtime`. |
 | 所有选中卡片都是纯内发光。 / All selected cards use pure inset glow. | Resolved / 已修正 | Selected 状态已改为 inset box-shadow，不再改 background；仍需 Electron 视觉体验确认。 / Selected states now use inset box-shadow and no background changes; Electron visual review is still required. |
 | 所有拉伸把手都是纯白竖条。 / All resize handles are pure vertical white handles. | Incorrect / 不准确 | 只有 Video/Audio 是竖向把手，其他类型仍使用 SVG 端帽。 / Only Video/Audio use vertical handles; other clip types still use SVG caps. |
-| Annotation 可以在同一轨道自由重叠。 / Annotation may freely overlap within the same track. | Incorrect / 不准确 | 已确认新规则：所有片段都不允许同轨重叠，Annotation 重叠时应自动新增轨道/换行。 / Confirmed new rule: no clip type may overlap within the same track; Annotation should add or use another row when ranges overlap. |
+| Annotation 可以在同一轨道自由重叠。 / Annotation may freely overlap within the same track. | Resolved / 已修正 | Timeline 可视层和 ProjectModel 层都已增加分轨门禁；仍需 Electron 拖拽手感验收。 / Timeline visual layout and ProjectModel now have lane-wrapping gates; Electron drag feel still needs hands-on review. |
 | 所有片段都可以自由重叠。 / All clips may overlap freely. | Incorrect / 不准确 | 已确认新规则：所有片段都不允许同轨重叠。 / Confirmed new rule: no clip type may overlap within the same track. |
 
 ## 工作协议 / Working Protocol
@@ -178,3 +179,5 @@ These are high-risk claims from the old checklist; `Resolved` items must be re-a
   Added the machine evidence map, linking hot update, project duration, no same-track overlap, and core UX wiring to existing audit commands.
 - `TL-07` 明确采用已决策的黑屏尾部规则：Main Track 结束后工程继续播放到所有片段最晚结束。  
   `TL-07` now uses the resolved black-tail rule: after Main Track ends, project playback continues until the latest clip end.
+- 新增 `audit:timeline-lane-wrapping`，将 Annotation/Audio 的可视分轨算法抽成共享 helper，并验证重叠 Annotation 不会落在同一可视 lane。  
+  Added `audit:timeline-lane-wrapping`, extracted Annotation/Audio visual lane partitioning into a shared helper, and verifies overlapping annotations do not share the same visual lane.
