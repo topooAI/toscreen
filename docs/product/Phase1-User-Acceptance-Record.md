@@ -16,6 +16,18 @@ This document records hands-on user acceptance for Phase 1. Machine gates only p
 5. UA-01 到 UA-08 全部改为 `[x]` 后，将阶段结论改为 `Released / 已放行`；此时 `npm run audit:phase1-readiness` 才应输出 `phaseComplete: true`。
    After UA-01 through UA-08 are all changed to `[x]`, change the phase conclusion to `Released / 已放行`; only then should `npm run audit:phase1-readiness` output `phaseComplete: true`.
 
+### 1.1 当前对照入口 / Current Checklist Entry
+
+实际迭代时按这个顺序看，不需要在多个文档里来回找。
+Use this order during real iteration so the working checklist stays in one place.
+
+| 顺序 / Order | 看哪一节 / Section To Use | 用来判断什么 / What It Decides |
+|---|---|---|
+| 1 | `2.1 快速对照清单 / Quick Reference Checklist` | Codex 可以直接推进哪些工程闭环，哪些节点必须由用户验收或拍板。 / Which engineering loops Codex can push forward directly, and which checkpoints require user review or decision. |
+| 2 | `2.2 用户介入节点清单 / User Checkpoint List` | 我什么时候必须停下来问你，什么时候可以继续独立修代码、补门禁、更新文档和提交。 / When I must stop and ask you, and when I can continue fixing code, adding gates, updating docs, and committing independently. |
+| 3 | `2.3 详细执行列表 / Detailed Execution List` | 每个工作域的执行边界、用户介入条件和验收标准。 / The execution boundary, user checkpoint, and acceptance standard for each work area. |
+| 4 | `3. 用户验收清单 / User Acceptance Checklist` | Phase 1 是否可以关闭，是否进入下一阶段。 / Whether Phase 1 can close and move to the next stage. |
+
 ## 2. 开发对照列表 / Development Ownership Checklist
 
 这个列表用于一边开发一边对照：默认 Codex 可以继续推进确定性的工程工作；只有进入“必须用户判断”的节点时才停下来。

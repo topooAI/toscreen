@@ -10,49 +10,105 @@ const timelineEditorPath = path.join(
   "timeline",
   "TimelineEditor.tsx",
 );
+const videoEditorPath = path.join(
+  repoRoot,
+  "src",
+  "components",
+  "video-editor",
+  "VideoEditor.tsx",
+);
+const playbackControlsPath = path.join(
+  repoRoot,
+  "src",
+  "components",
+  "video-editor",
+  "PlaybackControls.tsx",
+);
 
-const content = fs.readFileSync(timelineEditorPath, "utf8");
+const timelineEditorContent = fs.readFileSync(timelineEditorPath, "utf8");
+const videoEditorContent = fs.readFileSync(videoEditorPath, "utf8");
+const playbackControlsContent = fs.readFileSync(playbackControlsPath, "utf8");
 
 assertIncludes(
+  timelineEditorContent,
   "const projectTotalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);",
   "Timeline project duration must derive from the project-level videoDuration prop.",
 );
 assertIncludes(
+  timelineEditorContent,
   "const sourceTotalMs = useMemo(() => Math.max(0, Math.round((sourceVideoDuration ?? videoDuration) * 1000)), [sourceVideoDuration, videoDuration]);",
   "Timeline source duration must remain explicit for source-bound video and trim operations.",
 );
 assertIncludes(
+  timelineEditorContent,
   "const totalMs = projectTotalMs;",
   "Timeline default coordinate domain must be project duration, not source video duration.",
 );
 assertIncludes(
+  timelineEditorContent,
   "useTimeMap(trimRegions, sourceTotalMs)",
   "Trim time mapping must stay in the source-video duration domain.",
 );
 assertIncludes(
+  timelineEditorContent,
   "span: { start: 0, end: mapTime(sourceTotalMs) }",
   "Main video track rendering must stay source-bound instead of extending through black-tail project time.",
 );
 assertIncludes(
+  timelineEditorContent,
   "buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective)",
   "Main clip partitioning must go through the source-bound segmentation helper.",
 );
 assertIncludes(
+  timelineEditorContent,
   "sourceEndMs: segment.sourceEndMs",
   "Source-backed main clips must retain source duration as their source end.",
 );
 assertIncludes(
+  timelineEditorContent,
   "const clampedEnd = Math.min(projectTotalMs, Math.max(minEnd, region.endMs));",
   "Camera/Zoom regions must clamp against project duration.",
 );
 assertIncludes(
+  timelineEditorContent,
   "const clampedEnd = Math.min(sourceTotalMs, Math.max(minEnd, region.endMs));",
   "Trim regions must clamp against source duration.",
 );
+assertIncludes(
+  videoEditorContent,
+  "videoDuration={projectDuration}",
+  "VideoEditor must pass projectDuration into TimelineEditor as the project-level duration.",
+);
+assertIncludes(
+  videoEditorContent,
+  "sourceVideoDuration={duration}",
+  "VideoEditor must pass the original source duration separately for source-bound operations.",
+);
+assertIncludes(
+  timelineEditorContent,
+  "duration={videoDuration}",
+  "Timeline playback controls must display the project-level videoDuration prop.",
+);
+assertIncludes(
+  playbackControlsContent,
+  "onSeek(Math.min(duration, currentTime + 0.1));",
+  "PlaybackControls next-frame seek must clamp against its duration prop.",
+);
+assertIncludes(
+  playbackControlsContent,
+  "{formatTime(duration)}",
+  "PlaybackControls must display the duration prop as the total time.",
+);
 
 assertNotIncludes(
+  timelineEditorContent,
   "const totalMs = useMemo(() => Math.max(0, Math.round((sourceVideoDuration ?? videoDuration) * 1000))",
   "Timeline must not use sourceVideoDuration as the default totalMs domain.",
+);
+assertNotIncludes(
+  timelineEditorContent,
+  "duration={sourceVideoDuration",
+  "Timeline playback controls must not display sourceVideoDuration.",
 );
 
 console.log(JSON.stringify({
@@ -66,16 +122,19 @@ console.log(JSON.stringify({
     "main clip segmentation helper stays source-bound",
     "Camera/Zoom clamps to project duration",
     "Trim clamps to source duration",
+    "VideoEditor passes projectDuration into TimelineEditor",
+    "Timeline playback controls display project duration, not source duration",
+    "PlaybackControls clamps forward seek and total label against duration prop",
   ],
 }, null, 2));
 
-function assertIncludes(needle: string, message: string) {
+function assertIncludes(content: string, needle: string, message: string) {
   if (!content.includes(needle)) {
     fail(message, { needle });
   }
 }
 
-function assertNotIncludes(needle: string, message: string) {
+function assertNotIncludes(content: string, needle: string, message: string) {
   if (content.includes(needle)) {
     fail(message, { needle });
   }

@@ -91,6 +91,7 @@ const requiredPhrases = [
   "VIDEO-03A | Trim 后主片段分段合同",
   "VIDEO-03B | Trim 后主片段视觉验收",
   "VIDEO-06 | Main Track 与时间刻度解耦",
+  "播放控件总时长",
   "2026-07-01",
 ];
 
