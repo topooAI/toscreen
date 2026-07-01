@@ -19,6 +19,7 @@ import {
   parseHandsOnSteps,
   validateAcceptancePlanEvidence,
 } from "./phase1AcceptancePlan";
+import { summarizeSceneMigration } from "./phase1SceneMigration";
 
 type HandoffStatus = "ready" | "blocked";
 
@@ -55,7 +56,11 @@ async function buildHandoffPacket(directory: string) {
   }
   const acceptancePlan = buildAcceptancePlan(acceptance.checkedIds, handsOnSteps);
   const packageJson = await readPackageJson(errors);
-  errors.push(...validateAcceptancePlanEvidence(acceptancePlan, packageJson?.scripts ?? {}));
+  const packageScripts = packageJson?.scripts ?? {};
+  errors.push(...validateAcceptancePlanEvidence(acceptancePlan, packageScripts));
+  if (typeof packageScripts["audit:project-model-default-scene"] !== "string") {
+    errors.push("Missing audit:project-model-default-scene script for Scene migration evidence.");
+  }
   const latestRecording = await findLatestRecording(directory, errors, warnings);
   const projectPath = latestRecording
     ? await findFirstExistingPath(projectPathCandidatesForMediaPath(latestRecording.path))
@@ -186,6 +191,7 @@ async function summarizeProjectModel(projectPath: string, errors: string[]) {
 
   const restored = restoreLegacyEditorStateFromProjectModel(rawProject.projectModel);
   const renderSettings = getProjectRenderSettings(rawProject.projectModel);
+  const sceneMigration = summarizeSceneMigration(rawProject.projectModel);
 
   return {
     present: true,
@@ -194,6 +200,8 @@ async function summarizeProjectModel(projectPath: string, errors: string[]) {
     assets: rawProject.projectModel.assets?.length ?? 0,
     tracks: rawProject.projectModel.tracks?.length ?? 0,
     clips: rawProject.projectModel.clips?.length ?? 0,
+    scenes: rawProject.projectModel.scenes?.length ?? 0,
+    sceneMigration,
     warnings: validation.warnings,
     coreRestore: {
       zoomRegions: restored.zoomRegions.length,
