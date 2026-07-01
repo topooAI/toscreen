@@ -88,6 +88,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:timeline-seek-mapping"],
   },
   {
+    id: "timeline-playhead-time",
+    command: npmCommand,
+    args: ["run", "audit:timeline-playhead-time"],
+  },
+  {
     id: "preview-project-time",
     command: npmCommand,
     args: ["run", "audit:preview-project-time"],

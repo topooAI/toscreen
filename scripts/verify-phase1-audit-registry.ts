@@ -24,6 +24,7 @@ const requiredAuditScripts = [
   "audit:timeline-drag-safety",
   "audit:timeline-magnetic-snap",
   "audit:timeline-seek-mapping",
+  "audit:timeline-playhead-time",
   "audit:preview-project-time",
   "audit:export-black-tail-rendering",
   "audit:screenstudio-core-contract",

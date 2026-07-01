@@ -28,6 +28,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:timeline-drag-safety",
     "npm run audit:timeline-magnetic-snap",
     "npm run audit:timeline-seek-mapping",
+    "npm run audit:timeline-playhead-time",
     "npm run audit:electron-editor-runtime",
   ],
   "UA-04": [

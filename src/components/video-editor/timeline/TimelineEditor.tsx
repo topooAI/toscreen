@@ -12,6 +12,7 @@ import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
 import { partitionIntoTimelineLanes } from "./lanePartition";
 import { getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
+import { resolveTimelinePlayheadDisplayTime } from "./timelinePlayheadTime";
 import { resolveTimelineSeekFromClientX } from "./timelineSeekMapping";
 import type { Range, Span } from "dnd-timeline";
 import type { ZoomRegion, TrimRegion, AnnotationRegion, AudioRegion } from "../types";
@@ -255,27 +256,25 @@ function PlaybackCursor({
       }
       
       const video = videoRef?.current;
-      const rawTimeMs = freezeExternalTime ? currentTimeMsRef.current : (video ? video.currentTime * 1000 : currentTimeMsRef.current);
-      const timeMs = (isTrimTrackVisible || !mapSourceToEffective) 
-        ? rawTimeMs 
-        : mapSourceToEffective(rawTimeMs);
+      const { displayTimeMs } = resolveTimelinePlayheadDisplayTime({
+        currentTimeMs: currentTimeMsRef.current,
+        externalVideoTimeMs: video ? video.currentTime * 1000 : undefined,
+        isVideoPlaying: !!video && !video.paused && !Number.isNaN(video.currentTime),
+        isDragging: isDraggingRef.current,
+        freezeExternalTime,
+        isTrimTrackVisible,
+        mapSourceToEffective,
+      });
 
       // --- 关键防守与解绑逻辑 ---
       // 1. 防御 NaN 或 Infinity，避免 valueToPixels 崩溃导致游标飞到 0px
-      if (!Number.isFinite(timeMs) || !Number.isFinite(videoDurationMs) || videoDurationMs <= 0) {
+      if (displayTimeMs === null || !Number.isFinite(videoDurationMs) || videoDurationMs <= 0) {
         container.style.display = 'none';
         rafId = requestAnimationFrame(tick);
         return;
       }
 
-      let finalTimeMs = timeMs;
-      // 2. 只有在视频真正播放时，且没有在拖拽时，才跟随底层真实的 currentTime
-      // 当暂停或拖拽时，或者拿不到 video 实例时，完全信任 React 传递下来的 currentTimeMsRef（精准落点，无视底层帧吸附）
-      if (!freezeExternalTime && !isDraggingRef.current && video && !video.paused && !Number.isNaN(video.currentTime)) {
-        finalTimeMs = timeMs;
-      } else {
-        finalTimeMs = currentTimeMsRef.current;
-      }
+      const finalTimeMs = displayTimeMs;
 
       if (finalTimeMs < 0) {
         container.style.display = 'none';
