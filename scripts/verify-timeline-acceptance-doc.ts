@@ -30,6 +30,7 @@ const requiredPhrases = [
   "RULE-03 | 拉伸把手样式",
   "RULE-04 | 片段选中样式",
   "TL-07 | Main Track 到头后继续播放其他轨道",
+  "DRAG-03 | Zoom 碰撞处理",
   "DRAG-04 | Annotation 自动分轨",
   "0:20 之后画面为黑屏尾部",
   "VIDEO-06 | Main Track 与时间刻度解耦",

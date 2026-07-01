@@ -25,6 +25,9 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
     if (id.startsWith("row-audio-")) {
       const idx = parseInt(id.replace("row-audio-", ""), 10) + 1;
       meta = { label: idx === 1 ? "Audio" : `Audio ${idx}` };
+    } else if (id.startsWith("row-zoom-")) {
+      const idx = parseInt(id.replace("row-zoom-", ""), 10) + 1;
+      meta = { label: idx === 1 ? "Focus" : `Focus ${idx}` };
     } else if (id.startsWith("row-annotation-")) {
       const idx = parseInt(id.replace("row-annotation-", ""), 10) + 1;
       meta = { label: idx === 1 ? "Text" : `Text ${idx}` };

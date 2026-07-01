@@ -25,7 +25,7 @@ import { formatShortcut } from "../../../utils/platformUtils";
 
 import PlaybackControls from "../PlaybackControls";
 
-const ZOOM_ROW_ID = "row-zoom";
+const ZOOM_ROW_ID = "row-zoom-0";
 const TRIM_ROW_ID = "row-trim";
 const VIDEO_ROW_ID = "row-video";
 const FALLBACK_RANGE_MS = 1000;
@@ -599,26 +599,35 @@ function Timeline({
         ))}
       </Row>
       
-      <Row id={ZOOM_ROW_ID} onAddClick={onAddZoom}>
-        {items.filter(item => item.rowId === ZOOM_ROW_ID).map((item) => (
-          <Item
-            id={item.id}
-            key={item.id}
-            rowId={item.rowId}
-            span={item.span}
-            isSelected={item.id === selectedZoomId}
-            onSelect={() => onSelectZoom?.(item.id)}
-            variant="zoom"
-            zoomDepth={item.zoomDepth}
-            onDirectSpanChange={onItemSpanChange}
-            onDirectSpanPreview={onItemResizePreview}
-            onDirectResizeStart={onTimelineResizeStart}
-            onDirectResizeEnd={onTimelineResizeEnd}
-          >
-            {item.label}
-          </Item>
-        ))}
-      </Row>
+      {(() => {
+        const zoomRowIds = Array.from(new Set(
+          items.filter(item => item.rowId.startsWith("row-zoom-")).map(item => item.rowId)
+        )).sort();
+        const finalZoomRowIds = zoomRowIds.length > 0 ? zoomRowIds : [ZOOM_ROW_ID];
+
+        return finalZoomRowIds.map((rowId) => (
+          <Row id={rowId} key={rowId} onAddClick={onAddZoom}>
+            {items.filter(item => item.rowId === rowId).map((item) => (
+              <Item
+                id={item.id}
+                key={item.id}
+                rowId={item.rowId}
+                span={item.span}
+                isSelected={item.id === selectedZoomId}
+                onSelect={() => onSelectZoom?.(item.id)}
+                variant="zoom"
+                zoomDepth={item.zoomDepth}
+                onDirectSpanChange={onItemSpanChange}
+                onDirectSpanPreview={onItemResizePreview}
+                onDirectResizeStart={onTimelineResizeStart}
+                onDirectResizeEnd={onTimelineResizeEnd}
+              >
+                {item.label}
+              </Item>
+            ))}
+          </Row>
+        ));
+      })()}
 
       {(() => {
         const annotationRowIds = Array.from(new Set(
@@ -941,8 +950,8 @@ export default function TimelineEditor({
     const isAnnotationItem = (annotationRegions || []).some(r => r.id === excludeId);
     const isAudioItem = (audioRegions || []).some(r => r.id === baseExcludeId);
 
-    if (isAnnotationItem) {
-      // Annotation overlap is resolved by visual lane wrapping instead of collision rejection.
+    if (isZoomItem || isAnnotationItem) {
+      // Zoom/Annotation overlap is resolved by visual lane wrapping instead of collision rejection.
       return false;
     }
 
@@ -1000,8 +1009,8 @@ export default function TimelineEditor({
     const isAnnotationItem = (annotationRegions || []).some(r => r.id === excludeId);
     const isAudioItem = (audioRegions || []).some(r => r.id === baseExcludeId);
 
-    if (isAnnotationItem) {
-      // Annotation overlap is resolved by visual lane wrapping instead of collision rejection.
+    if (isZoomItem || isAnnotationItem) {
+      // Zoom/Annotation overlap is resolved by visual lane wrapping instead of collision rejection.
       return newSpan;
     }
 
@@ -1312,9 +1321,10 @@ export default function TimelineEditor({
       } : undefined,
     }];
     
-    const zooms: TimelineRenderItem[] = zoomRegions.map((region, index) => ({
+    const partitionedZooms = partitionIntoTimelineLanes(zoomRegions);
+    const zooms: TimelineRenderItem[] = partitionedZooms.map(({ item: region, trackIndex }, index) => ({
       id: region.id,
-      rowId: ZOOM_ROW_ID,
+      rowId: `row-zoom-${trackIndex}`,
       span: { start: mapTime(region.startMs), end: mapTime(region.endMs) },
       label: `Zoom ${index + 1}`,
       zoomDepth: region.depth,
