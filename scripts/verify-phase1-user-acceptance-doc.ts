@@ -16,6 +16,7 @@ const requiredPhrases = [
   "npm run audit:phase1",
   "npm run audit:phase1-readiness",
   "npm run audit:recordings",
+  "npm run audit:timeline-track-origin",
   "npm run audit:timeline-lane-wrapping",
   "npm run audit:timeline-drag-safety",
   "npm run audit:timeline-magnetic-snap",

@@ -20,6 +20,7 @@ const requiredAuditScripts = [
   "audit:project-duration",
   "audit:export-duration-render-settings",
   "audit:timeline-duration-domains",
+  "audit:timeline-track-origin",
   "audit:timeline-lane-wrapping",
   "audit:timeline-drag-safety",
   "audit:timeline-magnetic-snap",

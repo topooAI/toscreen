@@ -119,7 +119,7 @@ const checks = [
     file: "row",
     needles: [
       "data-timeline-track-area=\"true\"",
-      "marginLeft: 16",
+      "marginLeft: TIMELINE_BREATHING_GAP_PX",
       "id !== \"row-video\"",
     ],
   },

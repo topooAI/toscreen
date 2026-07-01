@@ -68,6 +68,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:timeline-duration-domains"],
   },
   {
+    id: "timeline-track-origin",
+    command: npmCommand,
+    args: ["run", "audit:timeline-track-origin"],
+  },
+  {
     id: "timeline-lane-wrapping",
     command: npmCommand,
     args: ["run", "audit:timeline-lane-wrapping"],

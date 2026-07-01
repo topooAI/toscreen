@@ -19,6 +19,7 @@
     "audit:project-duration": "tsx scripts/verify-project-duration-contract.ts",
     "audit:export-duration-render-settings": "tsx scripts/verify-export-duration-render-settings.ts",
     "audit:timeline-duration-domains": "tsx scripts/verify-timeline-duration-domains.ts",
+    "audit:timeline-track-origin": "tsx scripts/verify-timeline-track-origin.ts",
     "audit:timeline-lane-wrapping": "tsx scripts/verify-timeline-lane-wrapping.ts",
     "audit:timeline-drag-safety": "tsx scripts/verify-timeline-drag-safety.ts",
     "audit:timeline-magnetic-snap": "tsx scripts/verify-timeline-magnetic-snap.ts",

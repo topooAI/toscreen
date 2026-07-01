@@ -14,6 +14,7 @@ import { partitionIntoTimelineLanes } from "./lanePartition";
 import { getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
 import { resolveTimelinePlayheadDisplayTime } from "./timelinePlayheadTime";
 import { resolveTimelineSeekFromClientX } from "./timelineSeekMapping";
+import { FALLBACK_TRACK_START_PX, resolveTrackStartPx } from "./timelineTrackOrigin";
 import type { Range, Span } from "dnd-timeline";
 import type { ZoomRegion, TrimRegion, AnnotationRegion, AudioRegion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
@@ -33,7 +34,6 @@ const TRIM_ROW_ID = "row-trim";
 const VIDEO_ROW_ID = "row-video";
 const FALLBACK_RANGE_MS = 1000;
 const TARGET_MARKER_COUNT = 12;
-const FALLBACK_TRACK_START_PX = 156;
 
 function getTrackStartPx(timeline: HTMLElement | null) {
   if (!timeline) return FALLBACK_TRACK_START_PX;
@@ -42,7 +42,10 @@ function getTrackStartPx(timeline: HTMLElement | null) {
 
   const timelineRect = timeline.getBoundingClientRect();
   const trackRect = trackArea.getBoundingClientRect();
-  return Math.max(0, trackRect.left - timelineRect.left);
+  return resolveTrackStartPx({
+    timelineLeftPx: timelineRect.left,
+    trackLeftPx: trackRect.left,
+  });
 }
 
 interface TimelineEditorProps {
@@ -761,10 +764,10 @@ const { setTimelineRef, style, range, pixelsToValue, setSidebarRef } = useTimeli
       className="select-none bg-[#09090b] min-h-[140px] h-full relative cursor-pointer group"
       onClick={handleTimelineClick}
     >
-      {/* 虚拟的 Sidebar 测量节点：真实宽度140 + 16px呼吸留白 = 156 */}
+      {/* 虚拟的 Sidebar 测量节点：真实宽度 + 呼吸留白 = 轨道起点 fallback */}
       <div 
         ref={setSidebarRef} 
-        style={{ position: 'absolute', width: 156, height: 1, opacity: 0, pointerEvents: 'none' }} 
+        style={{ position: 'absolute', width: FALLBACK_TRACK_START_PX, height: 1, opacity: 0, pointerEvents: 'none' }}
       />
 
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px)] bg-[length:20px_100%] pointer-events-none" />

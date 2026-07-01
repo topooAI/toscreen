@@ -2,6 +2,7 @@ import { useRow } from "dnd-timeline";
 import type { RowDefinition } from "dnd-timeline";
 import { Plus } from "lucide-react";
 import React from "react";
+import { TIMELINE_BREATHING_GAP_PX, TIMELINE_SIDEBAR_WIDTH_PX } from "./timelineTrackOrigin";
 
 interface RowProps extends RowDefinition {
   children: React.ReactNode;
@@ -44,7 +45,7 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
       {/* Sidebar Track Control Header */}
       <div 
         className="border-r border-white/5 bg-[#0c0c0e] flex items-center justify-between px-3 gap-2 select-none z-10 shrink-0 cursor-grab active:cursor-grabbing hover:bg-white/[0.03] transition-colors relative"
-        style={{ width: 140 }}
+        style={{ width: TIMELINE_SIDEBAR_WIDTH_PX }}
         title="长按拖拽排序"
       >
         <div className="flex items-center overflow-hidden flex-1">
@@ -82,7 +83,7 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
       <div 
         data-timeline-track-area="true"
         ref={setNodeRef} 
-        style={{ ...rowStyle, position: 'relative', flex: 1, height: '100%', marginLeft: 16 }}
+        style={{ ...rowStyle, position: 'relative', flex: 1, height: '100%', marginLeft: TIMELINE_BREATHING_GAP_PX }}
       >
         {children}
       </div>

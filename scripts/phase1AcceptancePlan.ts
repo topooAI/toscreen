@@ -24,6 +24,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
   ],
   "UA-03": [
     "npm run audit:timeline-acceptance-doc",
+    "npm run audit:timeline-track-origin",
     "npm run audit:timeline-lane-wrapping",
     "npm run audit:timeline-drag-safety",
     "npm run audit:timeline-magnetic-snap",
