@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   companionAudioPathCandidatesForMediaPath,
   projectPathCandidatesForMediaPath,
@@ -12,6 +11,11 @@ import {
   validateVideoEditorProject,
 } from "../src/components/video-editor/project";
 import { summarizeSceneMigration } from "./phase1SceneMigration";
+import {
+  auditProjectAssetFiles,
+  type ProjectAssetFileAudit,
+  summarizeMissingAssetFiles,
+} from "./recordingAssetFiles";
 
 type AuditStatus = "ok" | "warn" | "fail";
 
@@ -72,24 +76,7 @@ async function auditRecordingRestore(directory: string) {
     clips?: number;
     scenes?: number;
     sceneMigration?: ReturnType<typeof summarizeSceneMigration>;
-    assetFiles?: {
-      checked: Array<{
-        assetId: string;
-        type: string;
-        path: string;
-      }>;
-      skipped: Array<{
-        assetId: string;
-        type: string;
-        source: string;
-        reason: string;
-      }>;
-      missing: Array<{
-        assetId: string;
-        type: string;
-        path: string;
-      }>;
-    };
+    assetFiles?: ProjectAssetFileAudit;
     restoredCompanionAudioPath?: string | null;
     coreRestore?: {
       sourceCameraClips: number;
@@ -161,7 +148,7 @@ async function auditRecordingRestore(directory: string) {
       if (!validation.valid) errors.push("ProjectModel sidecar is invalid.");
       if (validation.valid) {
         if (assetFiles.missing.length > 0) {
-          errors.push(`ProjectModel asset files are missing: ${assetFiles.missing.map((asset) => `${asset.assetId} -> ${asset.path}`).join(", ")}.`);
+          errors.push(`ProjectModel asset files are missing: ${summarizeMissingAssetFiles(assetFiles)}.`);
         }
         if (sourceCameraClips > 0 && restoredZoomRegions !== sourceCameraClips) {
           errors.push(`Camera restore mismatch: expected ${sourceCameraClips} restored zoom regions, got ${restoredZoomRegions}.`);
@@ -222,57 +209,4 @@ async function findFirstExistingPath(candidates: string[]) {
 
 function countClips(project: { clips?: Array<{ type?: string }> }, type: string) {
   return project.clips?.filter((clip) => clip.type === type).length ?? 0;
-}
-
-async function auditProjectAssetFiles(project: {
-  assets?: Array<{
-    id?: string;
-    type?: string;
-    sourceUrl?: string;
-    filePath?: string;
-  }>;
-}) {
-  const checked: Array<{ assetId: string; type: string; path: string }> = [];
-  const skipped: Array<{ assetId: string; type: string; source: string; reason: string }> = [];
-  const missing: Array<{ assetId: string; type: string; path: string }> = [];
-
-  for (const asset of project.assets ?? []) {
-    const assetId = asset.id || "(missing id)";
-    const type = asset.type || "(missing type)";
-    const source = asset.filePath || asset.sourceUrl || "";
-    const localPath = localFilePathFromAssetSource(source);
-
-    if (!source) {
-      skipped.push({ assetId, type, source, reason: "no source path" });
-      continue;
-    }
-
-    if (!localPath) {
-      skipped.push({ assetId, type, source, reason: "non-local source" });
-      continue;
-    }
-
-    if (await pathExists(localPath)) {
-      checked.push({ assetId, type, path: localPath });
-    } else {
-      missing.push({ assetId, type, path: localPath });
-    }
-  }
-
-  return { checked, skipped, missing };
-}
-
-function localFilePathFromAssetSource(source: string) {
-  if (!source) return null;
-  if (source.startsWith("file://")) {
-    try {
-      return fileURLToPath(source);
-    } catch {
-      return source.replace(/^file:\/\//, "");
-    }
-  }
-  if (path.isAbsolute(source)) {
-    return source;
-  }
-  return null;
 }

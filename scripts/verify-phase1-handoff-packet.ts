@@ -20,6 +20,10 @@ import {
   validateAcceptancePlanEvidence,
 } from "./phase1AcceptancePlan";
 import { summarizeSceneMigration } from "./phase1SceneMigration";
+import {
+  auditProjectAssetFiles,
+  summarizeMissingAssetFiles,
+} from "./recordingAssetFiles";
 
 type HandoffStatus = "ready" | "blocked";
 
@@ -200,6 +204,10 @@ async function summarizeProjectModel(projectPath: string, errors: string[]) {
   const restored = restoreLegacyEditorStateFromProjectModel(rawProject.projectModel);
   const renderSettings = getProjectRenderSettings(rawProject.projectModel);
   const sceneMigration = summarizeSceneMigration(rawProject.projectModel);
+  const assetFiles = await auditProjectAssetFiles(rawProject.projectModel);
+  if (assetFiles.missing.length > 0) {
+    errors.push(`ProjectModel asset files are missing: ${summarizeMissingAssetFiles(assetFiles)}.`);
+  }
 
   return {
     present: true,
@@ -210,6 +218,7 @@ async function summarizeProjectModel(projectPath: string, errors: string[]) {
     clips: rawProject.projectModel.clips?.length ?? 0,
     scenes: rawProject.projectModel.scenes?.length ?? 0,
     sceneMigration,
+    assetFiles,
     warnings: validation.warnings,
     coreRestore: {
       zoomRegions: restored.zoomRegions.length,

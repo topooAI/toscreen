@@ -17,6 +17,10 @@ import {
 } from "./phase1AcceptancePlan";
 import { parsePhase1AcceptanceState } from "./phase1AcceptanceState";
 import { summarizeSceneMigration } from "./phase1SceneMigration";
+import {
+  auditProjectAssetFiles,
+  summarizeMissingAssetFiles,
+} from "./recordingAssetFiles";
 
 const repoRoot = process.cwd();
 const recordingsDir = process.argv[2] || path.join(
@@ -209,6 +213,10 @@ async function findLatestRecording(
     errors.push("Latest projectModel is invalid.");
   }
   const sceneMigration = summarizeSceneMigration(projectModel);
+  const assetFiles = await auditProjectAssetFiles(projectModel);
+  if (assetFiles.missing.length > 0) {
+    errors.push(`Latest projectModel asset files are missing: ${summarizeMissingAssetFiles(assetFiles)}.`);
+  }
   const restored = validation.valid
     ? restoreLegacyEditorStateFromProjectModel(projectModel)
     : null;
@@ -231,6 +239,7 @@ async function findLatestRecording(
       clips: projectModel.clips?.length ?? 0,
       scenes: projectModel.scenes?.length ?? 0,
       sceneMigration,
+      assetFiles,
       aiEditPlans: projectModel.aiEditPlans?.length ?? 0,
       restored: restored ? {
         zoomRegions: restored.zoomRegions.length,
