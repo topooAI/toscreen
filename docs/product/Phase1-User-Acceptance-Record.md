@@ -21,6 +21,9 @@ This document records hands-on user acceptance for Phase 1. Machine gates only p
 这个列表用于一边开发一边对照：默认 Codex 可以继续推进确定性的工程工作；只有进入“必须用户判断”的节点时才停下来。
 Use this list while iterating: by default, Codex can keep moving on deterministic engineering work; it stops only when a user judgment is required.
 
+这就是“Codex 能否独立完成、哪些节点需要用户介入”的主对照表；日常迭代时优先看本节，阶段放行时再看第 3 节 UA-01 到 UA-08。
+This is the main checklist for what Codex can complete independently and where the user must step in; use this section during daily iteration, then use UA-01 through UA-08 in Section 3 for phase release.
+
 ### 2.1 快速对照清单 / Quick Reference Checklist
 
 这张清单是工作时放在旁边看的最短版本：左边是 Codex 可以直接推进的工程闭环，右边是必须由用户验收或拍板的节点。
@@ -94,7 +97,7 @@ Run `npm run audit:phase1-handoff` first and confirm it reports `status: "ready"
 | `npm run audit:recordings` | 检查真实最新录制项目恢复证据。 / Checks restore evidence for the latest real recording. | 必须通过，并输出 `coreRestore`。 / Must pass and output `coreRestore`. |
 | `npm run audit:project-model-default-scene` | 检查真实保存路径的默认 Scene 结构。 / Checks the default Scene structure on the real save path. | 非空 ProjectModel 必须生成覆盖工程总长、引用所有 clip 的默认 `demo` Scene；旧无 Scene sidecar 恢复后再次保存也必须补上。 / A non-empty ProjectModel must generate a full-duration default `demo` Scene that references every clip; old scene-less sidecars must gain it after restore and save. |
 | `npm run audit:phase1-handoff` | 输出实机验收前预检包。 / Outputs the hands-on acceptance handoff packet. | 必须能找到最新真实录制、合法 ProjectModel sidecar、待验收 UA 列表、`handsOnSteps` 和 `acceptancePlan`；`acceptancePlan.machineEvidence` 必须引用真实 npm scripts。 / Must find the latest real recording, valid ProjectModel sidecar, pending UA list, `handsOnSteps`, and `acceptancePlan`; `acceptancePlan.machineEvidence` must reference real npm scripts. |
-| `npm run audit:phase1-user-review-packet` | 输出用户评审入口包。 / Outputs the user review entry packet. | 必须合并模型能力、开放问题、最新真实录制、ProjectModel 恢复摘要和 UA 验收计划；它不能替代用户勾选验收。 / Must combine model capabilities, open questions, latest real recording, ProjectModel restore summary, and UA acceptance plan; it cannot replace user check-off acceptance. |
+| `npm run audit:phase1-user-review-packet` | 输出用户评审入口包。 / Outputs the user review entry packet. | 必须合并模型能力、开放问题、最新真实录制、ProjectModel 恢复摘要、旧无 Scene sidecar 的 `sceneMigration` 预览和 UA 验收计划；它不能替代用户勾选验收。 / Must combine model capabilities, open questions, latest real recording, ProjectModel restore summary, `sceneMigration` preview for old scene-less sidecars, and UA acceptance plan; it cannot replace user check-off acceptance. |
 
 ## 5. 阶段结论 / Phase Conclusion
 

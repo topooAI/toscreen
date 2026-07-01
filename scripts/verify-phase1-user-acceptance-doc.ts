@@ -46,6 +46,7 @@ const requiredPhrases = [
   "machine evidence",
   "acceptancePlan.machineEvidence",
   "真实 npm scripts",
+  "sceneMigration",
   "完全退出并重启 Electron",
   "拖拽、拉伸、磁吸、滚轮缩放、移动游标",
   "系统光标模拟、Zoom/Focus、背景虚化、黑屏尾部",

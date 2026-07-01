@@ -79,6 +79,9 @@ const acceptancePlan = buildAcceptancePlan(
 const warnings: string[] = [];
 const errors = [
   ...validateAcceptancePlanEvidence(acceptancePlan, packageScripts),
+  ...(typeof packageScripts["audit:project-model-default-scene"] === "string"
+    ? []
+    : ["Missing audit:project-model-default-scene script for Scene migration evidence."]),
   ...requiredCapabilityPhrases
     .filter((phrase) => !reviewPacket.includes(phrase))
     .map((phrase) => `ProjectModel review packet is missing capability phrase: ${phrase}`),
@@ -89,6 +92,9 @@ const errors = [
 
 if (!architectureDoc.includes("PH1-57 用户模型确认 / User model review")) {
   errors.push("Architecture doc is missing the PH1-57 user model review checkpoint.");
+}
+if (!architectureDoc.includes("sceneMigration")) {
+  errors.push("Architecture doc is missing the sceneMigration review-packet note.");
 }
 
 const latestRecording = await findLatestRecording(recordingsDir, warnings, errors);
@@ -201,6 +207,7 @@ async function findLatestRecording(
   if (!validation.valid) {
     errors.push("Latest projectModel is invalid.");
   }
+  const sceneMigration = summarizeSceneMigration(projectModel);
   const restored = validation.valid
     ? restoreLegacyEditorStateFromProjectModel(projectModel)
     : null;
@@ -222,6 +229,7 @@ async function findLatestRecording(
       tracks: projectModel.tracks?.length ?? 0,
       clips: projectModel.clips?.length ?? 0,
       scenes: projectModel.scenes?.length ?? 0,
+      sceneMigration,
       aiEditPlans: projectModel.aiEditPlans?.length ?? 0,
       restored: restored ? {
         zoomRegions: restored.zoomRegions.length,
@@ -237,6 +245,25 @@ async function findLatestRecording(
         durationMs: renderSettings.durationMs,
       } : null,
     },
+  };
+}
+
+function summarizeSceneMigration(projectModel: {
+  durationMs?: number;
+  clips?: unknown[];
+  scenes?: unknown[];
+}) {
+  const currentScenes = Array.isArray(projectModel.scenes) ? projectModel.scenes.length : 0;
+  const clips = Array.isArray(projectModel.clips) ? projectModel.clips.length : 0;
+  const needsDefaultScene = clips > 0 && currentScenes === 0;
+  return {
+    currentScenes,
+    needsDefaultScene,
+    expectedAfterNextSave: needsDefaultScene ? 1 : currentScenes,
+    evidence: "npm run audit:project-model-default-scene",
+    note: needsDefaultScene
+      ? "Latest sidecar predates default Scene generation; restoring it in Electron and saving again should add one full-duration demo Scene."
+      : "Latest sidecar already has Scene structure or has no clips requiring a default Scene.",
   };
 }
 
