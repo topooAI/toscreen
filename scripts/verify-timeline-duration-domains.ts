@@ -34,11 +34,11 @@ assertIncludes(
   "Main video track rendering must stay source-bound instead of extending through black-tail project time.",
 );
 assertIncludes(
-  "currentSourceStart < sourceTotalMs",
-  "Main clip partitioning must end at source duration.",
+  "buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective)",
+  "Main clip partitioning must go through the source-bound segmentation helper.",
 );
 assertIncludes(
-  "sourceEndMs: sourceTotalMs",
+  "sourceEndMs: segment.sourceEndMs",
   "Source-backed main clips must retain source duration as their source end.",
 );
 assertIncludes(
@@ -63,6 +63,7 @@ console.log(JSON.stringify({
     "totalMs aliases projectTotalMs",
     "useTimeMap stays source-bound",
     "main video rendering stays source-bound",
+    "main clip segmentation helper stays source-bound",
     "Camera/Zoom clamps to project duration",
     "Trim clamps to source duration",
   ],

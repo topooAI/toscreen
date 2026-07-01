@@ -23,6 +23,7 @@ const requiredPhrases = [
   "npm run audit:timeline-seek-mapping",
   "npm run audit:timeline-playhead-time",
   "npm run audit:audio-resize-bounds",
+  "npm run audit:main-clip-segmentation",
   "npm run audit:project-model-clip-overlap-policy",
   "npm run audit:project-model-lane-wrapping",
   "npm run audit:project-duration",
@@ -63,6 +64,8 @@ const requiredPhrases = [
   "Audio source-bound resize contract",
   "Audio 跨轨 wiring",
   "0:20 之后画面为黑屏尾部",
+  "VIDEO-03A | Trim 后主片段分段合同",
+  "VIDEO-03B | Trim 后主片段视觉验收",
   "VIDEO-06 | Main Track 与时间刻度解耦",
   "2026-07-01",
 ];

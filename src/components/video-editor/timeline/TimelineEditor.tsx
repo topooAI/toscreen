@@ -13,6 +13,7 @@ import KeyframeMarkers from "./KeyframeMarkers";
 import { partitionIntoTimelineLanes } from "./lanePartition";
 import { clampAudioResizeSpanToSource, resolveAudioResizeBounds } from "./timelineAudioResizeBounds";
 import { getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
+import { buildMainClipSegments } from "./timelineMainClipSegments";
 import { resolveTimelinePlayheadDisplayTime } from "./timelinePlayheadTime";
 import { resolveTimelineSeekFromClientX } from "./timelineSeekMapping";
 import { FALLBACK_TRACK_START_PX, resolveTrackStartPx } from "./timelineTrackOrigin";
@@ -1386,47 +1387,24 @@ export default function TimelineEditor({
 
     const mainClips: TimelineRenderItem[] = [];
     if (!isTrimTrackVisible) {
-      const sortedTrims = [...trimRegions].sort((a, b) => a.startMs - b.startMs);
-      let currentSourceStart = 0;
-      sortedTrims.forEach((trim, index) => {
-        if (currentSourceStart < trim.startMs) {
-           mainClips.push({
-             id: `main-clip-${index}`,
-             rowId: VIDEO_ROW_ID,
-             span: { start: mapTime(currentSourceStart), end: mapTime(trim.startMs) },
-             label: 'Main Clip',
-             variant: 'video',
-             sourceUrl: videoPath,
-             sourceStartMs: currentSourceStart,
-             sourceEndMs: trim.startMs,
-             totalDurationMs: trim.startMs - currentSourceStart,
-             associatedAudio: originalAudio ? {
-              ...originalAudio,
-              sourceStartMs: currentSourceStart,
-              sourceEndMs: trim.startMs,
-            } : undefined,
-           });
-        }
-        currentSourceStart = trim.endMs;
+      buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective).forEach((segment) => {
+        mainClips.push({
+          id: segment.id,
+          rowId: VIDEO_ROW_ID,
+          span: { start: segment.effectiveStartMs, end: segment.effectiveEndMs },
+          label: 'Main Clip',
+          variant: 'video',
+          sourceUrl: videoPath,
+          sourceStartMs: segment.sourceStartMs,
+          sourceEndMs: segment.sourceEndMs,
+          totalDurationMs: segment.sourceEndMs - segment.sourceStartMs,
+          associatedAudio: originalAudio ? {
+            ...originalAudio,
+            sourceStartMs: segment.sourceStartMs,
+            sourceEndMs: segment.sourceEndMs,
+          } : undefined,
+        });
       });
-      if (currentSourceStart < sourceTotalMs) {
-         mainClips.push({
-             id: `main-clip-final`,
-             rowId: VIDEO_ROW_ID,
-             span: { start: mapTime(currentSourceStart), end: mapTime(sourceTotalMs) },
-             label: 'Main Clip',
-             variant: 'video',
-             sourceUrl: videoPath,
-             sourceStartMs: currentSourceStart,
-             sourceEndMs: sourceTotalMs,
-             totalDurationMs: sourceTotalMs - currentSourceStart,
-             associatedAudio: originalAudio ? {
-               ...originalAudio,
-               sourceStartMs: currentSourceStart,
-               sourceEndMs: sourceTotalMs,
-             } : undefined,
-         });
-      }
     }
 
     const videoItems = isTrimTrackVisible ? videos : mainClips;

@@ -103,6 +103,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:audio-resize-bounds"],
   },
   {
+    id: "main-clip-segmentation",
+    command: npmCommand,
+    args: ["run", "audit:main-clip-segmentation"],
+  },
+  {
     id: "preview-project-time",
     command: npmCommand,
     args: ["run", "audit:preview-project-time"],

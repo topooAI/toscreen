@@ -27,6 +27,7 @@ const requiredAuditScripts = [
   "audit:timeline-seek-mapping",
   "audit:timeline-playhead-time",
   "audit:audio-resize-bounds",
+  "audit:main-clip-segmentation",
   "audit:preview-project-time",
   "audit:export-black-tail-rendering",
   "audit:screenstudio-core-contract",
