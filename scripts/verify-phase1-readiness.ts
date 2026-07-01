@@ -59,6 +59,7 @@ const requiredMachineGates = [
   "audit:project-model-camera-migration",
   "audit:project-model-lane-wrapping",
   "audit:project-model-clip-overlap-policy",
+  "audit:original-audio-accordion",
   "audit:project-model-core-clips",
   "audit:project-model-annotations",
   "audit:project-model-motion-clips",

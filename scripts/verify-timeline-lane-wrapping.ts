@@ -94,7 +94,7 @@ const wiringNeedles = [
   {
     file: "TimelineEditor.tsx",
     content: timelineEditor,
-    needle: "const filteredAudios = (audioRegions || []).filter(region => !region.isOriginal || region.isDetached)",
+    needle: "const filteredAudios = getStandaloneAudioRegions(audioRegions || [])",
   },
   {
     file: "TimelineEditor.tsx",

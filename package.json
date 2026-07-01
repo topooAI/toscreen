@@ -26,6 +26,7 @@
     "audit:timeline-seek-mapping": "tsx scripts/verify-timeline-seek-mapping.ts",
     "audit:timeline-playhead-time": "tsx scripts/verify-timeline-playhead-time.ts",
     "audit:audio-resize-bounds": "tsx scripts/verify-audio-resize-bounds.ts",
+    "audit:original-audio-accordion": "tsx scripts/verify-original-audio-accordion.ts",
     "audit:main-clip-segmentation": "tsx scripts/verify-main-clip-segmentation.ts",
     "audit:preview-project-time": "tsx scripts/verify-preview-project-time.ts",
     "audit:export-black-tail-rendering": "tsx scripts/verify-export-black-tail-rendering.ts",

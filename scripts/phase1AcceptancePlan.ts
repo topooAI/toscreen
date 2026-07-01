@@ -21,6 +21,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:recordings",
     "npm run audit:project-model-restore",
     "npm run audit:project-model-sidecar-parity",
+    "npm run audit:original-audio-accordion",
   ],
   "UA-03": [
     "npm run audit:timeline-acceptance-doc",
@@ -35,6 +36,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
   ],
   "UA-04": [
     "npm run audit:main-clip-segmentation",
+    "npm run audit:original-audio-accordion",
     "npm run audit:screenstudio-core-contract",
     "npm run audit:electron-editor-runtime",
   ],

@@ -14,6 +14,11 @@ import { partitionIntoTimelineLanes } from "./lanePartition";
 import { clampAudioResizeSpanToSource, resolveAudioResizeBounds } from "./timelineAudioResizeBounds";
 import { getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
 import { buildMainClipSegments } from "./timelineMainClipSegments";
+import {
+  buildAssociatedOriginalAudioForSourceRange,
+  getAttachedOriginalAudio,
+  getStandaloneAudioRegions,
+} from "./timelineOriginalAudio";
 import { resolveTimelinePlayheadDisplayTime } from "./timelinePlayheadTime";
 import { resolveTimelineSeekFromClientX } from "./timelineSeekMapping";
 import { FALLBACK_TRACK_START_PX, resolveTrackStartPx } from "./timelineTrackOrigin";
@@ -1309,7 +1314,7 @@ export default function TimelineEditor({
   const timelineItems = useMemo<TimelineRenderItem[]>(() => {
     const mapTime = (time: number) => isTrimTrackVisible ? time : mapSourceToEffective(time);
 
-    const originalAudio = audioRegions.find(r => r.isOriginal && !r.isDetached);
+    const originalAudio = getAttachedOriginalAudio(audioRegions);
 
     const videos: TimelineRenderItem[] = [{
       id: 'video-track',
@@ -1319,11 +1324,7 @@ export default function TimelineEditor({
       variant: 'video',
       sourceUrl: videoPath,
       sourceStartMs: 0,
-      associatedAudio: originalAudio ? {
-        ...originalAudio,
-        sourceStartMs: 0,
-        sourceEndMs: sourceTotalMs,
-      } : undefined,
+      associatedAudio: buildAssociatedOriginalAudioForSourceRange(originalAudio, 0, sourceTotalMs),
     }];
     
     const partitionedZooms = partitionIntoTimelineLanes(zoomRegions);
@@ -1366,7 +1367,7 @@ export default function TimelineEditor({
       };
     });
 
-    const filteredAudios = (audioRegions || []).filter(region => !region.isOriginal || region.isDetached);
+    const filteredAudios = getStandaloneAudioRegions(audioRegions || []);
     const partitionedAudios = partitionIntoTimelineLanes(filteredAudios);
     const audios: TimelineRenderItem[] = partitionedAudios.map(({ item: region, trackIndex }) => ({
       id: region.id,
@@ -1398,11 +1399,11 @@ export default function TimelineEditor({
           sourceStartMs: segment.sourceStartMs,
           sourceEndMs: segment.sourceEndMs,
           totalDurationMs: segment.sourceEndMs - segment.sourceStartMs,
-          associatedAudio: originalAudio ? {
-            ...originalAudio,
-            sourceStartMs: segment.sourceStartMs,
-            sourceEndMs: segment.sourceEndMs,
-          } : undefined,
+          associatedAudio: buildAssociatedOriginalAudioForSourceRange(
+            originalAudio,
+            segment.sourceStartMs,
+            segment.sourceEndMs,
+          ),
         });
       });
     }
