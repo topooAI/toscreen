@@ -94,6 +94,46 @@ const wiringNeedles = [
   {
     file: "TimelineEditor.tsx",
     content: timelineEditor,
+    needle: "const filteredAudios = (audioRegions || []).filter(region => !region.isOriginal || region.isDetached)",
+  },
+  {
+    file: "TimelineEditor.tsx",
+    content: timelineEditor,
+    needle: "const partitionedAudios = partitionIntoTimelineLanes(filteredAudios)",
+  },
+  {
+    file: "TimelineEditor.tsx",
+    content: timelineEditor,
+    needle: "rowId: `row-audio-${trackIndex}`",
+  },
+  {
+    file: "TimelineEditor.tsx",
+    content: timelineEditor,
+    needle: "item.rowId.startsWith(\"row-audio-\")",
+  },
+  {
+    file: "TimelineEditor.tsx",
+    content: timelineEditor,
+    needle: "newRowId.startsWith('row-audio-')",
+  },
+  {
+    file: "TimelineEditor.tsx",
+    content: timelineEditor,
+    needle: "if (!targetRowId.startsWith('row-audio-')) return true",
+  },
+  {
+    file: "TimelineEditor.tsx",
+    content: timelineEditor,
+    needle: "onAudioTrackChange?.(baseId, newTrackIndex)",
+  },
+  {
+    file: "Row.tsx",
+    content: row,
+    needle: "id.startsWith(\"row-audio-\")",
+  },
+  {
+    file: "TimelineEditor.tsx",
+    content: timelineEditor,
     needle: "const partitionedZooms = partitionIntoTimelineLanes(zoomRegions)",
   },
   {
