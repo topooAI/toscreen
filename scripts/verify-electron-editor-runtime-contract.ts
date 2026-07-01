@@ -130,6 +130,8 @@ const checks = [
       ".glassVideo",
       "background: #27272a",
       ".glassVideo.selected",
+      "border-radius: 6px",
+      "box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.82)",
     ],
   },
 ] as const;
@@ -141,6 +143,30 @@ for (const check of checks) {
   const missing = check.needles.filter((needle) => !fileContent.includes(needle));
   if (missing.length > 0) {
     failures.push({ area: check.area, file: files[check.file], missing });
+  }
+}
+
+const clipClasses = ["glassPurple", "glassRed", "glassYellow", "glassBlue", "glassVideo"] as const;
+
+for (const className of clipClasses) {
+  const baseRule = new RegExp(`\\.${className}\\s*\\{[\\s\\S]*?\\}`, "m").exec(content.itemGlass)?.[0] ?? "";
+  const selectedRule = new RegExp(`\\.${className}\\.selected\\s*\\{[\\s\\S]*?\\}`, "m").exec(content.itemGlass)?.[0] ?? "";
+  const missing: string[] = [];
+
+  if (!baseRule.includes("border-radius: 6px")) {
+    missing.push(`${className} base border-radius: 6px`);
+  }
+
+  if (!selectedRule.includes("box-shadow: inset")) {
+    missing.push(`${className}.selected inset box-shadow`);
+  }
+
+  if (selectedRule.includes("background:")) {
+    missing.push(`${className}.selected must not change background`);
+  }
+
+  if (missing.length > 0) {
+    failures.push({ area: "clip-selected-visual-contract", file: files.itemGlass, missing });
   }
 }
 
