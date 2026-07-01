@@ -45,6 +45,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:original-audio-accordion",
     "npm run audit:main-video-thumbnails",
     "npm run audit:screenstudio-core-contract",
+    "npm run audit:screenstudio-control-wiring",
     "npm run audit:electron-editor-runtime",
   ],
   "UA-05": [

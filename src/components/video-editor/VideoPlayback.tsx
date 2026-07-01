@@ -736,7 +736,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
         <div
           ref={overlayRef}
           className="absolute inset-0 select-none"
-          style={{ pointerEvents: 'none' }}
+          style={{ pointerEvents: selectedZoom && !isPlaying ? 'auto' : 'none' }}
           onPointerDown={handleOverlayPointerDown}
           onPointerMove={handleOverlayPointerMove}
           onPointerUp={handleOverlayPointerUp}

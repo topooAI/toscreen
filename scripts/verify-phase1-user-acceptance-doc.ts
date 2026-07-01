@@ -25,6 +25,7 @@ const requiredPhrases = [
   "npm run audit:timeline-waveform-layout",
   "npm run audit:timeline-trim-row-hidden",
   "npm run audit:phase1-handoff",
+  "npm run audit:screenstudio-control-wiring",
   "phaseComplete: false",
   "phaseComplete: true",
   "coreRestore",

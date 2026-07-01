@@ -148,6 +148,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:screenstudio-core-contract"],
   },
   {
+    id: "screenstudio-control-wiring",
+    command: npmCommand,
+    args: ["run", "audit:screenstudio-control-wiring"],
+  },
+  {
     id: "electron-editor-runtime",
     command: npmCommand,
     args: ["run", "audit:electron-editor-runtime"],

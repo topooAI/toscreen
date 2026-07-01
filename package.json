@@ -35,6 +35,7 @@
     "audit:preview-project-time": "tsx scripts/verify-preview-project-time.ts",
     "audit:export-black-tail-rendering": "tsx scripts/verify-export-black-tail-rendering.ts",
     "audit:screenstudio-core-contract": "tsx scripts/verify-screenstudio-core-contract.ts",
+    "audit:screenstudio-control-wiring": "tsx scripts/verify-screenstudio-control-wiring.ts",
     "audit:electron-editor-runtime": "tsx scripts/verify-electron-editor-runtime-contract.ts",
     "audit:project-model-smoke": "tsx scripts/audit-project-model-smoke.ts",
     "audit:project-model-restore": "tsx scripts/verify-project-model-restore.ts",
