@@ -53,6 +53,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:preview-export-contract"],
   },
   {
+    id: "export-background-parity",
+    command: npmCommand,
+    args: ["run", "audit:export-background-parity"],
+  },
+  {
     id: "project-duration",
     command: npmCommand,
     args: ["run", "audit:project-duration"],

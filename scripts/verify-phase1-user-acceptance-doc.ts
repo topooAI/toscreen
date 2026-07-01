@@ -26,6 +26,7 @@ const requiredPhrases = [
   "npm run audit:timeline-trim-row-hidden",
   "npm run audit:phase1-handoff",
   "npm run audit:screenstudio-control-wiring",
+  "npm run audit:export-background-parity",
   "phaseComplete: false",
   "phaseComplete: true",
   "coreRestore",

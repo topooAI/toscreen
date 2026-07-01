@@ -17,6 +17,7 @@ const requiredAuditScripts = [
   "audit:project-model-roundtrip",
   "audit:recordings",
   "audit:preview-export-contract",
+  "audit:export-background-parity",
   "audit:project-duration",
   "audit:export-duration-render-settings",
   "audit:timeline-duration-domains",

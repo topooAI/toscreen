@@ -37,6 +37,185 @@ interface AnimationState {
   focusY: number;
 }
 
+type CanvasBackgroundFill = string | CanvasGradient;
+
+function splitTopLevelCommas(value: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let depth = 0;
+
+  for (const char of value) {
+    if (char === "(") depth += 1;
+    if (char === ")" && depth > 0) depth -= 1;
+
+    if (char === "," && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.trim()) {
+    parts.push(current.trim());
+  }
+
+  return parts;
+}
+
+function isColorStopCandidate(value: string): boolean {
+  return /^(#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\(|[a-zA-Z]+)/.test(value.trim())
+    && !/^(to\s+|circle\b|ellipse\b|closest-|farthest-|at\s+)/.test(value.trim());
+}
+
+function parseColorStop(value: string, fallbackOffset: number) {
+  const trimmed = value.trim();
+  const percentMatch = trimmed.match(/^(.*)\s+(-?\d+(?:\.\d+)?)%\s*$/);
+  if (!percentMatch) {
+    return {
+      color: trimmed,
+      offset: fallbackOffset,
+    };
+  }
+
+  return {
+    color: percentMatch[1].trim(),
+    offset: Math.min(1, Math.max(0, Number(percentMatch[2]) / 100)),
+  };
+}
+
+function parseGradientStops(parts: string[]) {
+  const candidates = parts.filter(isColorStopCandidate);
+  return candidates.map((part, index) => {
+    const fallbackOffset = candidates.length <= 1 ? 0 : index / (candidates.length - 1);
+    return parseColorStop(part, fallbackOffset);
+  });
+}
+
+function linearDirectionToVector(direction: string | undefined) {
+  const normalized = direction?.trim().toLowerCase();
+  if (!normalized) {
+    return { x: 0, y: 1 };
+  }
+
+  if (normalized.endsWith("deg")) {
+    const degrees = Number(normalized.replace("deg", "").trim());
+    if (Number.isFinite(degrees)) {
+      const radians = degrees * Math.PI / 180;
+      return {
+        x: Math.sin(radians),
+        y: -Math.cos(radians),
+      };
+    }
+  }
+
+  if (normalized.startsWith("to ")) {
+    const x = normalized.includes("right") ? 1 : normalized.includes("left") ? -1 : 0;
+    const y = normalized.includes("bottom") ? 1 : normalized.includes("top") ? -1 : 0;
+    if (x !== 0 || y !== 0) {
+      const length = Math.hypot(x, y);
+      return { x: x / length, y: y / length };
+    }
+  }
+
+  return { x: 0, y: 1 };
+}
+
+function createLinearGradientFill(
+  ctx: CanvasRenderingContext2D,
+  parts: string[],
+  width: number,
+  height: number,
+): CanvasGradient | null {
+  const firstPart = parts[0]?.trim().toLowerCase();
+  const direction = firstPart && (firstPart.startsWith("to ") || firstPart.endsWith("deg"))
+    ? firstPart
+    : undefined;
+  const stops = parseGradientStops(direction ? parts.slice(1) : parts);
+  if (stops.length === 0) {
+    return null;
+  }
+
+  const vector = linearDirectionToVector(direction);
+  const cx = width / 2;
+  const cy = height / 2;
+  const halfLength = Math.sqrt(width * width + height * height) / 2;
+  const gradient = ctx.createLinearGradient(
+    cx - vector.x * halfLength,
+    cy - vector.y * halfLength,
+    cx + vector.x * halfLength,
+    cy + vector.y * halfLength,
+  );
+
+  for (const stop of stops) {
+    gradient.addColorStop(stop.offset, stop.color);
+  }
+
+  return gradient;
+}
+
+function parseRadialCenter(direction: string | undefined, width: number, height: number) {
+  const centerMatch = direction?.match(/\bat\s+(-?\d+(?:\.\d+)?)%\s+(-?\d+(?:\.\d+)?)%/i);
+  if (!centerMatch) {
+    return { x: width / 2, y: height / 2 };
+  }
+
+  return {
+    x: width * (Number(centerMatch[1]) / 100),
+    y: height * (Number(centerMatch[2]) / 100),
+  };
+}
+
+function createRadialGradientFill(
+  ctx: CanvasRenderingContext2D,
+  parts: string[],
+  width: number,
+  height: number,
+): CanvasGradient | null {
+  const firstPart = parts[0]?.trim();
+  const hasDirection = firstPart && !isColorStopCandidate(firstPart);
+  const center = parseRadialCenter(hasDirection ? firstPart : undefined, width, height);
+  const stops = parseGradientStops(hasDirection ? parts.slice(1) : parts);
+  if (stops.length === 0) {
+    return null;
+  }
+
+  const radius = Math.max(
+    Math.hypot(center.x, center.y),
+    Math.hypot(width - center.x, center.y),
+    Math.hypot(center.x, height - center.y),
+    Math.hypot(width - center.x, height - center.y),
+  );
+  const gradient = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, radius);
+
+  for (const stop of stops) {
+    gradient.addColorStop(stop.offset, stop.color);
+  }
+
+  return gradient;
+}
+
+function createCanvasBackgroundFill(
+  ctx: CanvasRenderingContext2D,
+  wallpaper: string,
+  width: number,
+  height: number,
+): CanvasBackgroundFill | null {
+  const gradientMatch = wallpaper.match(/^\s*(linear|radial)-gradient\((.*)\)\s*$/);
+  if (!gradientMatch) {
+    return wallpaper;
+  }
+
+  const [, type, params] = gradientMatch;
+  const parts = splitTopLevelCommas(params);
+  if (type === "linear") {
+    return createLinearGradientFill(ctx, parts, width, height);
+  }
+
+  return createRadialGradientFill(ctx, parts, width, height);
+}
+
 // Renders video frames with all effects (background, zoom, crop, blur, shadow) to an offscreen canvas for export.
 
 export class FrameRenderer {
@@ -194,55 +373,9 @@ export class FrameRenderer {
         }
         
         bgCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-      } else if (wallpaper.startsWith('#')) {
-        bgCtx.fillStyle = wallpaper;
-        bgCtx.fillRect(0, 0, this.config.width, this.config.height);
-      } else if (wallpaper.startsWith('linear-gradient') || wallpaper.startsWith('radial-gradient')) {
-        
-        const gradientMatch = wallpaper.match(/(linear|radial)-gradient\((.+)\)/);
-        if (gradientMatch) {
-          const [, type, params] = gradientMatch;
-          const parts = params.split(',').map(s => s.trim());
-          
-          let gradient: CanvasGradient;
-          
-          if (type === 'linear') {
-            gradient = bgCtx.createLinearGradient(0, 0, 0, this.config.height);
-            parts.forEach((part, index) => {
-              if (part.startsWith('to ') || part.includes('deg')) return;
-              
-              const colorMatch = part.match(/^(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|[a-z]+)/);
-              if (colorMatch) {
-                const color = colorMatch[1];
-                const position = index / (parts.length - 1);
-                gradient.addColorStop(position, color);
-              }
-            });
-          } else {
-            const cx = this.config.width / 2;
-            const cy = this.config.height / 2;
-            const radius = Math.max(this.config.width, this.config.height) / 2;
-            gradient = bgCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-            
-            parts.forEach((part, index) => {
-              const colorMatch = part.match(/^(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|[a-z]+)/);
-              if (colorMatch) {
-                const color = colorMatch[1];
-                const position = index / (parts.length - 1);
-                gradient.addColorStop(position, color);
-              }
-            });
-          }
-          
-          bgCtx.fillStyle = gradient;
-          bgCtx.fillRect(0, 0, this.config.width, this.config.height);
-        } else {
-          console.warn('[FrameRenderer] Could not parse gradient, using black fallback');
-          bgCtx.fillStyle = '#000000';
-          bgCtx.fillRect(0, 0, this.config.width, this.config.height);
-        }
       } else {
-        bgCtx.fillStyle = wallpaper;
+        const fill = createCanvasBackgroundFill(bgCtx, wallpaper, this.config.width, this.config.height);
+        bgCtx.fillStyle = fill ?? '#000000';
         bgCtx.fillRect(0, 0, this.config.width, this.config.height);
       }
     } catch (error) {

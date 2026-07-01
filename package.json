@@ -16,6 +16,7 @@
     "audit:phase1-registry": "tsx scripts/verify-phase1-audit-registry.ts",
     "audit:export-entrypoints": "tsx scripts/verify-export-entrypoints.ts",
     "audit:preview-export-contract": "tsx scripts/verify-preview-export-contract.ts",
+    "audit:export-background-parity": "tsx scripts/verify-export-background-parity.ts",
     "audit:project-duration": "tsx scripts/verify-project-duration-contract.ts",
     "audit:export-duration-render-settings": "tsx scripts/verify-export-duration-render-settings.ts",
     "audit:timeline-duration-domains": "tsx scripts/verify-timeline-duration-domains.ts",

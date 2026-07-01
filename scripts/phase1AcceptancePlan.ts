@@ -50,6 +50,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
   ],
   "UA-05": [
     "npm run audit:preview-export-contract",
+    "npm run audit:export-background-parity",
     "npm run audit:export-duration-render-settings",
     "npm run audit:export-black-tail-rendering",
   ],
