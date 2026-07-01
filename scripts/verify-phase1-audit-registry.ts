@@ -28,6 +28,7 @@ const requiredAuditScripts = [
   "audit:timeline-seek-mapping",
   "audit:timeline-playhead-time",
   "audit:audio-resize-bounds",
+  "audit:timeline-waveform-layout",
   "audit:original-audio-accordion",
   "audit:main-video-thumbnails",
   "audit:main-clip-segmentation",

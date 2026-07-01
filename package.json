@@ -27,6 +27,7 @@
     "audit:timeline-seek-mapping": "tsx scripts/verify-timeline-seek-mapping.ts",
     "audit:timeline-playhead-time": "tsx scripts/verify-timeline-playhead-time.ts",
     "audit:audio-resize-bounds": "tsx scripts/verify-audio-resize-bounds.ts",
+    "audit:timeline-waveform-layout": "tsx scripts/verify-timeline-waveform-layout.ts",
     "audit:original-audio-accordion": "tsx scripts/verify-original-audio-accordion.ts",
     "audit:main-video-thumbnails": "tsx scripts/verify-main-video-thumbnails.ts",
     "audit:main-clip-segmentation": "tsx scripts/verify-main-clip-segmentation.ts",

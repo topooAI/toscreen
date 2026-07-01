@@ -108,6 +108,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:audio-resize-bounds"],
   },
   {
+    id: "timeline-waveform-layout",
+    command: npmCommand,
+    args: ["run", "audit:timeline-waveform-layout"],
+  },
+  {
     id: "original-audio-accordion",
     command: npmCommand,
     args: ["run", "audit:original-audio-accordion"],
