@@ -44,6 +44,23 @@ Use this as the shortest working checklist: the left side is engineering work Co
 | 11. AI 自动剪辑 / AI auto-editing | 设计可审阅、可撤销、可解释的 AI Edit Plan。 / Design reviewable, undoable, explainable AI Edit Plan. | AI 自动做哪些剪辑决策必须用真实用例确认。 / Real examples are required to decide what AI automates. |
 | 12. 阶段放行 / Phase gate | 跑门禁、列风险、整理下一阶段建议并同步 GitHub。 / Run gates, list risks, summarize next-phase suggestions, and sync GitHub. | 是否关闭 Phase 1 并进入下一阶段必须由用户确认。 / User must confirm closing Phase 1 and moving to the next phase. |
 
+### 2.2 用户介入节点清单 / User Checkpoint List
+
+这张列表用于判断我什么时候必须停下来问你。没有触发这些节点时，我可以继续独立修代码、补门禁、更新文档、提交并同步 GitHub。
+Use this list to decide when I must stop and ask you. If none of these checkpoints is triggered, I can keep fixing code, adding gates, updating docs, committing, and syncing GitHub.
+
+| 状态 / Status | 节点 / Checkpoint | 你需要判断什么 / What You Decide | 我可以先做到哪里 / What I Can Do First |
+|---|---|---|---|
+| [ ] | 产品方向偏移 / Product direction drift | ToScreen 是否仍然是 AI product-demo editor，而不是普通剪辑器、纯录屏工具或 full Jitter。 / Whether ToScreen remains an AI product-demo editor, not a generic editor, recorder-only tool, or full Jitter. | 整理定位、非目标、架构文档和阶段路线。 / Maintain positioning, non-goals, architecture docs, and phase roadmap. |
+| [ ] | 大能力进入真实 UI / Major capability enters real UI | AI、3D 运镜、Lottie、多源画面、数字人是否从模型入口进入 Phase 1 可操作 UI。 / Whether AI, 3D camera, Lottie, multi-source video, or digital human moves from model hooks into Phase 1 interactive UI. | 先完成 ProjectModel、adapter、validator、保存恢复和审计门禁。 / Finish ProjectModel, adapters, validators, save/restore, and audit gates first. |
+| [ ] | 时间轴手感变化 / Timeline feel change | 拖拽、拉伸、磁吸、滚轮缩放、游标、片段换行是否跟手稳定。 / Whether drag, resize, snap, wheel zoom, playhead, and lane wrapping feel stable. | 定位事件链路、修复冲突、补机器合同。 / Trace event paths, fix conflicts, and add machine contracts. |
+| [ ] | Electron 重启恢复 / Electron restart restore | 真实录制项目重启后是否不丢画面、音频、Zoom/Focus、背景、光标和导出设置。 / Whether a real recording restores picture, audio, Zoom/Focus, background, cursor, and export settings after restart. | 修保存路径、sidecar、legacy fallback 和恢复审计。 / Fix save paths, sidecar, legacy fallback, and restore audits. |
+| [ ] | Screen Studio 核心体验 / Screen Studio-grade UX | 录屏预览、系统光标、Zoom/Focus、背景虚化、播放和基础导出是否达到第一阶段产品感。 / Whether recording preview, system cursor, Zoom/Focus, background blur, playback, and basic export reach Phase 1 product quality. | 分模块修复并用机器门禁防止功能再次丢失。 / Fix module by module and guard against regressions with machine gates. |
+| [ ] | Preview/Export 成片判断 / Preview/export output review | 导出成片是否和预览在画面、节奏、缩放、光标、背景、音频和黑屏尾部一致。 / Whether export matches preview in picture, timing, zoom, cursor, background, audio, and black tail. | 统一预览和导出的数据源、工程时长和渲染设置。 / Unify preview/export data sources, project duration, and render settings. |
+| [ ] | Camera/Focus 命名与镜头语言 / Camera/Focus language | Focus/Zoom 是否升级为 Camera Clip，以及未来 3D 运镜的操作语言是否合理。 / Whether Focus/Zoom becomes Camera Clip and whether the future 3D camera interaction language is right. | 先做模型迁移和兼容层，不强改当前 UI 语言。 / Build model migration and compatibility first without forcing UI terminology changes. |
+| [ ] | AI 自动剪辑边界 / AI auto-editing boundary | AI 哪些剪辑决策可以自动应用，哪些必须先生成可审阅计划。 / Which AI edit decisions may apply automatically and which must stay as reviewable plans first. | 建立 AI Edit Plan、可回滚应用路径和审计合同。 / Build AI Edit Plan, reversible apply path, and audit contracts. |
+| [ ] | Phase 1 阶段放行 / Phase 1 release | 是否关闭 Phase 1 并进入下一阶段。 / Whether to close Phase 1 and move to the next stage. | 跑完机器门禁、列风险、整理剩余问题并同步 GitHub。 / Run machine gates, list risks, summarize remaining issues, and sync GitHub. |
+
 | ID | 工作域 / Area | Codex 可以独立推进 / Codex Can Continue | 用户需要介入 / User Must Step In | 对照标准 / What To Check |
 |---|---|---|---|---|
 | DEV-01 | 产品定位 / Product positioning | 整理定位、范围、非目标、阶段路线和决策日志。 / Organize positioning, scope, non-goals, roadmap, and decision log. | 当 ToScreen 可能偏离 AI product-demo editor 时。 / When ToScreen may drift away from AI product-demo editor. | 是否仍然不是普通剪辑器、不是单纯录屏工具、不是完整 Jitter 替代品。 / It remains not a generic editor, recorder-only tool, or full Jitter replacement. |
