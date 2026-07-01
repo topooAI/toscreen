@@ -82,7 +82,7 @@ const legacyInput: LegacyEditorProjectInput = {
   borderRadius: 22,
   padding: 64,
   aspectRatio: "16:9",
-  exportQuality: "high",
+  exportQuality: "source",
   now: new Date("2026-06-30T00:00:00.000Z"),
 };
 

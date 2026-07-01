@@ -78,7 +78,7 @@ const project = createProjectFromLegacyEditorState({
   borderRadius: 18,
   padding: 54,
   aspectRatio: "16:9",
-  exportQuality: "high",
+  exportQuality: "source",
   now: new Date("2026-06-30T00:00:00.000Z"),
 });
 
@@ -107,7 +107,7 @@ assertEqual(renderSettings.cursor.smoothing, false, "cursor.smoothing");
 assertEqual(renderSettings.cursor.showVectorCursor, true, "cursor.showVectorCursor");
 assertEqual(renderSettings.cursor.offsetMs, -120, "cursor.offsetMs");
 assertEqual(renderSettings.effects.motionBlurEnabled, false, "effects.motionBlurEnabled");
-assertEqual(renderSettings.exportSettings.quality, "high", "exportSettings.quality");
+assertEqual(renderSettings.exportSettings.quality, "source", "exportSettings.quality");
 
 console.log(JSON.stringify({
   status: "ok",

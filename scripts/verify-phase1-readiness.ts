@@ -46,6 +46,7 @@ const requiredMachineGates = [
   "audit:project-model-smoke",
   "audit:project-model-restore",
   "audit:project-model-roundtrip",
+  "audit:project-model-canvas-settings",
   "audit:recordings",
   "audit:preview-export-contract",
   "audit:project-duration",

@@ -15,6 +15,7 @@ const requiredAuditScripts = [
   "audit:project-model-smoke",
   "audit:project-model-restore",
   "audit:project-model-roundtrip",
+  "audit:project-model-canvas-settings",
   "audit:recordings",
   "audit:recording-asset-files",
   "audit:preview-export-contract",

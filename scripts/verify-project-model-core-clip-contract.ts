@@ -13,9 +13,21 @@ function createValidProject(): VideoEditorProject {
     durationMs: 8000,
     canvas: {
       aspectRatio: "16:9",
-      width: 1920,
-      height: 1080,
-      background: { type: "color", value: "#000000" },
+      background: {
+        wallpaper: "#000000",
+        showBlur: false,
+      },
+      padding: 60,
+      borderRadius: 20,
+      shadow: {
+        intensity: 0.5,
+      },
+      cropRegion: {
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+      },
     },
     assets: [
       { id: "asset-screen", type: "screen-recording", name: "Screen", sourceUrl: "file:///screen.mov" },
@@ -112,6 +124,9 @@ function createValidProject(): VideoEditorProject {
       },
     ],
     scenes: [],
+    exportSettings: {
+      quality: "good",
+    },
   };
 }
 

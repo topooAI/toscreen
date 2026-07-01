@@ -33,7 +33,13 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
   if (typeof project.durationMs !== "number" || !Number.isFinite(project.durationMs) || project.durationMs < 0) {
     errors.push("Project durationMs must be a finite non-negative number.");
   }
-  if (!project.canvas) errors.push("Project canvas settings are required.");
+  if (!project.canvas) {
+    errors.push("Project canvas settings are required.");
+  } else {
+    validateProjectCanvasSettings(project.canvas, errors);
+  }
+  validateProjectExportSettings(project.exportSettings, errors);
+  validateLegacyRuntimeSettings(project.legacyState, errors);
   const assets = Array.isArray(project.assets) ? project.assets : [];
   const uiSources = Array.isArray(project.uiSources) ? project.uiSources : [];
   const tracks = Array.isArray(project.tracks) ? project.tracks : [];
@@ -561,6 +567,73 @@ function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value
 
 function isZoomDepth(value: unknown): boolean {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 6;
+}
+
+function validateProjectCanvasSettings(value: unknown, errors: string[]) {
+  const canvas = isRecord(value) ? value : undefined;
+  if (!canvas) {
+    errors.push("Project canvas settings must be an object.");
+    return;
+  }
+
+  if (!isOneOf(canvas.aspectRatio, ["16:9", "9:16", "1:1", "4:3", "4:5"])) {
+    errors.push("Project canvas aspectRatio is invalid or missing.");
+  }
+
+  const background = isRecord(canvas.background) ? canvas.background : undefined;
+  if (!background) {
+    errors.push("Project canvas background is required.");
+  } else {
+    if (typeof background.wallpaper !== "string" || !background.wallpaper.trim()) {
+      errors.push("Project canvas background.wallpaper is required.");
+    }
+    if (typeof background.showBlur !== "boolean") {
+      errors.push("Project canvas background.showBlur must be boolean.");
+    }
+  }
+
+  if (!isFiniteNumber(canvas.padding) || canvas.padding < 0) {
+    errors.push("Project canvas padding must be a finite non-negative number.");
+  }
+  if (!isFiniteNumber(canvas.borderRadius) || canvas.borderRadius < 0) {
+    errors.push("Project canvas borderRadius must be a finite non-negative number.");
+  }
+
+  const shadow = isRecord(canvas.shadow) ? canvas.shadow : undefined;
+  if (!shadow) {
+    errors.push("Project canvas shadow settings are required.");
+  } else if (!isFiniteNumber(shadow.intensity) || shadow.intensity < 0) {
+    errors.push("Project canvas shadow.intensity must be a finite non-negative number.");
+  }
+
+  if (canvas.cropRegion === undefined) {
+    errors.push("Project canvas cropRegion is required.");
+  } else {
+    validateOptionalCropRegion(canvas.cropRegion, "Project canvas cropRegion", errors);
+  }
+}
+
+function validateProjectExportSettings(value: unknown, errors: string[]) {
+  const exportSettings = isRecord(value) ? value : undefined;
+  if (!exportSettings) {
+    errors.push("Project exportSettings are required.");
+    return;
+  }
+  if (!isOneOf(exportSettings.quality, ["medium", "good", "source"])) {
+    errors.push("Project exportSettings.quality is invalid or missing.");
+  }
+}
+
+function validateLegacyRuntimeSettings(value: unknown, errors: string[]) {
+  if (value === undefined) return;
+  const legacyState = isRecord(value) ? value : undefined;
+  if (!legacyState) {
+    errors.push("Project legacyState must be an object.");
+    return;
+  }
+  if (legacyState.motionBlurEnabled !== undefined && typeof legacyState.motionBlurEnabled !== "boolean") {
+    errors.push("Project legacyState.motionBlurEnabled must be boolean.");
+  }
 }
 
 function validateFocus(value: unknown, label: string, errors: string[]) {
