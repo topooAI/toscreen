@@ -17,6 +17,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:project-model-review-doc",
     "npm run audit:project-model-review-packet",
     "npm run audit:project-model-entity-schema",
+    "npm run audit:project-model-ui-source-schema",
   ],
   "UA-02": [
     "npm run audit:recordings",
@@ -65,6 +66,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
   "UA-07": [
     "npm run audit:project-model-ai-plan",
     "npm run audit:project-model-ai-plan-lifecycle",
+    "npm run audit:project-model-ui-source-schema",
   ],
   "UA-08": [
     "npm run audit:phase1-readiness",

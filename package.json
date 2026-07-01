@@ -43,6 +43,7 @@
     "audit:project-model-roundtrip": "tsx scripts/verify-project-model-roundtrip.ts",
     "audit:project-model-canvas-settings": "tsx scripts/verify-project-model-canvas-settings.ts",
     "audit:project-model-entity-schema": "tsx scripts/verify-project-model-entity-schema.ts",
+    "audit:project-model-ui-source-schema": "tsx scripts/verify-project-model-ui-source-schema.ts",
     "audit:recordings": "tsx scripts/audit-recording-restore.ts",
     "audit:recording-asset-files": "tsx scripts/verify-recording-asset-files.ts",
     "audit:project-model-future": "tsx scripts/verify-project-model-future-entries.ts",

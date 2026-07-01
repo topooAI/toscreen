@@ -48,6 +48,7 @@ const requiredMachineGates = [
   "audit:project-model-roundtrip",
   "audit:project-model-canvas-settings",
   "audit:project-model-entity-schema",
+  "audit:project-model-ui-source-schema",
   "audit:recordings",
   "audit:preview-export-contract",
   "audit:project-duration",

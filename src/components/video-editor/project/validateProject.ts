@@ -55,6 +55,25 @@ const VALID_CLIP_TYPES = [
   "cursor",
 ] as const;
 
+const VALID_UI_SOURCE_PROVIDERS = [
+  "figma",
+  "dom-snapshot",
+  "screenshot",
+  "design-file",
+  "manual",
+] as const;
+
+const VALID_UI_ELEMENT_ROLES = [
+  "frame",
+  "component",
+  "text",
+  "button",
+  "input",
+  "image",
+  "icon",
+  "custom",
+] as const;
+
 export function validateVideoEditorProject(projectInput: unknown): ProjectValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -135,10 +154,21 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       errors.push(`UI source at index ${index} must be an object.`);
       return;
     }
-    if (!uiSource.id) errors.push("UI source id is required.");
-    if (uiSourceIds.has(uiSource.id)) errors.push(`Duplicate UI source id: ${uiSource.id}.`);
-    uiSourceIds.add(uiSource.id);
-    if (!uiSource.provider) errors.push(`UI source ${uiSource.id || "(missing id)"} provider is required.`);
+    if (typeof uiSource.id !== "string" || !uiSource.id.trim()) {
+      errors.push("UI source id is required.");
+    } else {
+      if (uiSourceIds.has(uiSource.id)) errors.push(`Duplicate UI source id: ${uiSource.id}.`);
+      uiSourceIds.add(uiSource.id);
+    }
+    if (typeof uiSource.name !== "string" || !uiSource.name.trim()) {
+      errors.push(`UI source ${uiSource.id || "(missing id)"} name is required.`);
+    }
+    if (!isOneOf(uiSource.provider, VALID_UI_SOURCE_PROVIDERS)) {
+      errors.push(`UI source ${uiSource.id || "(missing id)"} provider is invalid or missing.`);
+    }
+    validateOptionalString(uiSource.sourceUrl, `UI source ${uiSource.id || "(missing id)"} sourceUrl`, errors);
+    validateOptionalString(uiSource.filePath, `UI source ${uiSource.id || "(missing id)"} filePath`, errors);
+    validateOptionalString(uiSource.capturedAt, `UI source ${uiSource.id || "(missing id)"} capturedAt`, errors);
     if (!Array.isArray(uiSource.elements)) {
       errors.push(`UI source ${uiSource.id || "(missing id)"} elements must be an array.`);
       return;
@@ -150,11 +180,24 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
         errors.push(`UI source ${uiSource.id || "(missing id)"} element at index ${elementIndex} must be an object.`);
         return;
       }
-      if (!element.id) errors.push(`UI source ${uiSource.id || "(missing id)"} element id is required.`);
-      if (elementIds.has(element.id)) {
-        errors.push(`UI source ${uiSource.id || "(missing id)"} has duplicate element id: ${element.id}.`);
+      if (typeof element.id !== "string" || !element.id.trim()) {
+        errors.push(`UI source ${uiSource.id || "(missing id)"} element id is required.`);
+      } else {
+        if (elementIds.has(element.id)) {
+          errors.push(`UI source ${uiSource.id || "(missing id)"} has duplicate element id: ${element.id}.`);
+        }
+        elementIds.add(element.id);
       }
-      elementIds.add(element.id);
+      validateOptionalString(element.name, `UI source ${uiSource.id || "(missing id)"} element ${element.id || "(missing id)"} name`, errors);
+      validateOptionalString(element.stableSelector, `UI source ${uiSource.id || "(missing id)"} element ${element.id || "(missing id)"} stableSelector`, errors);
+      if (element.role !== undefined && !isOneOf(element.role, VALID_UI_ELEMENT_ROLES)) {
+        errors.push(`UI source ${uiSource.id || "(missing id)"} element ${element.id || "(missing id)"} role is invalid.`);
+      }
+      validateOptionalUIElementBounds(
+        element.bounds,
+        `UI source ${uiSource.id || "(missing id)"} element ${element.id || "(missing id)"} bounds`,
+        errors,
+      );
     });
     uiElementIdsBySource.set(uiSource.id, elementIds);
   });
@@ -705,6 +748,33 @@ function validateLegacyRuntimeSettings(value: unknown, errors: string[]) {
   }
   if (legacyState.motionBlurEnabled !== undefined && typeof legacyState.motionBlurEnabled !== "boolean") {
     errors.push("Project legacyState.motionBlurEnabled must be boolean.");
+  }
+}
+
+function validateOptionalString(value: unknown, label: string, errors: string[]) {
+  if (value === undefined) return;
+  if (typeof value !== "string") {
+    errors.push(`${label} must be a string.`);
+  }
+}
+
+function validateOptionalUIElementBounds(value: unknown, label: string, errors: string[]) {
+  if (value === undefined) return;
+  const bounds = isRecord(value) ? value : undefined;
+  if (!bounds) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  ["x", "y", "width", "height"].forEach((key) => {
+    if (!isFiniteNumber(bounds[key])) {
+      errors.push(`${label}.${key} must be finite.`);
+    }
+  });
+  if (isFiniteNumber(bounds.width) && bounds.width <= 0) {
+    errors.push(`${label}.width must be positive.`);
+  }
+  if (isFiniteNumber(bounds.height) && bounds.height <= 0) {
+    errors.push(`${label}.height must be positive.`);
   }
 }
 

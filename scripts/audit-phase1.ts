@@ -53,6 +53,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:project-model-entity-schema"],
   },
   {
+    id: "project-model-ui-source-schema",
+    command: npmCommand,
+    args: ["run", "audit:project-model-ui-source-schema"],
+  },
+  {
     id: "recording-restore",
     command: npmCommand,
     args: ["run", "audit:recordings"],
