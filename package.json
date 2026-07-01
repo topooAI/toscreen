@@ -65,6 +65,7 @@
     "audit:timeline-acceptance-doc": "tsx scripts/verify-timeline-acceptance-doc.ts",
     "audit:timeline-debug-signal": "tsx scripts/verify-timeline-debug-signal.ts",
     "audit:timeline-resize-handles": "tsx scripts/verify-timeline-resize-handles.ts",
+    "audit:timeline-clip-style": "tsx scripts/verify-timeline-clip-style.ts",
     "audit:phase1-handoff": "tsx scripts/verify-phase1-handoff-packet.ts",
     "audit:export-audio-render-settings": "tsx scripts/verify-export-audio-render-settings.ts",
     "audit:preview-audio-render-settings": "tsx scripts/verify-preview-audio-render-settings.ts"

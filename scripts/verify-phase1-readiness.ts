@@ -77,6 +77,7 @@ const requiredMachineGates = [
   "audit:timeline-acceptance-doc",
   "audit:timeline-debug-signal",
   "audit:timeline-resize-handles",
+  "audit:timeline-clip-style",
   "audit:phase1-handoff",
 ];
 

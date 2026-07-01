@@ -283,6 +283,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:timeline-resize-handles"],
   },
   {
+    id: "timeline-clip-style",
+    command: npmCommand,
+    args: ["run", "audit:timeline-clip-style"],
+  },
+  {
     id: "phase1-handoff",
     command: npmCommand,
     args: ["run", "audit:phase1-handoff"],
