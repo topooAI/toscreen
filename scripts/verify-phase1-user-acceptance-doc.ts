@@ -20,6 +20,7 @@ const requiredPhrases = [
   "phaseComplete: false",
   "phaseComplete: true",
   "coreRestore",
+  "scenes",
   "开发对照列表 / Development Ownership Checklist",
   "快速对照清单 / Quick Reference Checklist",
   "Codex 独立推进 / Codex Owns",

@@ -10,6 +10,7 @@ import {
   restoreLegacyEditorStateFromProjectModel,
   validateVideoEditorProject,
 } from "../src/components/video-editor/project";
+import { summarizeSceneMigration } from "./phase1SceneMigration";
 
 type AuditStatus = "ok" | "warn" | "fail";
 
@@ -68,6 +69,8 @@ async function auditRecordingRestore(directory: string) {
     assets?: number;
     tracks?: number;
     clips?: number;
+    scenes?: number;
+    sceneMigration?: ReturnType<typeof summarizeSceneMigration>;
     restoredCompanionAudioPath?: string | null;
     coreRestore?: {
       sourceCameraClips: number;
@@ -105,6 +108,7 @@ async function auditRecordingRestore(directory: string) {
       const restoredZoomRegions = restored?.zoomRegions.length ?? 0;
       const restoredAudioRegions = restored?.audioRegions.length ?? 0;
       const restoredCursorPoints = restored?.cursorData?.length ?? 0;
+      const sceneMigration = summarizeSceneMigration(rawProject.projectModel);
 
       projectModel = {
         present: true,
@@ -115,6 +119,8 @@ async function auditRecordingRestore(directory: string) {
         assets: rawProject.projectModel.assets?.length,
         tracks: rawProject.projectModel.tracks?.length,
         clips: rawProject.projectModel.clips?.length,
+        scenes: rawProject.projectModel.scenes?.length,
+        sceneMigration,
         restoredCompanionAudioPath: restored?.companionAudioPath ?? null,
         ...(renderSettings ? {
           coreRestore: {
