@@ -11,6 +11,7 @@ import Row from "./Row";
 import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
 import { partitionIntoTimelineLanes } from "./lanePartition";
+import { clampAudioResizeSpanToSource, resolveAudioResizeBounds } from "./timelineAudioResizeBounds";
 import { getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
 import { resolveTimelinePlayheadDisplayTime } from "./timelinePlayheadTime";
 import { resolveTimelineSeekFromClientX } from "./timelineSeekMapping";
@@ -1498,8 +1499,8 @@ export default function TimelineEditor({
   }, [onAudioTrackChange]);
 
   const handleItemSpanChange = useCallback((id: string, span: Span) => {
-    const targetSpan = isTrimTrackVisible 
-      ? { ...span } 
+    let targetSpan = isTrimTrackVisible
+      ? { ...span }
       : { start: mapEffectiveToSource(span.start), end: mapEffectiveToSource(span.end) };
       
     // Check if it's a zoom or trim item
@@ -1520,23 +1521,23 @@ export default function TimelineEditor({
         
         if (maxDuration > 0 && isTrimming) {
           const sourceStart = audioRegion.sourceStartMs || 0;
-          const sourceEnd = audioRegion.sourceEndMs ?? (audioRegion.endMs - audioRegion.startMs);
-          
+          const audioResizeBounds = resolveAudioResizeBounds({
+            span: {
+              start: audioRegion.startMs,
+              end: audioRegion.endMs,
+            },
+            sourceStartMs: sourceStart,
+            sourceTotalMs: maxDuration,
+            pxPerMs: 1,
+          });
+
           const isTrimmingLeft = Math.abs(targetSpan.end - audioRegion.endMs) < 1;
           const isTrimmingRight = Math.abs(targetSpan.start - audioRegion.startMs) < 1;
 
           if (isTrimmingLeft) {
-            // How much left can we pull the handle? Max is exactly sourceStart ms.
-            const maxLeftShift = sourceStart;
-            if (audioRegion.startMs - targetSpan.start > maxLeftShift) {
-              targetSpan.start = audioRegion.startMs - maxLeftShift;
-            }
+            targetSpan = clampAudioResizeSpanToSource(targetSpan, audioResizeBounds, "start");
           } else if (isTrimmingRight) {
-            // How much right can we pull the handle? Max is the remaining duration in the source file.
-            const maxRightShift = maxDuration - sourceEnd;
-            if (targetSpan.end - audioRegion.endMs > maxRightShift) {
-              targetSpan.end = audioRegion.endMs + maxRightShift;
-            }
+            targetSpan = clampAudioResizeSpanToSource(targetSpan, audioResizeBounds, "end");
           }
         }
       }

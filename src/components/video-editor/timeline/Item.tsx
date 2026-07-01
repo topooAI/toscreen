@@ -9,6 +9,7 @@ import { VolumeKeyframe, AudioRegion, ZoomRegion } from '../types';
 import { useAudioWaveform } from "../hooks/useAudioWaveform";
 
 import { VideoThumbnails } from "./VideoThumbnails";
+import { getAudioWaveformLeftPx, resolveAudioResizeBounds } from "./timelineAudioResizeBounds";
 
 interface WaveformOverlayProps { 
   id: string; 
@@ -30,7 +31,7 @@ function WaveformOverlay({ id, url, isReal = false, sourceStartMs, effTotalDurat
   const { valueToPixels } = useTimelineContext();
   const pxPerMs = valueToPixels(1);
   const svgAbsoluteWidth = Math.max(1, effTotalDuration * pxPerMs);
-  const svgAbsoluteLeft = -sourceStartMs * pxPerMs;
+  const svgAbsoluteLeft = getAudioWaveformLeftPx(sourceStartMs, pxPerMs);
 
   const pathData = React.useMemo(() => {
     const peaks = activePeaks;
@@ -321,16 +322,21 @@ function ItemComponent({
     if (!node) return;
 
     const observer = new MutationObserver(() => {
+      const audioResizeBounds = resolveAudioResizeBounds({
+        span,
+        sourceStartMs,
+        sourceTotalMs: trueTotalDurMs,
+        pxPerMs,
+      });
       if (isResizingLeft.current) {
         let liveLeftPx = parseFloat(node.style.left || "0") + (transform?.x || 0);
-        const minAllowedLeftPx = (span.start - sourceStartMs) * pxPerMs;
-        
+
         // 物理墙限制：不能往左拖拽超过音频起始点
-        if (minAllowedLeftPx - liveLeftPx > 0.1) {
-          node.style.left = `${minAllowedLeftPx}px`;
-          const maxLeftWidth = baseWidthPx + baseLeftPx - minAllowedLeftPx;
+        if (audioResizeBounds.minAllowedLeftPx - liveLeftPx > 0.1) {
+          node.style.left = `${audioResizeBounds.minAllowedLeftPx}px`;
+          const maxLeftWidth = baseWidthPx + baseLeftPx - audioResizeBounds.minAllowedLeftPx;
           node.style.width = `${maxLeftWidth}px`;
-          liveLeftPx = minAllowedLeftPx;
+          liveLeftPx = audioResizeBounds.minAllowedLeftPx;
         }
 
         const liveDeltaX = liveLeftPx - baseLeftPx;
@@ -340,11 +346,10 @@ function ItemComponent({
         }
       } else if (isResizingRight.current) {
         // 物理墙限制：不能往右拖拽超过音频总时长
-        if (trueTotalDurMs > 0) {
-          const maxAllowedWidthPx = (trueTotalDurMs - sourceStartMs) * pxPerMs;
+        if (audioResizeBounds.sourceTotalMs > 0) {
           const liveWidthPx = parseFloat(node.style.width || "0");
-          if (liveWidthPx - maxAllowedWidthPx > 0.1) {
-            node.style.width = `${maxAllowedWidthPx}px`;
+          if (liveWidthPx - audioResizeBounds.maxAllowedWidthPx > 0.1) {
+            node.style.width = `${audioResizeBounds.maxAllowedWidthPx}px`;
           }
         }
       }

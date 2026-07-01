@@ -98,6 +98,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:timeline-playhead-time"],
   },
   {
+    id: "audio-resize-bounds",
+    command: npmCommand,
+    args: ["run", "audit:audio-resize-bounds"],
+  },
+  {
     id: "preview-project-time",
     command: npmCommand,
     args: ["run", "audit:preview-project-time"],
