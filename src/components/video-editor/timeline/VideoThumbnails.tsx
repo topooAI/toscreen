@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ZoomRegion, ZOOM_DEPTH_SCALES } from '../types';
+import {
+  buildThumbnailSegments,
+  getZoomBoundaryPercents,
+  type ThumbnailSegment,
+} from './timelineThumbnailSegments';
 
 interface VideoThumbnailsProps {
   id: string;
@@ -17,91 +22,21 @@ const THUMBNAIL_WIDTH = 64; // px
 const THUMBNAIL_HEIGHT = 64; // px, matches compressed main clip height
 const MAX_THUMBNAILS = 30; // Limit to prevent crashing
 
-type ThumbnailSegment = {
-  id: string;
-  startMs: number;
-  endMs: number;
-  zoom?: ZoomRegion;
-  images: string[];
-};
-
-function buildThumbnailSegments(sourceStartMs: number, durationMs: number, zoomRegions: ZoomRegion[] = []): ThumbnailSegment[] {
-  const sourceEndMs = sourceStartMs + durationMs;
-  const segments: ThumbnailSegment[] = [];
-  let cursor = sourceStartMs;
-
-  const overlappingZooms = [...zoomRegions]
-    .map((region) => ({
-      region,
-      startMs: Math.max(sourceStartMs, region.startMs),
-      endMs: Math.min(sourceEndMs, region.endMs),
-    }))
-    .filter(({ startMs, endMs }) => endMs > startMs)
-    .sort((a, b) => a.startMs - b.startMs);
-
-  overlappingZooms.forEach(({ region, startMs, endMs }) => {
-    if (cursor < startMs) {
-      segments.push({
-        id: `default-${cursor}-${startMs}`,
-        startMs: cursor,
-        endMs: startMs,
-        images: [],
-      });
-    }
-
-    const zoomStart = Math.max(cursor, startMs);
-    if (endMs > zoomStart) {
-      segments.push({
-        id: `${region.id}-${zoomStart}-${endMs}`,
-        startMs: zoomStart,
-        endMs,
-        zoom: region,
-        images: [],
-      });
-      cursor = endMs;
-    }
-  });
-
-  if (cursor < sourceEndMs) {
-    segments.push({
-      id: `default-${cursor}-${sourceEndMs}`,
-      startMs: cursor,
-      endMs: sourceEndMs,
-      images: [],
-    });
-  }
-
-  return segments;
-}
-
 export function VideoThumbnails({ id, src, sourceStartMs, effTotalDuration, svgOffset, pxPerMs, zoomRegions, boundaryZoomRegions, clipStartMs: _clipStartMs }: VideoThumbnailsProps) {
   const [segments, setSegments] = useState<ThumbnailSegment[]>([]);
 
   const absoluteWidth = Math.max(1, effTotalDuration * pxPerMs);
   const absoluteLeft = 0;
+  const thumbnailZoomRegions = boundaryZoomRegions || zoomRegions || [];
+  const thumbnailZoomSignature = JSON.stringify(thumbnailZoomRegions);
   const zoomBoundaryPercents = React.useMemo(() => {
-    const sourceEndMs = sourceStartMs + effTotalDuration;
-    const boundaries = new Set<number>();
-
-    (boundaryZoomRegions || zoomRegions || []).forEach((region) => {
-      const start = Math.max(sourceStartMs, region.startMs);
-      const end = Math.min(sourceEndMs, region.endMs);
-      if (end <= start) return;
-
-      [start, end].forEach((timeMs) => {
-        const localMs = timeMs - sourceStartMs;
-        if (localMs <= 0 || localMs >= effTotalDuration) return;
-        boundaries.add(Math.round((localMs / effTotalDuration) * 10000) / 100);
-      });
-    });
-
-    return Array.from(boundaries).sort((a, b) => a - b);
-  }, [boundaryZoomRegions, effTotalDuration, sourceStartMs, zoomRegions]);
+    return getZoomBoundaryPercents(sourceStartMs, effTotalDuration, thumbnailZoomRegions);
+  }, [effTotalDuration, sourceStartMs, thumbnailZoomSignature]);
 
   useEffect(() => {
     if (!src || absoluteWidth <= 0 || effTotalDuration <= 0) return;
 
-    const nextSegments = buildThumbnailSegments(sourceStartMs, effTotalDuration, zoomRegions);
+    const nextSegments = buildThumbnailSegments(sourceStartMs, effTotalDuration, thumbnailZoomRegions);
     const totalRequested = nextSegments.reduce((sum, segment) => {
       const segmentWidth = (segment.endMs - segment.startMs) * pxPerMs;
       return sum + Math.max(1, Math.ceil(segmentWidth / THUMBNAIL_WIDTH));
@@ -203,7 +138,7 @@ export function VideoThumbnails({ id, src, sourceStartMs, effTotalDuration, svgO
       video.removeEventListener('seeked', handleSeeked);
       video.removeAttribute('src');
     };
-  }, [src, absoluteWidth, effTotalDuration, pxPerMs, JSON.stringify(zoomRegions), sourceStartMs]);
+  }, [src, absoluteWidth, effTotalDuration, pxPerMs, thumbnailZoomSignature, sourceStartMs]);
 
   if (!src || segments.length === 0) return null;
 

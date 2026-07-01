@@ -28,6 +28,7 @@ const requiredAuditScripts = [
   "audit:timeline-playhead-time",
   "audit:audio-resize-bounds",
   "audit:original-audio-accordion",
+  "audit:main-video-thumbnails",
   "audit:main-clip-segmentation",
   "audit:preview-project-time",
   "audit:export-black-tail-rendering",

@@ -108,6 +108,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:original-audio-accordion"],
   },
   {
+    id: "main-video-thumbnails",
+    command: npmCommand,
+    args: ["run", "audit:main-video-thumbnails"],
+  },
+  {
     id: "main-clip-segmentation",
     command: npmCommand,
     args: ["run", "audit:main-clip-segmentation"],
