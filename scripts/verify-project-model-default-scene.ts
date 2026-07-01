@@ -1,10 +1,12 @@
 import {
   createProjectFromLegacyEditorState,
   getProjectRenderSettings,
+  restoreLegacyEditorStateFromProjectModel,
   validateVideoEditorProject,
 } from "../src/components/video-editor/project";
+import type { LegacyEditorProjectInput } from "../src/components/video-editor/project";
 
-const project = createProjectFromLegacyEditorState({
+const legacyInput: LegacyEditorProjectInput = {
   projectId: "project-default-scene",
   projectName: "Default Scene Contract",
   videoPath: "/tmp/default-scene-proxy.mp4",
@@ -77,7 +79,9 @@ const project = createProjectFromLegacyEditorState({
   aspectRatio: "16:9",
   exportQuality: "good",
   now: new Date("2026-06-30T00:00:00.000Z"),
-});
+};
+
+const project = createProjectFromLegacyEditorState(legacyInput);
 
 const validation = validateVideoEditorProject(project);
 if (!validation.valid) {
@@ -112,6 +116,52 @@ if (missingClipIds.length > 0) {
   });
 }
 
+const oldProjectWithoutScenes = {
+  ...project,
+  scenes: [],
+};
+const oldProjectValidation = validateVideoEditorProject(oldProjectWithoutScenes);
+if (!oldProjectValidation.valid) {
+  fail("Old sidecars without scenes should remain readable for migration.", oldProjectValidation);
+}
+
+const restoredOldProject = restoreLegacyEditorStateFromProjectModel(oldProjectWithoutScenes);
+const migratedProject = createProjectFromLegacyEditorState({
+  ...legacyInput,
+  companionAudioPath: restoredOldProject.companionAudioPath,
+  projectDurationSeconds: renderSettings.durationMs / 1000,
+  zoomRegions: restoredOldProject.zoomRegions,
+  trimRegions: restoredOldProject.trimRegions,
+  annotationRegions: restoredOldProject.annotationRegions,
+  audioRegions: restoredOldProject.audioRegions,
+  cursorData: restoredOldProject.cursorData ?? [],
+  cursorSize: restoredOldProject.cursorSize ?? legacyInput.cursorSize,
+  cursorSmoothing: restoredOldProject.cursorSmoothing ?? legacyInput.cursorSmoothing,
+  showVectorCursor: restoredOldProject.showVectorCursor ?? legacyInput.showVectorCursor,
+  cursorOffset: restoredOldProject.cursorOffset ?? legacyInput.cursorOffset,
+  cropRegion: restoredOldProject.cropRegion,
+  wallpaper: restoredOldProject.wallpaper,
+  shadowIntensity: restoredOldProject.shadowIntensity,
+  showBlur: restoredOldProject.showBlur,
+  motionBlurEnabled: restoredOldProject.motionBlurEnabled ?? legacyInput.motionBlurEnabled,
+  borderRadius: restoredOldProject.borderRadius,
+  padding: restoredOldProject.padding,
+  aspectRatio: restoredOldProject.aspectRatio,
+  exportQuality: restoredOldProject.exportQuality,
+});
+
+const migratedScene = migratedProject.scenes[0];
+if (!migratedScene) {
+  fail("Restoring an old scene-less sidecar and saving again should add a default scene.", migratedProject);
+}
+
+if (migratedScene.endMs !== renderSettings.durationMs) {
+  fail("Migrated default scene should preserve the restored project duration.", {
+    migratedScene,
+    durationMs: renderSettings.durationMs,
+  });
+}
+
 console.log(JSON.stringify({
   status: "ok",
   durationMs: renderSettings.durationMs,
@@ -122,6 +172,10 @@ console.log(JSON.stringify({
     startMs: scene.startMs,
     endMs: scene.endMs,
     clipIds: scene.clipIds.length,
+  },
+  migratedFromSceneLessSidecar: {
+    scenes: migratedProject.scenes.length,
+    defaultSceneClipIds: migratedScene.clipIds.length,
   },
   clips: project.clips.length,
 }, null, 2));
