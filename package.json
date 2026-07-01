@@ -23,6 +23,7 @@
     "audit:timeline-lane-wrapping": "tsx scripts/verify-timeline-lane-wrapping.ts",
     "audit:timeline-drag-safety": "tsx scripts/verify-timeline-drag-safety.ts",
     "audit:timeline-magnetic-snap": "tsx scripts/verify-timeline-magnetic-snap.ts",
+    "audit:timeline-range-zoom": "tsx scripts/verify-timeline-range-zoom.ts",
     "audit:timeline-seek-mapping": "tsx scripts/verify-timeline-seek-mapping.ts",
     "audit:timeline-playhead-time": "tsx scripts/verify-timeline-playhead-time.ts",
     "audit:audio-resize-bounds": "tsx scripts/verify-audio-resize-bounds.ts",

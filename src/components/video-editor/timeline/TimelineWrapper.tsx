@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { TimelineContext } from "dnd-timeline";
 import type { DragEndEvent, Range, ResizeEndEvent, ResizeMoveEvent, ResizeStartEvent, Span } from "dnd-timeline";
+import { resolveLeftAlignedTimelineRangeChange } from "./timelineRangeZoom";
 import { normalizeTimelineInteractionSpan } from "./timelineSpanSafety";
 
 interface TimelineWrapperProps {
@@ -22,36 +23,6 @@ interface TimelineWrapperProps {
   isMagneticSnapEnabled?: boolean;
   getMagneticSnapSpan?: (id: string, span: Span) => Span;
 }
-
-const clampRange = (candidate: Range, minVisibleRangeMs: number, totalMs: number): Range => {
-  let { start, end } = candidate;
-
-  // 1. 防止向左无限平移
-  if (start < 0) {
-    const span = end - start;
-    start = 0;
-    end = span;
-  }
-
-  // 2. 限制最大可视范围（最大缩放级别），防止缩放到几千小时导致比例尺崩溃
-  const maxSpan = Math.max(totalMs * 3, 60000); // 至少允许 60 秒，或者视频长度的 3 倍
-  if (end - start > maxSpan) {
-    end = start + maxSpan;
-  }
-
-  // 3. 给通用多轨时间轴足够的右侧工作空间。实现上仍保留性能护栏，但不再被主视频长度锁死。
-  const absoluteMaxEnd = Math.max(totalMs + 60 * 60 * 1000, maxSpan);
-  if (end > absoluteMaxEnd) {
-    const span = end - start;
-    end = absoluteMaxEnd;
-    start = Math.max(0, end - span);
-  }
-
-  // 4. 保证最小可视范围
-  end = Math.max(start + minVisibleRangeMs, end);
-
-  return { start, end };
-};
 
 export default function TimelineWrapper({
   children,
@@ -198,22 +169,7 @@ export default function TimelineWrapper({
   const handleRangeChange = useCallback(
     (updater: (previous: Range) => Range) => {
       onRangeChange((prev) => {
-        const normalized = clampRange(prev, minVisibleRangeMs, totalMs);
-        let desired = updater(normalized);
-        
-        const prevSpan = normalized.end - normalized.start;
-        const desiredSpan = desired.end - desired.start;
-        const isZoom = Math.abs(prevSpan - desiredSpan) > 1;
-        
-        // Force left-aligned zoom: keep the left edge fixed during zoom
-        if (isZoom) {
-          desired = {
-            start: normalized.start,
-            end: normalized.start + desiredSpan,
-          };
-        }
-        
-        return clampRange(desired, minVisibleRangeMs, totalMs);
+        return resolveLeftAlignedTimelineRangeChange(prev, updater, minVisibleRangeMs, totalMs);
       });
     },
     [onRangeChange, minVisibleRangeMs, totalMs],

@@ -52,6 +52,7 @@ const requiredMachineGates = [
   "audit:export-duration-render-settings",
   "audit:timeline-duration-domains",
   "audit:timeline-lane-wrapping",
+  "audit:timeline-range-zoom",
   "audit:preview-project-time",
   "audit:export-black-tail-rendering",
   "audit:screenstudio-core-contract",

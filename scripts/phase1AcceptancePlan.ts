@@ -29,6 +29,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:timeline-lane-wrapping",
     "npm run audit:timeline-drag-safety",
     "npm run audit:timeline-magnetic-snap",
+    "npm run audit:timeline-range-zoom",
     "npm run audit:timeline-seek-mapping",
     "npm run audit:timeline-playhead-time",
     "npm run audit:audio-resize-bounds",

@@ -88,6 +88,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:timeline-magnetic-snap"],
   },
   {
+    id: "timeline-range-zoom",
+    command: npmCommand,
+    args: ["run", "audit:timeline-range-zoom"],
+  },
+  {
     id: "timeline-seek-mapping",
     command: npmCommand,
     args: ["run", "audit:timeline-seek-mapping"],

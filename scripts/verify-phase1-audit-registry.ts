@@ -24,6 +24,7 @@ const requiredAuditScripts = [
   "audit:timeline-lane-wrapping",
   "audit:timeline-drag-safety",
   "audit:timeline-magnetic-snap",
+  "audit:timeline-range-zoom",
   "audit:timeline-seek-mapping",
   "audit:timeline-playhead-time",
   "audit:audio-resize-bounds",
