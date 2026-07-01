@@ -73,6 +73,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:timeline-lane-wrapping"],
   },
   {
+    id: "timeline-drag-safety",
+    command: npmCommand,
+    args: ["run", "audit:timeline-drag-safety"],
+  },
+  {
     id: "preview-project-time",
     command: npmCommand,
     args: ["run", "audit:preview-project-time"],

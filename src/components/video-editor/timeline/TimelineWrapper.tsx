@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { TimelineContext } from "dnd-timeline";
 import type { DragEndEvent, Range, ResizeEndEvent, ResizeMoveEvent, ResizeStartEvent, Span } from "dnd-timeline";
+import { normalizeTimelineInteractionSpan } from "./timelineSpanSafety";
 
 interface TimelineWrapperProps {
   children: ReactNode;
@@ -75,19 +76,8 @@ export default function TimelineWrapper({
   const totalMs = Math.max(0, Math.round(videoDuration * 1000));
 
   const clampSpanToBounds = useCallback(
-    (span: Span): Span => {
-      const rawDuration = Math.max(span.end - span.start, 0);
-      const normalizedStart = Number.isFinite(span.start) ? span.start : 0;
-
-      const minDuration = Math.max(minItemDurationMs, 1);
-      const duration = Math.max(rawDuration, minDuration);
-      const start = Math.max(0, normalizedStart);
-      return {
-        start,
-        end: start + duration,
-      };
-    },
-    [minItemDurationMs, totalMs],
+    (span: Span): Span => normalizeTimelineInteractionSpan(span, { minItemDurationMs }),
+    [minItemDurationMs],
   );
 
 
