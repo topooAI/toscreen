@@ -14,6 +14,47 @@ export interface ProjectValidationResult {
   warnings: string[];
 }
 
+const VALID_ASSET_TYPES = [
+  "screen-recording",
+  "video",
+  "audio",
+  "image",
+  "lottie",
+  "digital-human",
+  "ui-source",
+  "cursor-data",
+  "font",
+] as const;
+
+const VALID_TRACK_TYPES = [
+  "video",
+  "camera",
+  "presenter",
+  "text",
+  "annotation",
+  "lottie",
+  "image",
+  "ui-motion",
+  "audio",
+  "voice",
+  "music",
+  "cursor",
+] as const;
+
+const VALID_CLIP_TYPES = [
+  "screen-recording",
+  "video",
+  "audio",
+  "camera",
+  "presenter",
+  "text",
+  "annotation",
+  "lottie",
+  "image",
+  "ui-element-motion",
+  "cursor",
+] as const;
+
 export function validateVideoEditorProject(projectInput: unknown): ProjectValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -28,7 +69,14 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
 
   const project = projectInput as Partial<VideoEditorProject>;
 
-  if (!project.id) errors.push("Project id is required.");
+  if (typeof project.id !== "string" || !project.id.trim()) errors.push("Project id is required.");
+  if (typeof project.name !== "string" || !project.name.trim()) errors.push("Project name is required.");
+  if (typeof project.createdAt !== "string" || !project.createdAt.trim()) {
+    errors.push("Project createdAt is required.");
+  }
+  if (typeof project.updatedAt !== "string" || !project.updatedAt.trim()) {
+    errors.push("Project updatedAt is required.");
+  }
   if (project.schemaVersion !== 1) errors.push(`Unsupported project schema version: ${project.schemaVersion}.`);
   if (typeof project.durationMs !== "number" || !Number.isFinite(project.durationMs) || project.durationMs < 0) {
     errors.push("Project durationMs must be a finite non-negative number.");
@@ -64,11 +112,19 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       errors.push(`Asset at index ${index} must be an object.`);
       return;
     }
-    if (!asset.id) errors.push("Asset id is required.");
-    if (assetIds.has(asset.id)) errors.push(`Duplicate asset id: ${asset.id}.`);
-    assetIds.add(asset.id);
-    assetsById.set(asset.id, asset);
-    if (!asset.type) errors.push(`Asset ${asset.id || "(missing id)"} type is required.`);
+    if (typeof asset.id !== "string" || !asset.id.trim()) {
+      errors.push("Asset id is required.");
+    } else {
+      if (assetIds.has(asset.id)) errors.push(`Duplicate asset id: ${asset.id}.`);
+      assetIds.add(asset.id);
+      assetsById.set(asset.id, asset);
+    }
+    if (!isOneOf(asset.type, VALID_ASSET_TYPES)) {
+      errors.push(`Asset ${asset.id || "(missing id)"} type is invalid or missing.`);
+    }
+    if (typeof asset.name !== "string" || !asset.name.trim()) {
+      errors.push(`Asset ${asset.id || "(missing id)"} name is required.`);
+    }
     if (!asset.sourceUrl) warnings.push(`Asset ${asset.id || "(missing id)"} has no sourceUrl.`);
   });
 
@@ -110,11 +166,19 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       errors.push(`Track at index ${index} must be an object.`);
       return;
     }
-    if (!track.id) errors.push("Track id is required.");
-    if (trackIds.has(track.id)) errors.push(`Duplicate track id: ${track.id}.`);
-    trackIds.add(track.id);
-    tracksById.set(track.id, track);
-    if (!track.type) errors.push(`Track ${track.id || "(missing id)"} type is required.`);
+    if (typeof track.id !== "string" || !track.id.trim()) {
+      errors.push("Track id is required.");
+    } else {
+      if (trackIds.has(track.id)) errors.push(`Duplicate track id: ${track.id}.`);
+      trackIds.add(track.id);
+      tracksById.set(track.id, track);
+    }
+    if (!isOneOf(track.type, VALID_TRACK_TYPES)) {
+      errors.push(`Track ${track.id || "(missing id)"} type is invalid or missing.`);
+    }
+    if (typeof track.name !== "string" || !track.name.trim()) {
+      errors.push(`Track ${track.id || "(missing id)"} name is required.`);
+    }
     if (!Number.isFinite(track.order)) errors.push(`Track ${track.id || "(missing id)"} order must be finite.`);
   });
   tracks.forEach((track) => {
@@ -137,10 +201,16 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
       errors.push(`Clip at index ${index} must be an object.`);
       return;
     }
-    if (!clip.id) errors.push("Clip id is required.");
-    if (clipIds.has(clip.id)) errors.push(`Duplicate clip id: ${clip.id}.`);
-    clipIds.add(clip.id);
-    clipsById.set(clip.id, clip);
+    if (typeof clip.id !== "string" || !clip.id.trim()) {
+      errors.push("Clip id is required.");
+    } else {
+      if (clipIds.has(clip.id)) errors.push(`Duplicate clip id: ${clip.id}.`);
+      clipIds.add(clip.id);
+      clipsById.set(clip.id, clip);
+    }
+    if (!isOneOf(clip.type, VALID_CLIP_TYPES)) {
+      errors.push(`Clip ${clip.id || "(missing id)"} type is invalid or missing.`);
+    }
 
     if (!trackIds.has(clip.trackId)) {
       errors.push(`Clip ${clip.id || "(missing id)"} references missing track ${clip.trackId}.`);
@@ -542,7 +612,9 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     });
     validateAIEditPlanLifecycle(plan.id || "(missing id)", plan.status, stepStatuses, errors);
   });
-  if (project.activeAIEditPlanId && !aiEditPlanIds.has(project.activeAIEditPlanId)) {
+  if (project.activeAIEditPlanId !== undefined && typeof project.activeAIEditPlanId !== "string") {
+    errors.push("Project activeAIEditPlanId must be a string.");
+  } else if (project.activeAIEditPlanId && !aiEditPlanIds.has(project.activeAIEditPlanId)) {
     errors.push(`Active AI edit plan ${project.activeAIEditPlanId} does not exist.`);
   }
 

@@ -48,6 +48,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:project-model-canvas-settings"],
   },
   {
+    id: "project-model-entity-schema",
+    command: npmCommand,
+    args: ["run", "audit:project-model-entity-schema"],
+  },
+  {
     id: "recording-restore",
     command: npmCommand,
     args: ["run", "audit:recordings"],
