@@ -93,6 +93,14 @@ async function buildHandoffPacket(directory: string) {
       startEditor: "npm run dev:editor",
       readiness: "npm run audit:phase1-readiness",
     },
+    editorRuntime: {
+      startCommand: "npm run dev:editor",
+      expectedDevServerUrl: "http://localhost:5173",
+      windowTypeEnv: "TOSCREEN_DEV_WINDOW_TYPE=editor",
+      expectedWindow: "Electron should open the editor window directly through createEditorWindow.",
+      hotUpdate: "Renderer changes should arrive through Vite HMR on localhost without recording again.",
+      machineEvidence: "npm run audit:electron-editor-runtime",
+    },
     docs: {
       acceptanceRecord: "docs/product/Phase1-User-Acceptance-Record.md",
       projectModelReviewPacket: "docs/product/ProjectModel-Review-Packet.md",

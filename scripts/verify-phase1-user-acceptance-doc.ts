@@ -43,6 +43,7 @@ const requiredPhrases = [
   "实机验收步骤 / Hands-On Acceptance Steps",
   "status: \"ready\"",
   "handsOnSteps",
+  "editorRuntime",
   "acceptancePlan",
   "machine evidence",
   "acceptancePlan.machineEvidence",
