@@ -12,6 +12,7 @@ import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
 import { partitionIntoTimelineLanes } from "./lanePartition";
 import { getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
+import { resolveTimelineSeekFromClientX } from "./timelineSeekMapping";
 import type { Range, Span } from "dnd-timeline";
 import type { ZoomRegion, TrimRegion, AnnotationRegion, AudioRegion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
@@ -305,13 +306,16 @@ function PlaybackCursor({
       if (!timelineRef.current || !onSeek) return;
       
       const rect = timelineRef.current.getBoundingClientRect();
-      const clickX = e.clientX - rect.left - trackStartPx;
-      
-      const relativeMs = pixelsToValue(clickX);
-      const effectiveMs = Math.max(0, range.start + relativeMs);
-      const sourceMs = (isTrimTrackVisible || !mapEffectiveToSource)
-        ? effectiveMs
-        : mapEffectiveToSource(effectiveMs);
+      const { sourceMs } = resolveTimelineSeekFromClientX({
+        clientX: e.clientX,
+        timelineLeftPx: rect.left,
+        trackStartPx,
+        rangeStartMs: range.start,
+        durationMs: videoDurationMs,
+        pixelsToValue,
+        mapEffectiveToSource,
+        isTrimTrackVisible,
+      });
       
       onSeek(sourceMs / 1000);
     };
@@ -734,25 +738,21 @@ const { setTimelineRef, style, range, pixelsToValue, setSidebarRef } = useTimeli
     onSelectAudio?.(null);
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const rawClickX = e.clientX - rect.left;
-    
-    if (rawClickX < trackStartPx) {
-      onSeek(0);
-      return;
-    }
-    
-    const clickX = rawClickX - trackStartPx;
-    
-    const relativeMs = pixelsToValue(clickX);
-    const effectiveMs = Math.max(0, range.start + relativeMs);
-    const sourceMs = (isTrimTrackVisible || !mapEffectiveToSource)
-      ? effectiveMs
-      : mapEffectiveToSource(effectiveMs);
+    const seek = resolveTimelineSeekFromClientX({
+      clientX: e.clientX,
+      timelineLeftPx: rect.left,
+      trackStartPx,
+      rangeStartMs: range.start,
+      durationMs: videoDurationMs,
+      pixelsToValue,
+      mapEffectiveToSource,
+      isTrimTrackVisible,
+    });
     
     console.log(
-      `[TimelineSeek] rawX=${rawClickX.toFixed(1)} trackStart=${trackStartPx.toFixed(1)} effectiveMs=${effectiveMs.toFixed(1)} sourceMs=${sourceMs.toFixed(1)}`
+      `[TimelineSeek] rawX=${seek.rawX.toFixed(1)} trackStart=${trackStartPx.toFixed(1)} effectiveMs=${seek.effectiveMs.toFixed(1)} sourceMs=${seek.sourceMs.toFixed(1)}`
     );
-    onSeek(sourceMs / 1000);
+    onSeek(seek.sourceMs / 1000);
   }, [isTimelineResizing, trackStartPx, range.start, pixelsToValue, onSeek, videoDurationMs, onSelectZoom, onSelectTrim, onSelectAnnotation, onSelectAudio, isTrimTrackVisible, mapEffectiveToSource]);
 
   return (

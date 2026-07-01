@@ -19,6 +19,7 @@ const requiredPhrases = [
   "npm run audit:timeline-lane-wrapping",
   "npm run audit:timeline-drag-safety",
   "npm run audit:timeline-magnetic-snap",
+  "npm run audit:timeline-seek-mapping",
   "npm run audit:phase1-handoff",
   "phaseComplete: false",
   "phaseComplete: true",
