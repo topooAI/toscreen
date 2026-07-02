@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { TimelineContext } from "dnd-timeline";
-import type { DragEndEvent, Range, ResizeEndEvent, ResizeMoveEvent, ResizeStartEvent, Span } from "dnd-timeline";
+import type { DragEndEvent, DragMoveEvent, Range, ResizeEndEvent, ResizeMoveEvent, ResizeStartEvent, Span } from "dnd-timeline";
 import { resolveLeftAlignedTimelineRangeChange } from "./timelineRangeZoom";
 import { normalizeTimelineInteractionSpan } from "./timelineSpanSafety";
+import type { TimelineMagneticSnapResult } from "./timelineMagneticSnap";
 
 interface TimelineWrapperProps {
   children: ReactNode;
@@ -22,6 +23,8 @@ interface TimelineWrapperProps {
   onResizeInteractionEnd?: () => void;
   isMagneticSnapEnabled?: boolean;
   getMagneticSnapSpan?: (id: string, span: Span) => Span;
+  getMagneticSnapResult?: (id: string, span: Span) => TimelineMagneticSnapResult;
+  onSnapGuideChange?: (timeMs: number | null) => void;
 }
 
 export default function TimelineWrapper({
@@ -41,6 +44,8 @@ export default function TimelineWrapper({
   onResizeInteractionEnd,
   isMagneticSnapEnabled = true,
   getMagneticSnapSpan,
+  getMagneticSnapResult,
+  onSnapGuideChange,
 }: TimelineWrapperProps) {
   const [forceUpdateKey, setForceUpdateKey] = useState(0);
   const resizeStartSpansRef = useRef(new Map<string, Span>());
@@ -89,6 +94,7 @@ export default function TimelineWrapper({
         window.addEventListener('click', blockSyntheticClick, { capture: true, once: true });
         resizeStartSpansRef.current.delete(activeItemId);
         onItemResizePreview?.(activeItemId, null);
+        onSnapGuideChange?.(null);
         onResizeInteractionEnd?.();
       };
 
@@ -105,6 +111,10 @@ export default function TimelineWrapper({
         return;
       }
       
+      if (isMagneticSnapEnabled && getMagneticSnapSpan) {
+        clampedSpan = getMagneticSnapSpan(activeItemId, clampedSpan);
+      }
+
       if (getNonOverlappingSpan) {
         clampedSpan = getNonOverlappingSpan(clampedSpan, activeItemId, undefined);
       }
@@ -118,21 +128,53 @@ export default function TimelineWrapper({
       onItemSpanChange(activeItemId, clampedSpan);
       finishResize();
     },
-    [clampSpanToBounds, getSpanFromResizeEvent, hasOverlap, minItemDurationMs, onItemResizePreview, onItemSpanChange, onResizeInteractionEnd, totalMs, isMagneticSnapEnabled, getMagneticSnapSpan, getNonOverlappingSpan]
+    [clampSpanToBounds, getSpanFromResizeEvent, hasOverlap, minItemDurationMs, onItemResizePreview, onItemSpanChange, onResizeInteractionEnd, onSnapGuideChange, totalMs, isMagneticSnapEnabled, getMagneticSnapSpan, getNonOverlappingSpan]
   );
 
   const onResizeMove = useCallback(
     (event: ResizeMoveEvent) => {
+      const activeItemId = event.active.id as string;
       const updatedSpan = getSpanFromResizeEvent(event);
       if (!updatedSpan) return;
 
-      const liveSpan = clampSpanToBounds(updatedSpan);
+      let liveSpan = clampSpanToBounds(updatedSpan);
 
       if (liveSpan.end - liveSpan.start < Math.min(minItemDurationMs, totalMs || minItemDurationMs)) {
         return;
       }
+
+      if (isMagneticSnapEnabled && getMagneticSnapResult) {
+        const snap = getMagneticSnapResult(activeItemId, liveSpan);
+        liveSpan = snap.span;
+        onSnapGuideChange?.(snap.targetMs);
+      } else {
+        onSnapGuideChange?.(null);
+      }
+
+      onItemResizePreview?.(activeItemId, liveSpan);
     },
-    [clampSpanToBounds, getSpanFromResizeEvent, minItemDurationMs, totalMs]
+    [clampSpanToBounds, getMagneticSnapResult, getSpanFromResizeEvent, isMagneticSnapEnabled, minItemDurationMs, onItemResizePreview, onSnapGuideChange, totalMs]
+  );
+
+  const onDragMove = useCallback(
+    (event: DragMoveEvent) => {
+      if (!isMagneticSnapEnabled || !getMagneticSnapResult) {
+        onSnapGuideChange?.(null);
+        return;
+      }
+
+      const updatedSpan = event.active.data.current.getSpanFromDragEvent?.(event);
+      if (!updatedSpan) {
+        onSnapGuideChange?.(null);
+        return;
+      }
+
+      const activeItemId = event.active.id as string;
+      const liveSpan = clampSpanToBounds(updatedSpan);
+      const snap = getMagneticSnapResult(activeItemId, liveSpan);
+      onSnapGuideChange?.(snap.targetMs);
+    },
+    [clampSpanToBounds, getMagneticSnapResult, isMagneticSnapEnabled, onSnapGuideChange],
   );
 
   const onDragEnd = useCallback(
@@ -140,7 +182,10 @@ export default function TimelineWrapper({
       const originalRowId = event.active.data.current?.rowId as string;
       const activeRowId = (event.over?.id as string) || originalRowId;
       const updatedSpan = event.active.data.current.getSpanFromDragEvent?.(event);
-      if (!updatedSpan || !activeRowId) return;
+      if (!updatedSpan || !activeRowId) {
+        onSnapGuideChange?.(null);
+        return;
+      }
       
       const activeItemId = event.active.id as string;
       let clampedSpan = clampSpanToBounds(updatedSpan);
@@ -155,6 +200,7 @@ export default function TimelineWrapper({
       
       if (hasOverlap(clampedSpan, activeItemId, activeRowId)) {
         setForceUpdateKey(prev => prev + 1);
+        onSnapGuideChange?.(null);
         return;
       }
 
@@ -162,9 +208,14 @@ export default function TimelineWrapper({
       if (activeRowId) {
         onItemRowChange?.(activeItemId, activeRowId);
       }
+      onSnapGuideChange?.(null);
     },
-    [clampSpanToBounds, hasOverlap, onItemSpanChange, onItemRowChange, isMagneticSnapEnabled, getMagneticSnapSpan, getNonOverlappingSpan]
+    [clampSpanToBounds, hasOverlap, onItemSpanChange, onItemRowChange, onSnapGuideChange, isMagneticSnapEnabled, getMagneticSnapSpan, getNonOverlappingSpan]
   );
+
+  const onDragCancel = useCallback(() => {
+    onSnapGuideChange?.(null);
+  }, [onSnapGuideChange]);
 
   const handleRangeChange = useCallback(
     (updater: (previous: Range) => Range) => {
@@ -183,7 +234,9 @@ export default function TimelineWrapper({
       onResizeStart={onResizeStart}
       onResizeEnd={onResizeEnd}
       onResizeMove={onResizeMove}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
       resizeHandleWidth={4}
       rangeGridSizeDefinition={1}
       autoScroll={{ enabled: false }}

@@ -15,6 +15,12 @@ interface GetMagneticSnapSpanOptions {
   videoRowId: string;
 }
 
+export interface TimelineMagneticSnapResult {
+  span: Span;
+  targetMs: number | null;
+  edge: "start" | "end" | null;
+}
+
 export function getTimelineSnapThresholdMs(intervalMs: number): number {
   const safeInterval = Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : 0;
   return Math.max(50, Math.min(300, safeInterval / 5));
@@ -44,16 +50,16 @@ export function collectTimelineSnapTargets({
   return targets;
 }
 
-export function getTimelineMagneticSnapSpan({
+export function getTimelineMagneticSnapResult({
   activeItemId,
   targetSpan,
   items,
   currentTimeMs,
   intervalMs,
   videoRowId,
-}: GetMagneticSnapSpanOptions): Span {
+}: GetMagneticSnapSpanOptions): TimelineMagneticSnapResult {
   const activeItem = items.find((item) => item.id === activeItemId);
-  if (!activeItem) return targetSpan;
+  if (!activeItem) return { span: targetSpan, targetMs: null, edge: null };
 
   const oldSpan = activeItem.span;
   const snapTargets = collectTimelineSnapTargets({
@@ -70,13 +76,17 @@ export function getTimelineMagneticSnapSpan({
 
   let closestDelta = Infinity;
   let snapOffset = 0;
+  let snapTargetMs: number | null = null;
+  let snapEdge: TimelineMagneticSnapResult["edge"] = null;
 
-  const trySnapEdge = (edgeMs: number) => {
+  const trySnapEdge = (edgeMs: number, edge: "start" | "end") => {
     for (const targetMs of snapTargets) {
       const diff = targetMs - edgeMs;
       if (Math.abs(diff) < Math.abs(closestDelta) && Math.abs(diff) <= snapThresholdMs) {
         closestDelta = diff;
         snapOffset = diff;
+        snapTargetMs = targetMs;
+        snapEdge = edge;
       }
     }
   };
@@ -86,26 +96,30 @@ export function getTimelineMagneticSnapSpan({
     const isResizingRight = Math.abs(targetSpan.start - oldSpan.start) <= 2;
 
     if (isResizingLeft) {
-      trySnapEdge(targetSpan.start);
+      trySnapEdge(targetSpan.start, "start");
       return closestDelta !== Infinity
-        ? { start: targetSpan.start + snapOffset, end: targetSpan.end }
-        : targetSpan;
+        ? { span: { start: targetSpan.start + snapOffset, end: targetSpan.end }, targetMs: snapTargetMs, edge: snapEdge }
+        : { span: targetSpan, targetMs: null, edge: null };
     }
 
     if (isResizingRight) {
-      trySnapEdge(targetSpan.end);
+      trySnapEdge(targetSpan.end, "end");
       return closestDelta !== Infinity
-        ? { start: targetSpan.start, end: targetSpan.end + snapOffset }
-        : targetSpan;
+        ? { span: { start: targetSpan.start, end: targetSpan.end + snapOffset }, targetMs: snapTargetMs, edge: snapEdge }
+        : { span: targetSpan, targetMs: null, edge: null };
     }
 
-    return targetSpan;
+    return { span: targetSpan, targetMs: null, edge: null };
   }
 
-  trySnapEdge(targetSpan.start);
-  trySnapEdge(targetSpan.end);
+  trySnapEdge(targetSpan.start, "start");
+  trySnapEdge(targetSpan.end, "end");
 
   return closestDelta !== Infinity
-    ? { start: targetSpan.start + snapOffset, end: targetSpan.end + snapOffset }
-    : targetSpan;
+    ? { span: { start: targetSpan.start + snapOffset, end: targetSpan.end + snapOffset }, targetMs: snapTargetMs, edge: snapEdge }
+    : { span: targetSpan, targetMs: null, edge: null };
+}
+
+export function getTimelineMagneticSnapSpan(options: GetMagneticSnapSpanOptions): Span {
+  return getTimelineMagneticSnapResult(options).span;
 }

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   collectTimelineSnapTargets,
+  getTimelineMagneticSnapResult,
   getTimelineMagneticSnapSpan,
   getTimelineSnapThresholdMs,
   type TimelineSnapItem,
@@ -145,14 +146,24 @@ const timelineEditorPath = path.join(
 const timelineEditor = fs.readFileSync(timelineEditorPath, "utf8");
 
 const requiredNeedles = [
-  'import { getTimelineMagneticSnapSpan } from "./timelineMagneticSnap"',
+  'Magnet } from "lucide-react"',
+  'getTimelineMagneticSnapResult',
+  'getTimelineMagneticSnapSpan',
+  "isMagneticSnapEnabled",
+  "setIsMagneticSnapEnabled",
+  "snapGuideMs",
   "return getTimelineMagneticSnapSpan({",
+  "return getTimelineMagneticSnapResult({",
   "activeItemId",
   "targetSpan",
   "items: timelineItems",
   "currentTimeMs: activeCurrentTimeMs",
   "intervalMs: timelineScale.intervalMs",
   "videoRowId: VIDEO_ROW_ID",
+  "isMagneticSnapEnabled={isMagneticSnapEnabled}",
+  "getMagneticSnapResult={getMagneticSnapResultForSpan}",
+  "onSnapGuideChange={setSnapGuideMs}",
+  "getDirectSnapSpan={getDirectSnapSpan}",
 ];
 
 const missing = requiredNeedles.filter((needle) => !timelineEditor.includes(needle));
@@ -164,6 +175,20 @@ if (missing.length > 0) {
     missing,
   }, null, 2));
   process.exit(1);
+}
+
+const snapResult = getTimelineMagneticSnapResult({
+  activeItemId: "zoom-a",
+  targetSpan: { start: 2920, end: 3920 },
+  items,
+  currentTimeMs: 2500,
+  intervalMs: 1000,
+  videoRowId: VIDEO_ROW_ID,
+});
+
+assertSpan("snap result exposes snapped span", snapResult.span, { start: 3000, end: 4000 });
+if (snapResult.targetMs !== 3000 || snapResult.edge !== "start") {
+  throw new Error(`Expected snap result target 3000/start, got ${JSON.stringify(snapResult)}`);
 }
 
 console.log(JSON.stringify({

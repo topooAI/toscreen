@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTimelineContext } from "dnd-timeline";
 import { useWaveformCache } from "../hooks/useWaveformCache";
 import { Button } from "../../ui/button";
-import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check, Target, Scan } from "lucide-react";
+import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check, Target, Scan, Magnet } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../../lib/utils";
 import { useTimeMap } from "../hooks/useTimeMap";
@@ -12,7 +12,8 @@ import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
 import { partitionIntoTimelineLanes } from "./lanePartition";
 import { clampAudioResizeSpanToSource, resolveAudioResizeBounds } from "./timelineAudioResizeBounds";
-import { getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
+import { getTimelineMagneticSnapResult, getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
+import type { TimelineMagneticSnapResult } from "./timelineMagneticSnap";
 import { buildMainClipSegments } from "./timelineMainClipSegments";
 import {
   buildAssociatedOriginalAudioForSourceRange,
@@ -515,6 +516,8 @@ function Timeline({
   selectedVideoId,
   onSelectVideo,
   isTimelineResizing,
+  snapGuideMs,
+  getDirectSnapSpan,
 }: {
   items: TimelineRenderItem[];
   zoomRegions: ZoomRegion[];
@@ -546,6 +549,8 @@ function Timeline({
   selectedVideoId: string | null;
   onSelectVideo: (id: string | null) => void;
   isTimelineResizing?: boolean;
+  snapGuideMs?: number | null;
+  getDirectSnapSpan?: (id: string, span: Span) => Span;
 }) {
   
   const trackRenderer = useMemo(() => {
@@ -633,6 +638,7 @@ function Timeline({
                 zoomDepth={item.zoomDepth}
                 onDirectSpanChange={onItemSpanChange}
                 onDirectSpanPreview={onItemResizePreview}
+                getDirectSnapSpan={getDirectSnapSpan}
                 onDirectResizeStart={onTimelineResizeStart}
                 onDirectResizeEnd={onTimelineResizeEnd}
               >
@@ -703,11 +709,13 @@ function Timeline({
       })()}
     </>
   );
-}, [items, zoomRegions, zoomBoundaryRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange, onItemSpanChange, onItemResizePreview, onTimelineResizeStart, onTimelineResizeEnd]);
+}, [items, zoomRegions, zoomBoundaryRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange, onItemSpanChange, onItemResizePreview, getDirectSnapSpan, onTimelineResizeStart, onTimelineResizeEnd]);
 
-const { setTimelineRef, style, range, pixelsToValue, setSidebarRef } = useTimelineContext();
+const { setTimelineRef, style, range, pixelsToValue, valueToPixels, direction, setSidebarRef } = useTimelineContext();
   const localTimelineRef = useRef<HTMLDivElement | null>(null);
   const [trackStartPx, setTrackStartPx] = useState(FALLBACK_TRACK_START_PX);
+  const sideProperty = direction === "rtl" ? "right" : "left";
+  const isSnapGuideVisible = snapGuideMs !== null && snapGuideMs !== undefined && snapGuideMs >= range.start && snapGuideMs <= range.end;
 
   const setRefs = useCallback((node: HTMLDivElement | null) => {
     localTimelineRef.current = node;
@@ -779,6 +787,12 @@ const { setTimelineRef, style, range, pixelsToValue, setSidebarRef } = useTimeli
 
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px)] bg-[length:20px_100%] pointer-events-none" />
       <TimelineAxis intervalMs={intervalMs} videoDurationMs={videoDurationMs} trackStartPx={trackStartPx} />
+      {isSnapGuideVisible && (
+        <div
+          className="absolute top-8 bottom-0 z-40 w-[2px] bg-[#34B27B] shadow-[0_0_10px_rgba(52,178,123,0.75)] pointer-events-none"
+          style={{ [sideProperty]: `${trackStartPx + valueToPixels(snapGuideMs - range.start) - 1}px` }}
+        />
+      )}
       {trackRenderer}
 
       <PlaybackCursor 
@@ -863,6 +877,8 @@ export default function TimelineEditor({
   const [selectedKeyframeId, setSelectedKeyframeId] = useState<string | null>(null);
   const [resizePreview, setResizePreview] = useState<{ id: string; span: Span } | null>(null);
   const [isTimelineResizing, setIsTimelineResizing] = useState(false);
+  const [isMagneticSnapEnabled, setIsMagneticSnapEnabled] = useState(false);
+  const [snapGuideMs, setSnapGuideMs] = useState<number | null>(null);
   const [shortcuts, setShortcuts] = useState({
     pan: 'Shift + Ctrl + Scroll',
     zoom: 'Ctrl + Scroll'
@@ -875,6 +891,12 @@ export default function TimelineEditor({
       });
     });
   }, []);
+
+  useEffect(() => {
+    if (!isMagneticSnapEnabled) {
+      setSnapGuideMs(null);
+    }
+  }, [isMagneticSnapEnabled]);
 
   // Add keyframe at current playhead position
   const addKeyframe = useCallback(() => {
@@ -1415,6 +1437,20 @@ export default function TimelineEditor({
     trimRegions, annotationRegions, audioRegions, totalMs, waveformCache, videoPath
   ]);
 
+  const getMagneticSnapResultForSpan = useCallback((
+    activeItemId: string,
+    targetSpan: Span
+  ): TimelineMagneticSnapResult => {
+    return getTimelineMagneticSnapResult({
+      activeItemId,
+      targetSpan,
+      items: timelineItems,
+      currentTimeMs: activeCurrentTimeMs,
+      intervalMs: timelineScale.intervalMs,
+      videoRowId: VIDEO_ROW_ID,
+    });
+  }, [timelineItems, activeCurrentTimeMs, timelineScale.intervalMs]);
+
   const getMagneticSnapSpan = useCallback((
     activeItemId: string,
     targetSpan: Span
@@ -1428,6 +1464,17 @@ export default function TimelineEditor({
       videoRowId: VIDEO_ROW_ID,
     });
   }, [timelineItems, activeCurrentTimeMs, timelineScale.intervalMs]);
+
+  const getDirectSnapSpan = useCallback((id: string, span: Span): Span => {
+    if (!isMagneticSnapEnabled) {
+      setSnapGuideMs(null);
+      return span;
+    }
+
+    const snap = getMagneticSnapResultForSpan(id, span);
+    setSnapGuideMs(snap.targetMs);
+    return snap.span;
+  }, [getMagneticSnapResultForSpan, isMagneticSnapEnabled]);
 
   const previewZoomRegions = useMemo(() => {
     if (!resizePreview || !zoomRegions.some(region => region.id === resizePreview.id)) {
@@ -1451,6 +1498,7 @@ export default function TimelineEditor({
   const handleItemResizePreview = useCallback((id: string, span: Span | null) => {
     if (!span || !zoomRegions.some(region => region.id === id)) {
       setResizePreview(prev => (prev?.id === id ? null : prev));
+      setSnapGuideMs(null);
       return;
     }
 
@@ -1570,6 +1618,21 @@ export default function TimelineEditor({
           >
             <MessageSquare className="w-4 h-4" />
           </Button>
+          <Button
+            onClick={() => setIsMagneticSnapEnabled((enabled) => !enabled)}
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-7 w-7 transition-all",
+              isMagneticSnapEnabled
+                ? "text-[#34B27B] bg-[#34B27B]/10 hover:bg-[#34B27B]/20"
+                : "text-slate-400 hover:text-[#34B27B] hover:bg-[#34B27B]/10"
+            )}
+            title={isMagneticSnapEnabled ? "Magnetic Snap On" : "Magnetic Snap Off"}
+            aria-pressed={isMagneticSnapEnabled}
+          >
+            <Magnet className="w-4 h-4" />
+          </Button>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -1642,6 +1705,9 @@ export default function TimelineEditor({
           hasOverlap={hasOverlap}
           getNonOverlappingSpan={getNonOverlappingSpan}
           getMagneticSnapSpan={getMagneticSnapSpan}
+          getMagneticSnapResult={getMagneticSnapResultForSpan}
+          isMagneticSnapEnabled={isMagneticSnapEnabled}
+          onSnapGuideChange={setSnapGuideMs}
           onRangeChange={setRange}
           minItemDurationMs={timelineScale.minItemDurationMs}
           minVisibleRangeMs={timelineScale.minVisibleRangeMs}
@@ -1687,6 +1753,8 @@ export default function TimelineEditor({
             selectedVideoId={selectedVideoId}
             onSelectVideo={onSelectVideo}
             isTimelineResizing={isTimelineResizing}
+            snapGuideMs={snapGuideMs}
+            getDirectSnapSpan={getDirectSnapSpan}
           />
         </TimelineWrapper>
       </div>

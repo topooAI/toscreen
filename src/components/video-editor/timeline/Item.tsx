@@ -118,6 +118,7 @@ interface ItemProps {
   onVolumeKeyframesChange?: (keyframes: VolumeKeyframe[]) => void;
   onDirectSpanChange?: (id: string, span: Span) => void;
   onDirectSpanPreview?: (id: string, span: Span | null) => void;
+  getDirectSnapSpan?: (id: string, span: Span) => Span;
   onDirectResizeStart?: () => void;
   onDirectResizeEnd?: () => void;
   zoomRegions?: ZoomRegion[];
@@ -158,6 +159,7 @@ function ItemComponent({
   onVolumeKeyframesChange,
   onDirectSpanChange,
   onDirectSpanPreview,
+  getDirectSnapSpan,
   onDirectResizeStart,
   onDirectResizeEnd,
   zoomRegions = [],
@@ -259,7 +261,7 @@ function ItemComponent({
       moveEvent.preventDefault();
       const deltaPx = moveEvent.clientX - startClientX;
       const deltaMs = deltaPx / Math.max(pxPerMs, 0.0001);
-      const nextSpan = direction === 'start'
+      const rawNextSpan = direction === 'start'
         ? {
             start: Math.max(0, Math.min(initialSpan.start + deltaMs, initialSpan.end - minDurationMs)),
             end: initialSpan.end,
@@ -268,6 +270,7 @@ function ItemComponent({
             start: initialSpan.start,
             end: Math.max(initialSpan.start + minDurationMs, initialSpan.end + deltaMs),
           };
+      const nextSpan = getDirectSnapSpan?.(id, rawNextSpan) ?? rawNextSpan;
 
       directResizeSpanRef.current = nextSpan;
       onDirectSpanPreview?.(id, nextSpan);
@@ -314,7 +317,7 @@ function ItemComponent({
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp, { once: true });
-  }, [baseLeftPx, baseWidthPx, id, isTrim, isZoom, onDirectResizeEnd, onDirectResizeStart, onDirectSpanChange, onDirectSpanPreview, onSelect, pxPerMs, span]);
+  }, [baseLeftPx, baseWidthPx, getDirectSnapSpan, id, isTrim, isZoom, onDirectResizeEnd, onDirectResizeStart, onDirectSpanChange, onDirectSpanPreview, onSelect, pxPerMs, span]);
 
   // 使用 MutationObserver 在 dnd-timeline 内部不触发 React 渲染的拖拽过程中，实时修正波形的物理偏移并设置拖拽物理墙
   React.useEffect(() => {
@@ -680,6 +683,7 @@ export default React.memo(ItemComponent, (prev, next) => {
     prev.zoomBoundaryRegions === next.zoomBoundaryRegions &&
     prev.onDirectSpanChange === next.onDirectSpanChange &&
     prev.onDirectSpanPreview === next.onDirectSpanPreview &&
+    prev.getDirectSnapSpan === next.getDirectSnapSpan &&
     prev.onDirectResizeStart === next.onDirectResizeStart &&
     prev.onDirectResizeEnd === next.onDirectResizeEnd
   );
