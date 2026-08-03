@@ -22,8 +22,8 @@ const videoEditor = fs.readFileSync(videoEditorPath, "utf8");
 
 assertIncludes(
   videoPlayback,
-  "const projectTimeMs = Number.isFinite(currentTimeRef.current)",
-  "VideoPlayback zoom/render loop must derive visual time from project currentTimeRef.",
+  "const projectTimeMs = isPlayingRef.current && mappedEffectiveMs !== null",
+  "VideoPlayback zoom/render loop must derive playing time from the shared effective map.",
 );
 assertIncludes(
   videoPlayback,
@@ -59,7 +59,7 @@ assertIncludes(
 console.log(JSON.stringify({
   status: "ok",
   checks: [
-    "VideoPlayback visual time derives from project currentTimeRef",
+    "VideoPlayback visual time derives from shared effective time",
     "Zoom interpolation uses project time",
     "Preview has black-tail layer after source video end",
     "VideoEditor guards source-video tail events from resetting project time",

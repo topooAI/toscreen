@@ -8,6 +8,7 @@ export interface MainTrackTimeMap {
   effectiveDurationMs: number;
   clips: readonly MainTrackClip[];
   speedSections: readonly SpeedSection[];
+  clipProjectSpans: ReadonlyArray<{ clipId: string; projectStartMs: number; projectEndMs: number }>;
   mapSourceToProject(sourceTimeMs: number): number | null;
   mapProjectToSource(projectTimeMs: number): number;
   mapProjectToEffective(projectTimeMs: number): number;
@@ -39,6 +40,12 @@ export function createMainTrackTimeMap(document: EditingDocument, sourceDuration
     }))
     .filter((clip) => clip.sourceEndMs - clip.sourceStartMs > EPSILON);
   const projectDurationMs = clips.reduce((sum, clip) => sum + clip.sourceEndMs - clip.sourceStartMs, 0);
+  let clipCursorMs = 0;
+  const clipProjectSpans = clips.map((clip) => {
+    const span = { clipId: clip.id, projectStartMs: clipCursorMs, projectEndMs: clipCursorMs + clip.sourceEndMs - clip.sourceStartMs };
+    clipCursorMs = span.projectEndMs;
+    return span;
+  });
   const speedSections = normalizeSpeedSections(document.speedSections, projectDurationMs);
 
   const rateAtProjectTime = (projectTimeMs: number) => {
@@ -113,6 +120,7 @@ export function createMainTrackTimeMap(document: EditingDocument, sourceDuration
     effectiveDurationMs,
     clips,
     speedSections,
+    clipProjectSpans,
     mapSourceToProject,
     mapProjectToSource,
     mapProjectToEffective,

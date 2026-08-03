@@ -116,6 +116,7 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
   }
   validateProjectExportSettings(project.exportSettings, errors);
   validateLegacyRuntimeSettings(project.legacyState, errors);
+  validateEditingDocument(project.editingDocument, errors);
   const assets = Array.isArray(project.assets) ? project.assets : [];
   const uiSources = Array.isArray(project.uiSources) ? project.uiSources : [];
   const tracks = Array.isArray(project.tracks) ? project.tracks : [];
@@ -692,6 +693,26 @@ export function validateVideoEditorProject(projectInput: unknown): ProjectValida
     errors,
     warnings,
   };
+}
+
+function validateEditingDocument(value: unknown, errors: string[]) {
+  if (value === undefined) return;
+  if (!isRecord(value) || !Array.isArray(value.clips) || !Array.isArray(value.speedSections)) {
+    errors.push('Project editingDocument must contain clips and speedSections arrays.');
+    return;
+  }
+  const ids = new Set<string>();
+  value.clips.forEach((clip, index) => {
+    if (!isRecord(clip) || typeof clip.id !== 'string' || !isFiniteNumber(clip.sourceStartMs) || !isFiniteNumber(clip.sourceEndMs) || clip.sourceEndMs <= clip.sourceStartMs) {
+      errors.push(`Editing clip at index ${index} is invalid.`);
+    } else if (ids.has(clip.id)) errors.push(`Duplicate editing clip id: ${clip.id}.`);
+    else ids.add(clip.id);
+  });
+  value.speedSections.forEach((section, index) => {
+    if (!isRecord(section) || typeof section.id !== 'string' || !isFiniteNumber(section.projectStartMs) || !isFiniteNumber(section.projectEndMs) || section.projectEndMs <= section.projectStartMs || !isFiniteNumber(section.rate) || section.rate <= 0 || !isOneOf(section.origin, ['manual', 'typing'])) {
+      errors.push(`Editing speed section at index ${index} is invalid.`);
+    }
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -104,6 +104,13 @@ const originalInput: LegacyEditorProjectInput = {
   padding: 58,
   aspectRatio: "16:9",
   exportQuality: "source",
+  editingDocument: {
+    clips: [
+      { id: 'main-b', sourceStartMs: 9200, sourceEndMs: 12000 },
+      { id: 'main-a', sourceStartMs: 0, sourceEndMs: 8000 },
+    ],
+    speedSections: [{ id: 'speed-typing', projectStartMs: 500, projectEndMs: 1500, rate: 4, origin: 'typing' }],
+  },
   now: new Date("2026-06-30T00:00:00.000Z"),
 };
 
@@ -137,6 +144,7 @@ const secondProject = createProjectFromLegacyEditorState({
   padding: restored.padding,
   aspectRatio: restored.aspectRatio,
   exportQuality: restored.exportQuality,
+  editingDocument: restored.editingDocument,
   now: new Date("2026-06-30T00:00:00.000Z"),
 });
 assertValidProject(secondProject, "secondProject");
@@ -180,6 +188,7 @@ function renderSettingsSnapshot(settings: ProjectRenderSettings) {
     durationMs: settings.durationMs,
     canvas: settings.canvas,
     timeline: {
+      editingDocument: settings.timeline.editingDocument,
       zoomRegions: settings.timeline.zoomRegions,
       trimRegions: settings.timeline.trimRegions,
       annotationRegions: settings.timeline.annotationRegions,

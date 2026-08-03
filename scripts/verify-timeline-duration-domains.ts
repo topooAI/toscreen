@@ -46,8 +46,8 @@ assertIncludes(
 );
 assertIncludes(
   timelineEditorContent,
-  "useTimeMap(trimRegions, sourceTotalMs)",
-  "Trim time mapping must stay in the source-video duration domain.",
+  "useTimeMap(trimRegions, sourceTotalMs, editingSession?.document)",
+  "Timeline time mapping must receive the source duration plus the persisted EditingDocument.",
 );
 assertIncludes(
   timelineEditorContent,

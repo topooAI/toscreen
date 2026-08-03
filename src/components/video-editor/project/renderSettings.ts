@@ -13,6 +13,7 @@ import type {
 import { resolveCursorStyle } from "../types";
 import { restoreLegacyEditorStateFromProjectModel } from "./legacyAdapter";
 import type { VideoEditorProject } from "./types";
+import type { EditingDocument } from "../editing";
 
 export interface ProjectRenderSettings {
   durationMs: number;
@@ -26,6 +27,7 @@ export interface ProjectRenderSettings {
     cropRegion: CropRegion;
   };
   timeline: {
+    editingDocument: EditingDocument;
     zoomRegions: ZoomRegion[];
     trimRegions: TrimRegion[];
     annotationRegions: AnnotationRegion[];
@@ -50,6 +52,7 @@ export interface ProjectRenderSettings {
 }
 
 export interface ProjectAutosaveSnapshot {
+  editingDocument: EditingDocument;
   zoomRegions: ZoomRegion[];
   trimRegions: TrimRegion[];
   annotationRegions: AnnotationRegion[];
@@ -89,6 +92,7 @@ export function getProjectRenderSettings(project: VideoEditorProject): ProjectRe
       cropRegion: restored.cropRegion,
     },
     timeline: {
+      editingDocument: restored.editingDocument,
       zoomRegions: restored.zoomRegions,
       trimRegions: restored.trimRegions,
       annotationRegions: restored.annotationRegions,
@@ -125,6 +129,7 @@ export function createProjectAutosaveSnapshot(
   );
 
   return {
+    editingDocument: renderSettings.timeline.editingDocument,
     zoomRegions: renderSettings.timeline.zoomRegions,
     trimRegions: renderSettings.timeline.trimRegions,
     annotationRegions: renderSettings.timeline.annotationRegions,

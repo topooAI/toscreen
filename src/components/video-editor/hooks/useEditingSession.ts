@@ -7,11 +7,13 @@ import {
   redoEditingCommand,
   undoEditingCommand,
   type EditingCommand,
+  type EditingDocument,
 } from '../editing';
 
 export function useEditingSession(sourceDurationMs: number) {
   const [history, dispatchHistory] = useReducer(
-    (state: ReturnType<typeof createEditingHistory>, action: { type: 'execute'; command: EditingCommand } | { type: 'undo' } | { type: 'redo' } | { type: 'initialize'; sourceDurationMs: number }) => {
+    (state: ReturnType<typeof createEditingHistory>, action: { type: 'execute'; command: EditingCommand } | { type: 'undo' } | { type: 'redo' } | { type: 'initialize'; sourceDurationMs: number } | { type: 'restore'; document: EditingDocument }) => {
+      if (action.type === 'restore') return createEditingHistory(action.document);
       if (action.type === 'initialize') {
         if (state.present.clips.length > 0 || state.past.length > 0 || action.sourceDurationMs <= 0) return state;
         return createEditingHistory(createInitialEditingDocument(action.sourceDurationMs));
@@ -34,6 +36,7 @@ export function useEditingSession(sourceDurationMs: number) {
     execute,
     undo: useCallback(() => dispatchHistory({ type: 'undo' }), []),
     redo: useCallback(() => dispatchHistory({ type: 'redo' }), []),
+    restore: useCallback((document: EditingDocument) => dispatchHistory({ type: 'restore', document }), []),
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
   };

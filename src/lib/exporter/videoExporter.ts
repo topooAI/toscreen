@@ -6,8 +6,10 @@ import { AudioMixerExporter } from './audioMixerExporter';
 import { AudioEncoderWrapper } from './audioEncoder';
 import { resolveExportDurationSeconds } from './duration';
 import type { ZoomRegion, CropRegion, TrimRegion, AnnotationRegion, AudioRegion, CursorCustomImageMap, CursorStylePreset } from '@/components/video-editor/types';
+import type { createEditingRenderPlan } from '@/components/video-editor/editing';
 
 interface VideoExporterConfig extends ExportConfig {
+  editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
   videoUrl: string;
   projectDurationMs?: number;
   wallpaper: string;
@@ -56,6 +58,7 @@ export class VideoExporter {
   }
 
   private getEffectiveDuration(totalDuration: number): number {
+    if (this.config.editingRenderPlan) return this.config.editingRenderPlan.durationMs / 1000;
     return resolveExportDurationSeconds({
       sourceDurationSeconds: totalDuration,
       trimRegions: this.config.trimRegions,
@@ -165,6 +168,9 @@ export class VideoExporter {
 
       videoElement.muted = true;
       videoElement.playbackRate = 1.0; // Normal speed, we control pacing via pause/play
+      if (this.config.editingRenderPlan) {
+        videoElement.currentTime = this.config.editingRenderPlan.exportSample(0).sourceTimeMs / 1000;
+      }
 
       const totalExpectedFrames = Math.floor(effectiveDuration * this.config.frameRate);
       let totalFramesExported = 0;
@@ -254,6 +260,16 @@ export class VideoExporter {
         videoElement.pause();
 
         const sourceTimeSec = metadata.mediaTime;
+        const renderPlan = this.config.editingRenderPlan;
+        if (renderPlan) {
+          const target = renderPlan.exportSample((totalFramesExported / this.config.frameRate) * 1000);
+          if (Math.abs(sourceTimeSec * 1000 - target.sourceTimeMs) > 20) {
+            videoElement.currentTime = target.sourceTimeMs / 1000;
+            videoElement.requestVideoFrameCallback(processFrame);
+            videoElement.play().catch(() => {});
+            return;
+          }
+        }
         
         // 2. Trim Skip Logic
         const trimRegions = this.config.trimRegions || [];
@@ -282,7 +298,9 @@ export class VideoExporter {
         }
 
         // 3. Throttle and Sync Time
-        const effectiveTimeSec = this.mapSourceToEffectiveTime(sourceTimeSec);
+        const effectiveTimeSec = renderPlan
+          ? totalFramesExported / this.config.frameRate
+          : this.mapSourceToEffectiveTime(sourceTimeSec);
         const expectedFrameIndex = Math.floor(effectiveTimeSec * this.config.frameRate);
         
         if (expectedFrameIndex > totalFramesExported) {

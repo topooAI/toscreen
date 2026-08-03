@@ -11,6 +11,7 @@ import type {
   ZoomRegion,
 } from "../types";
 import { resolveCursorStyle } from "../types";
+import { createInitialEditingDocument, type EditingDocument } from "../editing";
 import type {
   ProjectAsset,
   ProjectClip,
@@ -57,6 +58,7 @@ export interface LegacyEditorProjectInput {
   padding: number;
   aspectRatio: AspectRatio;
   exportQuality: ExportQuality;
+  editingDocument?: EditingDocument;
   now?: Date;
 }
 
@@ -93,6 +95,7 @@ export interface LegacyEditorRestoredState {
   cursorCustomImage?: string | null;
   cursorCustomImages?: CursorCustomImageMap;
   cursorOffset?: number;
+  editingDocument: EditingDocument;
 }
 
 export function calculateLegacyProjectDurationSeconds(input: LegacyProjectDurationInput): number {
@@ -423,6 +426,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
     exportSettings: {
       quality: input.exportQuality,
     },
+    editingDocument: input.editingDocument,
     legacyState: {
       trimRegions: input.trimRegions,
       motionBlurEnabled: input.motionBlurEnabled,
@@ -454,11 +458,18 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
   const legacyTrimRegions = Array.isArray(project.legacyState?.trimRegions)
     ? project.legacyState.trimRegions as TrimRegion[]
     : [];
+  const sourceDurationMs = screenClip?.sourceEndMs ?? screenClip?.endMs ?? project.durationMs;
+  const persistedTrimRegions = screenClip?.type === 'screen-recording'
+    ? screenClip.props.trimRegions || legacyTrimRegions
+    : legacyTrimRegions;
+  const editingDocument = project.editingDocument
+    ?? migrateLegacyTrimsToEditingDocument(persistedTrimRegions, sourceDurationMs);
   const legacyMotionBlurEnabled = typeof project.legacyState?.motionBlurEnabled === "boolean"
     ? project.legacyState.motionBlurEnabled
     : undefined;
 
   return {
+    editingDocument,
     companionAudioPath,
     cameraPath: project.assets.find(asset => asset.metadata?.role === 'presenter-camera')?.filePath || null,
     zoomRegions: project.clips.flatMap((clip): ZoomRegion[] => {
@@ -473,9 +484,7 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
         focus: clip.props.focus,
       }];
     }),
-    trimRegions: screenClip?.type === "screen-recording"
-      ? screenClip.props.trimRegions || legacyTrimRegions
-      : legacyTrimRegions,
+    trimRegions: persistedTrimRegions,
     annotationRegions: project.clips.flatMap((clip): AnnotationRegion[] => (
       clip.type === "annotation" ? [clip.props.sourceRegion] : []
     )),
@@ -504,6 +513,23 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
       cursorOffset: cursorClip.props.offsetMs,
     } : {}),
   };
+}
+
+export function migrateLegacyTrimsToEditingDocument(trimRegions: TrimRegion[], sourceDurationMs: number): EditingDocument {
+  const initial = createInitialEditingDocument(sourceDurationMs);
+  if (trimRegions.length === 0) return initial;
+  const trims = [...trimRegions]
+    .map((trim) => ({ startMs: Math.max(0, trim.startMs), endMs: Math.min(sourceDurationMs, trim.endMs) }))
+    .filter((trim) => trim.endMs > trim.startMs)
+    .sort((a, b) => a.startMs - b.startMs);
+  const clips: EditingDocument['clips'] = [];
+  let cursor = 0;
+  trims.forEach((trim, index) => {
+    if (trim.startMs > cursor) clips.push({ id: `legacy-main-${index}`, sourceStartMs: cursor, sourceEndMs: trim.startMs });
+    cursor = Math.max(cursor, trim.endMs);
+  });
+  if (cursor < sourceDurationMs) clips.push({ id: 'legacy-main-final', sourceStartMs: cursor, sourceEndMs: sourceDurationMs });
+  return { clips, speedSections: [] };
 }
 
 function audioAssetId(region: AudioRegion) {

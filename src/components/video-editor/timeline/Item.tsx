@@ -106,7 +106,7 @@ interface ItemProps {
   onSelect?: () => void;
   children?: React.ReactNode;
   zoomDepth?: number;
-  variant?: 'zoom' | 'trim' | 'annotation' | 'video' | 'audio';
+  variant?: 'zoom' | 'trim' | 'annotation' | 'video' | 'audio' | 'speed';
   isNestedTrim?: boolean;
   audioPeaks?: number[];
   audioPeaksDurationMs?: number;
@@ -186,8 +186,9 @@ function ItemComponent({
   const isVideo = variant === 'video';
   const isAudio = variant === 'audio';
   const isAnnotation = variant === 'annotation';
-  const canTimelineDirectDrag = isAudio || isAnnotation;
-  const canTimelineDirectResize = isTrim || isAudio || isAnnotation;
+  const isSpeed = variant === 'speed';
+  const canTimelineDirectDrag = isAudio || isAnnotation || isSpeed;
+  const canTimelineDirectResize = isTrim || isAudio || isAnnotation || isSpeed;
   const dynamicResizeHandleWidth = isZoom || isTrim
     ? 5
     : 5;
@@ -661,7 +662,7 @@ function ItemComponent({
     ? glassStyles.glassPurple 
     : isVideo
     ? glassStyles.glassVideo
-    : isTrim 
+    : isTrim || isSpeed
     ? glassStyles.glassRed 
     : glassStyles.glassYellow;
 

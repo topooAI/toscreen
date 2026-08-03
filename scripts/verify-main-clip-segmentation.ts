@@ -93,7 +93,7 @@ const requiredNeedles = [
     source: timelineEditorSource,
     needles: [
       'from "./timelineMainClipSegments"',
-      "useTimeMap(trimRegions, sourceTotalMs)",
+  "useTimeMap(trimRegions, sourceTotalMs, editingSession?.document)",
       "buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective)",
       "span: { start: segment.effectiveStartMs, end: segment.effectiveEndMs }",
       "sourceStartMs: segment.sourceStartMs",

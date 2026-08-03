@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode
 import { useTimelineContext } from "dnd-timeline";
 import { useWaveformCache } from "../hooks/useWaveformCache";
 import { Button } from "../../ui/button";
-import { Orbit, Plus } from "lucide-react";
+import { Orbit, Plus, Redo2, Trash2, Undo2 } from "lucide-react";
 import {
   PiCornersOutBold,
   PiCrosshairBold,
@@ -36,12 +36,14 @@ import { FALLBACK_TRACK_START_PX, resolveTrackStartPx } from "./timelineTrackOri
 import type { Range, Span } from "dnd-timeline";
 import type { ZoomRegion, TrimRegion, AnnotationRegion, AudioRegion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
+import type { EditingCommand, EditingDocument, MainTrackTimeMap } from '../editing';
 
 import PlaybackControls from "../PlaybackControls";
 
 const ZOOM_ROW_ID = "row-zoom-0";
 const CAMERA_ROW_ID = "row-camera-0";
 const TRIM_ROW_ID = "row-trim";
+const SPEED_ROW_ID = "row-speed";
 
 function TimelineToolTooltip({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -74,6 +76,15 @@ function getTrackStartPx(timeline: HTMLElement | null) {
 }
 
 interface TimelineEditorProps {
+  editingSession?: {
+    document: EditingDocument;
+    timeMap: MainTrackTimeMap;
+    execute: (command: EditingCommand) => void;
+    undo: () => void;
+    redo: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
+  };
   videoDuration: number;
   sourceVideoDuration?: number;
   currentTime: number;
@@ -135,7 +146,7 @@ interface TimelineRenderItem {
   span: Span;
   label: string;
   zoomDepth?: number;
-  variant: 'zoom' | 'trim' | 'annotation' | 'audio' | 'video';
+  variant: 'zoom' | 'trim' | 'annotation' | 'audio' | 'video' | 'speed';
   sourceUrl?: string;
   sourceStartMs?: number;
   sourceEndMs?: number;
@@ -143,6 +154,7 @@ interface TimelineRenderItem {
   startMs?: number;
   volume?: number;
   volumeKeyframes?: any[];
+  speedRate?: number;
   audioPeaks?: number[];
   audioPeaksDurationMs?: number;
   associatedAudio?: AudioRegion;
@@ -541,6 +553,8 @@ function Timeline({
   snapGuideMs,
   getVisualSnapSpan,
   getVisualResizeSnapSpan,
+  selectedSpeedId,
+  onSelectSpeed,
 }: {
   items: TimelineRenderItem[];
   zoomRegions: ZoomRegion[];
@@ -576,6 +590,8 @@ function Timeline({
   snapGuideMs?: number | null;
   getVisualSnapSpan?: (id: string, span: Span, snapThresholdMs: number) => Span;
   getVisualResizeSnapSpan?: (id: string, span: Span, snapThresholdMs: number) => Span;
+  selectedSpeedId?: string | null;
+  onSelectSpeed?: (id: string | null) => void;
 }) {
   
   const trackRenderer = useMemo(() => {
@@ -640,6 +656,22 @@ function Timeline({
           >
             {item.label}
           </Item>
+        ))}
+      </Row>
+
+      <Row id={SPEED_ROW_ID}>
+        {items.filter(item => item.rowId === SPEED_ROW_ID).map((item) => (
+          <Item
+            id={item.id}
+            key={item.id}
+            rowId={item.rowId}
+            span={item.span}
+            isSelected={item.id === selectedSpeedId}
+            onSelect={() => onSelectSpeed?.(item.id)}
+            variant="speed"
+            onDirectSpanChange={onItemSpanChange}
+            onDirectDragSpanChange={onItemSpanChange}
+          >{item.label}</Item>
         ))}
       </Row>
 
@@ -868,6 +900,7 @@ const { setTimelineRef, style, range, pixelsToValue, valueToPixels, direction, s
 }
 
 export default function TimelineEditor({
+  editingSession,
   videoDuration,
   sourceVideoDuration,
   currentTime,
@@ -917,10 +950,26 @@ export default function TimelineEditor({
   const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
 
   const isTrimTrackVisible = false; // 用户强制要求删除 Trim UI
-  const { effectiveDurationMs, mapSourceToEffective, mapEffectiveToSource } = useTimeMap(trimRegions, sourceTotalMs);
+  const { effectiveDurationMs, mapSourceToEffective, mapEffectiveToSource, mapEffectiveToProject } = useTimeMap(trimRegions, sourceTotalMs, editingSession?.document);
   
-  const activeDurationMs = isTrimTrackVisible ? projectTotalMs : Math.max(projectTotalMs, effectiveDurationMs);
-  const activeCurrentTimeMs = isTrimTrackVisible ? currentTimeMs : mapSourceToEffective(currentTimeMs);
+  const activeDurationMs = editingSession
+    ? projectTotalMs
+    : (isTrimTrackVisible ? projectTotalMs : Math.max(projectTotalMs, effectiveDurationMs));
+  const activeCurrentTimeMs = editingSession ? currentTimeMs : (isTrimTrackVisible ? currentTimeMs : mapSourceToEffective(currentTimeMs));
+
+  const selectedMainClip = editingSession?.document.clips.find((clip) => clip.id === selectedVideoId);
+  const splitSelectedMainClip = useCallback(() => {
+    if (!editingSession || !selectedMainClip) return;
+    const projectTimeMs = mapEffectiveToProject(currentTimeMs);
+    const sourceTimeMs = editingSession.timeMap.mapProjectToSource(projectTimeMs);
+    editingSession.execute({ type: 'split', clipId: selectedMainClip.id, sourceTimeMs });
+  }, [currentTimeMs, editingSession, mapEffectiveToProject, selectedMainClip]);
+  const addSpeedRegion = useCallback(() => {
+    if (!editingSession) return;
+    const projectStartMs = mapEffectiveToProject(currentTimeMs);
+    const projectEndMs = Math.min(editingSession.timeMap.projectDurationMs, projectStartMs + 1000);
+    if (projectEndMs > projectStartMs) editingSession.execute({ type: 'set-speed', projectStartMs, projectEndMs, rate: 2 });
+  }, [currentTimeMs, editingSession, mapEffectiveToProject]);
 
   const timelineScale = useMemo(() => calculateTimelineScale(activeDurationMs / 1000), [activeDurationMs]);
   const safeMinDurationMs = useMemo(
@@ -935,6 +984,7 @@ export default function TimelineEditor({
   const [isTimelineResizing, setIsTimelineResizing] = useState(false);
   const [isMagneticSnapEnabled, setIsMagneticSnapEnabled] = useState(true);
   const [snapGuideMs, setSnapGuideMs] = useState<number | null>(null);
+  const [selectedSpeedId, setSelectedSpeedId] = useState<string | null>(null);
   useEffect(() => {
     if (!isMagneticSnapEnabled) {
       setSnapGuideMs(null);
@@ -1299,6 +1349,11 @@ export default function TimelineEditor({
       if (e.key === 'f' || e.key === 'F') {
         addKeyframe();
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) editingSession?.redo(); else editingSession?.undo();
+        return;
+      }
       if (e.key === 'z' || e.key === 'Z') {
         handleAddZoom();
       }
@@ -1309,7 +1364,9 @@ export default function TimelineEditor({
         handleAddAnnotation();
       }
       if (e.key === 's' || e.key === 'S') {
-        if (selectedZoomId) {
+        if (selectedMainClip) {
+          splitSelectedMainClip();
+        } else if (selectedZoomId) {
           handleSplitZoom();
         }
       }
@@ -1337,7 +1394,10 @@ export default function TimelineEditor({
         }
       }    
       if (((e.key === 'd' || e.key === 'D') && (e.ctrlKey || e.metaKey)) || e.key === 'Backspace' || e.key === 'Delete') {
-        if (selectedKeyframeId) {
+        if (selectedMainClip) {
+          editingSession?.execute({ type: 'delete', clipId: selectedMainClip.id });
+          onSelectVideo(null);
+        } else if (selectedKeyframeId) {
           deleteSelectedKeyframe();
         } else if (selectedZoomId) {
           deleteSelectedZoom();
@@ -1352,7 +1412,7 @@ export default function TimelineEditor({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [addKeyframe, handleAddZoom, handleAddTrim, handleAddAnnotation, deleteSelectedKeyframe, deleteSelectedZoom, deleteSelectedTrim, deleteSelectedAnnotation, deleteSelectedAudio, selectedKeyframeId, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, annotationRegions, currentTime, onSelectAnnotation]);
+  }, [addKeyframe, handleAddZoom, handleAddTrim, handleAddAnnotation, deleteSelectedKeyframe, deleteSelectedZoom, deleteSelectedTrim, deleteSelectedAnnotation, deleteSelectedAudio, selectedKeyframeId, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, annotationRegions, currentTime, onSelectAnnotation, editingSession, onSelectVideo, selectedMainClip, splitSelectedMainClip]);
 
   const clampedRange = useMemo<Range>(() => {
     const start = Math.max(0, range.start);
@@ -1438,10 +1498,29 @@ export default function TimelineEditor({
       volume: region.volume,
       volumeKeyframes: region.volumeKeyframes,
     }));
+    const speeds: TimelineRenderItem[] = (editingSession?.document.speedSections ?? []).map((section) => ({
+      id: section.id,
+      rowId: SPEED_ROW_ID,
+      span: {
+        start: editingSession!.timeMap.mapProjectToEffective(section.projectStartMs),
+        end: editingSession!.timeMap.mapProjectToEffective(section.projectEndMs),
+      },
+      label: `${section.origin === 'typing' ? 'Typing ' : ''}${section.rate}×`,
+      variant: 'speed',
+      speedRate: section.rate,
+    }));
 
     const mainClips: TimelineRenderItem[] = [];
     if (!isTrimTrackVisible) {
-      buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective).forEach((segment) => {
+      const segments = editingSession
+        ? editingSession.document.clips.map((clip, index) => {
+            const clipSpan = editingSession.timeMap.clipProjectSpans[index];
+            const projectStartMs = clipSpan.projectStartMs;
+            const projectEndMs = clipSpan.projectEndMs;
+            return { id: clip.id, sourceStartMs: clip.sourceStartMs, sourceEndMs: clip.sourceEndMs, effectiveStartMs: editingSession.timeMap.mapProjectToEffective(projectStartMs), effectiveEndMs: editingSession.timeMap.mapProjectToEffective(projectEndMs) };
+          })
+        : buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective);
+      segments.forEach((segment) => {
         mainClips.push({
           id: segment.id,
           rowId: VIDEO_ROW_ID,
@@ -1462,10 +1541,10 @@ export default function TimelineEditor({
     }
 
     const videoItems = isTrimTrackVisible ? videos : mainClips;
-    return [...videoItems, ...zooms, ...trims, ...annotations, ...audios];
+    return [...videoItems, ...speeds, ...zooms, ...trims, ...annotations, ...audios];
   }, [
     isTrimTrackVisible, mapSourceToEffective, sourceTotalMs, zoomRegions,
-    trimRegions, annotationRegions, audioRegions, totalMs, waveformCache, videoPath
+    trimRegions, annotationRegions, audioRegions, totalMs, waveformCache, videoPath, editingSession
   ]);
 
   const getMagneticSnapResultForSpan = useCallback((
@@ -1604,6 +1683,16 @@ export default function TimelineEditor({
   }, [onAudioTrackChange]);
 
   const handleItemSpanChange = useCallback((id: string, span: Span) => {
+    const speedSection = editingSession?.document.speedSections.find((section) => section.id === id);
+    if (speedSection) {
+      editingSession!.execute({
+        type: 'update-speed',
+        id,
+        projectStartMs: mapEffectiveToProject(span.start),
+        projectEndMs: mapEffectiveToProject(span.end),
+      });
+      return;
+    }
     let targetSpan = isTrimTrackVisible
       ? { ...span }
       : { start: mapEffectiveToSource(span.start), end: mapEffectiveToSource(span.end) };
@@ -1648,9 +1737,16 @@ export default function TimelineEditor({
       }
       onAudioSpanChange?.(id, targetSpan);
     }
-  }, [zoomRegions, trimRegions, annotationRegions, audioRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, onAudioSpanChange, isTrimTrackVisible, mapEffectiveToSource, sourceTotalMs, safeMinDurationMs]);
+  }, [editingSession, mapEffectiveToProject, zoomRegions, trimRegions, annotationRegions, audioRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, onAudioSpanChange, isTrimTrackVisible, mapEffectiveToSource, sourceTotalMs, safeMinDurationMs]);
 
   const handleItemDragSpanChange = useCallback((id: string, span: Span) => {
+    const mainClip = editingSession?.document.clips.find((clip) => clip.id === id);
+    if (mainClip) {
+      const projectMidpoint = mapEffectiveToProject((span.start + span.end) / 2);
+      const toIndex = editingSession!.timeMap.clipProjectSpans.findIndex((clipSpan) => projectMidpoint < clipSpan.projectEndMs);
+      editingSession!.execute({ type: 'reorder', clipId: id, toIndex: toIndex < 0 ? editingSession!.document.clips.length - 1 : toIndex });
+      return;
+    }
     const targetSpan = isTrimTrackVisible
       ? { ...span }
       : { start: mapEffectiveToSource(span.start), end: mapEffectiveToSource(span.end) };
@@ -1660,7 +1756,7 @@ export default function TimelineEditor({
     } else {
       handleItemSpanChange(id, span);
     }
-  }, [handleItemSpanChange, isTrimTrackVisible, mapEffectiveToSource, onZoomSpanChange, sourceTotalMs, zoomRegions]);
+  }, [editingSession, handleItemSpanChange, isTrimTrackVisible, mapEffectiveToProject, mapEffectiveToSource, onZoomSpanChange, sourceTotalMs, zoomRegions]);
 
   if (!videoDuration || videoDuration === 0) {
     return (
@@ -1680,6 +1776,29 @@ export default function TimelineEditor({
     <div className="flex-1 flex flex-col bg-transparent overflow-hidden">
       <div className="flex items-center gap-2 p-2 border-b border-[var(--ui-border)] bg-transparent relative">
         <div className="flex items-center gap-1">
+          <TimelineToolTooltip label="Undo (Cmd/Ctrl+Z)">
+            <Button onClick={editingSession?.undo} disabled={!editingSession?.canUndo} variant="ghost" size="icon" className="h-7 w-7" aria-label="Undo edit"><Undo2 className="h-3 w-3" /></Button>
+          </TimelineToolTooltip>
+          <TimelineToolTooltip label="Redo (Shift+Cmd/Ctrl+Z)">
+            <Button onClick={editingSession?.redo} disabled={!editingSession?.canRedo} variant="ghost" size="icon" className="h-7 w-7" aria-label="Redo edit"><Redo2 className="h-3 w-3" /></Button>
+          </TimelineToolTooltip>
+          <TimelineToolTooltip label="Split selected Main Clip at playhead">
+            <Button onClick={splitSelectedMainClip} disabled={!selectedMainClip} variant="ghost" size="icon" className="h-7 w-7" aria-label="Split Main Clip"><PiScissorsBold className="h-3 w-3" /></Button>
+          </TimelineToolTooltip>
+          <TimelineToolTooltip label="Delete selected Main Clip">
+            <Button onClick={() => { if (selectedMainClip) { editingSession?.execute({ type: 'delete', clipId: selectedMainClip.id }); onSelectVideo(null); } }} disabled={!selectedMainClip} variant="ghost" size="icon" className="h-7 w-7" aria-label="Delete Main Clip"><Trash2 className="h-3 w-3" /></Button>
+          </TimelineToolTooltip>
+          <Button onClick={addSpeedRegion} variant="ghost" className="h-7 px-2 text-[10px]" aria-label="Add Speed Region">Speed</Button>
+          <select
+            aria-label="Selected Speed Region rate"
+            disabled={!selectedSpeedId}
+            className="h-7 rounded border border-[var(--ui-border)] bg-[var(--ui-control)] px-1 text-[11px]"
+            value={editingSession?.document.speedSections.find((section) => section.id === selectedSpeedId)?.rate ?? 1}
+            onChange={(event) => selectedSpeedId && editingSession?.execute({ type: 'update-speed', id: selectedSpeedId, rate: Number(event.target.value) })}
+          >
+            {[0.5, 1, 1.5, 2, 4, 8].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
+          </select>
+          <Button onClick={() => { if (selectedSpeedId) { editingSession?.execute({ type: 'delete-speed', id: selectedSpeedId }); setSelectedSpeedId(null); } }} disabled={!selectedSpeedId} variant="ghost" size="icon" className="h-7 w-7" aria-label="Delete Speed Region"><Trash2 className="h-3 w-3" /></Button>
           <TimelineToolTooltip label="Add Focus (Z)">
             <Button
               onClick={handleAddZoom}
@@ -1840,7 +1959,7 @@ export default function TimelineEditor({
             onAddAnnotation={handleAddAnnotation}
             videoRef={videoRef}
             mapSourceToEffective={mapSourceToEffective}
-            mapEffectiveToSource={mapEffectiveToSource}
+            mapEffectiveToSource={editingSession ? ((timeMs: number) => timeMs) : mapEffectiveToSource}
             isTrimTrackVisible={isTrimTrackVisible}
             selectedVideoId={selectedVideoId}
             onSelectVideo={onSelectVideo}
@@ -1848,6 +1967,8 @@ export default function TimelineEditor({
             snapGuideMs={snapGuideMs}
             getVisualSnapSpan={isMagneticSnapEnabled ? getVisualMagneticSnapSpan : undefined}
             getVisualResizeSnapSpan={isMagneticSnapEnabled ? getVisualResizeMagneticSnapSpan : undefined}
+            selectedSpeedId={selectedSpeedId}
+            onSelectSpeed={setSelectedSpeedId}
           />
         </TimelineWrapper>
       </div>

@@ -43,14 +43,16 @@ import { loadEditorPreferences, type AppTheme } from "@/lib/editorPreferences";
 import {
   createProjectFromLegacyEditorState,
   createProjectAutosaveSnapshot,
-  calculateLegacyProjectDurationSeconds,
   getProjectRenderSettings,
   resolveExportAudioRegions,
   resolveRuntimeAudioRegions,
   restoreLegacyEditorStateFromProjectModel,
+  migrateLegacyTrimsToEditingDocument,
   validateVideoEditorProject,
 } from "./project";
 import { createProductCameraRegion } from './videoPlayback/cameraMotion';
+import { useEditingSession } from './hooks/useEditingSession';
+import { createEditingRenderPlan } from './editing';
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -88,6 +90,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
   // HEALER: Automatically fix corrupted audio regions trapped in memory
   useEffect(() => {
+    if (editingSession.document.speedSections.some((section) => section.origin === 'typing')) return;
     if (audioRegions && audioRegions.length > 0) {
       let needsFix = false;
       const fixedRegions = audioRegions.map(r => {
@@ -239,14 +242,30 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     () => Math.max(0, Math.round(duration * 1000)),
     [duration],
   );
+  const editingSession = useEditingSession(recordingDurationMs);
+  const editingRenderPlan = useMemo(
+    () => createEditingRenderPlan(editingSession.document, recordingDurationMs),
+    [editingSession.document, recordingDurationMs],
+  );
+  useEffect(() => {
+    const typingEvents = cursorData
+      .filter((point) => point.type === 'keydown')
+      .map((point) => {
+        const projectTime = editingSession.timeMap.mapSourceToProject(point.timestamp);
+        return projectTime === null ? null : { timestamp: projectTime, type: 'keydown' };
+      })
+      .filter((event): event is { timestamp: number; type: string } => event !== null);
+    if (typingEvents.length > 0) {
+      editingSession.execute({ type: 'replace-typing-speed', events: typingEvents });
+    }
+  }, [cursorData, editingSession.document.speedSections, editingSession.execute, recordingDurationMs]);
 
-  const projectDuration = useMemo(() => calculateLegacyProjectDurationSeconds({
-    durationSeconds: duration,
-    zoomRegions,
-    trimRegions,
-    annotationRegions,
-    audioRegions,
-  }), [duration, zoomRegions, trimRegions, annotationRegions, audioRegions]);
+  const projectDuration = useMemo(() => Math.max(
+    editingRenderPlan.durationMs / 1000,
+    ...zoomRegions.map((region) => (editingRenderPlan.timeMap.mapSourceToEffective(region.endMs) ?? 0) / 1000),
+    ...annotationRegions.map((region) => (editingRenderPlan.timeMap.mapSourceToEffective(region.endMs) ?? 0) / 1000),
+    ...audioRegions.filter((region) => !region.isOriginal || region.isDetached).map((region) => region.endMs / 1000),
+  ), [editingRenderPlan, zoomRegions, annotationRegions, audioRegions]);
 
   const currentProjectModel = useMemo(() => createProjectFromLegacyEditorState({
     videoPath,
@@ -275,6 +294,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     padding,
     aspectRatio,
     exportQuality,
+    editingDocument: editingSession.document,
   }), [
     videoPath,
     originalVideoPath,
@@ -302,6 +322,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     padding,
     aspectRatio,
     exportQuality,
+    editingSession.document,
   ]);
 
   const currentRenderSettings = useMemo(
@@ -533,6 +554,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           ),
         );
         setTrimRegions(restored.trimRegions);
+        editingSession.restore(restored.editingDocument);
         setAnnotationRegions(restored.annotationRegions);
         setAudioRegions(restored.audioRegions);
         setCropRegion(restored.cropRegion);
@@ -564,7 +586,11 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     }
 
     if (project.zoomRegions) setZoomRegions(project.zoomRegions);
-    if (project.trimRegions) setTrimRegions(project.trimRegions);
+    if (project.trimRegions) {
+      setTrimRegions(project.trimRegions);
+      const legacySourceDurationMs = Math.max(0, Number(project.duration ?? duration) * 1000);
+      editingSession.restore(migrateLegacyTrimsToEditingDocument(project.trimRegions, legacySourceDurationMs));
+    }
     if (project.annotationRegions) setAnnotationRegions(project.annotationRegions);
     if (project.audioRegions) {
       const restoredAudio = project.audioRegions.map((ar: any) => ({
@@ -601,7 +627,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     if (project.cursorOffset !== undefined) setCursorOffset(project.cursorOffset);
     if (project.cameraPath !== undefined) setCameraPath(project.cameraPath);
     return "legacy";
-  }, []);
+  }, [duration, editingSession.restore]);
 
   useEffect(() => {
     async function loadVideo() {
@@ -802,8 +828,9 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     const video = videoPlaybackRef.current?.video;
     if (!video) return;
     
-    if (duration > 0 && nextTime < duration) {
-      video.currentTime = nextTime;
+    const sourceTime = editingRenderPlan.timeMap.mapEffectiveToSource(nextTime * 1000) / 1000;
+    if (duration > 0 && sourceTime < duration) {
+      video.currentTime = sourceTime;
     } else {
       video.pause();
       video.currentTime = Math.max(0, duration - 0.001);
@@ -1383,6 +1410,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
 
       const exporter = new VideoExporter({
+        editingRenderPlan,
         videoUrl: originalVideoPath ? toFileUrl(originalVideoPath) : (videoPath ? toFileUrl(videoPath) : ''),
         projectDurationMs: renderSettings.durationMs,
         width: exportWidth,
@@ -1713,6 +1741,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                     }}
                   >
                     <VideoPlayback
+                      editingRenderPlan={editingRenderPlan}
                       aspectRatio={currentRenderSettings.canvas.aspectRatio}
                       ref={videoPlaybackRef}
                       videoPath={videoPath ? toFileUrl(videoPath) : ''}
@@ -1796,6 +1825,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                   <div className="w-8 h-[3px] rounded-full bg-[var(--ui-border-strong)] transition-colors group-hover:bg-[var(--ui-text-tertiary)]"></div>
                 </div>
                 <TimelineEditor
+                  editingSession={editingSession}
                   videoDuration={projectDuration}
                   sourceVideoDuration={duration}
                   currentTime={currentTime}

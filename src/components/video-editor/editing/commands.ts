@@ -41,6 +41,19 @@ export function applyEditingCommand(document: EditingDocument, command: EditingC
       snapshot.speedSections = normalizeSpeedSections(snapshot.speedSections, duration);
       return snapshot;
     }
+    case 'update-speed': {
+      snapshot.speedSections = snapshot.speedSections.map((section) => section.id === command.id ? {
+        ...section,
+        projectStartMs: command.projectStartMs ?? section.projectStartMs,
+        projectEndMs: command.projectEndMs ?? section.projectEndMs,
+        rate: command.rate ?? section.rate,
+      } : section);
+      snapshot.speedSections = normalizeSpeedSections(snapshot.speedSections, createMainTrackTimeMap(snapshot, sourceDurationMs).projectDurationMs);
+      return snapshot;
+    }
+    case 'delete-speed':
+      snapshot.speedSections = snapshot.speedSections.filter((section) => section.id !== command.id);
+      return snapshot;
     case 'replace-typing-speed':
       snapshot.speedSections = [
         ...snapshot.speedSections.filter((section) => section.origin !== 'typing'),

@@ -11,6 +11,7 @@ import type {
 } from "../types";
 import type { AspectRatio } from "@/utils/aspectRatioUtils";
 import type { ExportQuality } from "@/lib/exporter";
+import type { EditingDocument } from "../editing";
 
 export type ProjectSchemaVersion = 1;
 
@@ -316,5 +317,6 @@ export interface VideoEditorProject {
   aiEditPlans?: AIEditPlan[];
   activeAIEditPlanId?: string;
   exportSettings: ProjectExportSettings;
+  editingDocument?: EditingDocument;
   legacyState?: Record<string, unknown>;
 }

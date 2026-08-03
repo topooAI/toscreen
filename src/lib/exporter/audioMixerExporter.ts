@@ -1,11 +1,13 @@
 import type { ExportConfig } from './types';
 import { resolveExportDurationSeconds } from './duration';
 import type { AudioRegion, TrimRegion } from '@/components/video-editor/types';
+import type { createEditingRenderPlan } from '@/components/video-editor/editing';
 
 type AudioMixerExportConfig = ExportConfig & {
   audioRegions?: AudioRegion[];
   trimRegions?: TrimRegion[];
   projectDurationMs?: number;
+  editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
 };
 
 export class AudioMixerExporter {
@@ -22,6 +24,7 @@ export class AudioMixerExporter {
   }
 
   private getEffectiveDuration(totalDuration: number): number {
+    if (this.config.editingRenderPlan) return this.config.editingRenderPlan.durationMs / 1000;
     return resolveExportDurationSeconds({
       sourceDurationSeconds: totalDuration,
       trimRegions: this.trimRegions,
@@ -60,6 +63,33 @@ export class AudioMixerExporter {
 
       // 3. Schedule Main Audio according to Trim Regions
       if (mainAudioBuffer) {
+        if (this.config.editingRenderPlan) {
+          const { timeMap } = this.config.editingRenderPlan;
+          let projectCursorMs = 0;
+          for (const clip of timeMap.clips) {
+            const clipProjectEndMs = projectCursorMs + clip.sourceEndMs - clip.sourceStartMs;
+            const boundaries = Array.from(new Set([
+              projectCursorMs,
+              clipProjectEndMs,
+              ...timeMap.speedSections.flatMap((section) => [section.projectStartMs, section.projectEndMs])
+                .filter((time) => time > projectCursorMs && time < clipProjectEndMs),
+            ])).sort((a, b) => a - b);
+            for (let index = 0; index < boundaries.length - 1; index += 1) {
+              const projectStartMs = boundaries[index];
+              const projectEndMs = boundaries[index + 1];
+              const rate = timeMap.rateAtProjectTime(projectStartMs + 0.01);
+              const source = offlineCtx.createBufferSource();
+              source.buffer = mainAudioBuffer;
+              source.playbackRate.value = rate;
+              const outputStart = timeMap.mapProjectToEffective(projectStartMs) / 1000;
+              const sourceStart = timeMap.mapProjectToSource(projectStartMs) / 1000;
+              const sourceDuration = (projectEndMs - projectStartMs) / 1000;
+              source.connect(offlineCtx.destination);
+              source.start(outputStart, sourceStart, sourceDuration);
+            }
+            projectCursorMs = clipProjectEndMs;
+          }
+        } else {
         const sortedTrims = [...this.trimRegions].sort((a, b) => a.startMs - b.startMs);
         let currentSourceTime = 0;
         let currentOutputTime = 0;
@@ -106,6 +136,7 @@ export class AudioMixerExporter {
           
           applyCrossfade(source, currentOutputTime, keepDuration);
           source.start(currentOutputTime, currentSourceTime, keepDuration);
+        }
         }
       }
 

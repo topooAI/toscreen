@@ -17,8 +17,10 @@ import { useCursorRenderer } from "./hooks/useCursorRenderer";
 import { MOCK_CURSOR_DATA } from "./mockCursorData";
 import { applyZoomTransform } from "./videoPlayback/zoomTransform";
 import { sampleCameraMotion } from "./videoPlayback/cameraMotion";
+import type { createEditingRenderPlan } from './editing';
 
 interface VideoPlaybackProps {
+  editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
   videoPath: string;
   onDurationChange: (duration: number) => void;
   onTimeUpdate: (time: number) => void;
@@ -103,6 +105,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
   cursorData = [],
   cursorOffset = 0,
   isLayoutResizing = false,
+  editingRenderPlan,
 }, ref) => {
   // 1. Refs for DOM elements
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -158,7 +161,10 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
     videoRef,
     appRef,
     videoContainerRef,
-    onTimeUpdate,
+    onTimeUpdate: (sourceTime) => {
+      const effectiveMs = editingRenderPlan?.timeMap.mapSourceToEffective(sourceTime * 1000);
+      onTimeUpdate((effectiveMs ?? sourceTime * 1000) / 1000);
+    },
     onPlayStateChange,
     onDurationChange: (nextDuration) => {
       setSourceDurationMs(Math.max(0, nextDuration * 1000));
@@ -483,13 +489,30 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
 
     const ticker = () => {
       const video = videoRef.current;
-      const projectTimeMs = Number.isFinite(currentTimeRef.current)
-        ? currentTimeRef.current
-        : (video?.currentTime || 0) * 1000;
+      if (video && editingRenderPlan && isPlayingRef.current) {
+        const sourceMs = video.currentTime * 1000;
+        const clipIndex = editingRenderPlan.timeMap.clips.findIndex((clip) => sourceMs >= clip.sourceStartMs - 2 && sourceMs <= clip.sourceEndMs + 2);
+        const clip = editingRenderPlan.timeMap.clips[clipIndex];
+        if (clip) {
+          const projectMs = editingRenderPlan.timeMap.mapSourceToProject(Math.min(sourceMs, clip.sourceEndMs)) ?? 0;
+          video.playbackRate = editingRenderPlan.timeMap.rateAtProjectTime(projectMs);
+          if (sourceMs >= clip.sourceEndMs - 16) {
+            const next = editingRenderPlan.timeMap.clips[clipIndex + 1];
+            if (next) video.currentTime = next.sourceStartMs / 1000;
+            else video.pause();
+          }
+        }
+      }
+      const sourceTimeMs = (video?.currentTime || 0) * 1000;
+      const mappedEffectiveMs = editingRenderPlan?.timeMap.mapSourceToEffective(sourceTimeMs);
+      const projectTimeMs = isPlayingRef.current && mappedEffectiveMs !== null && mappedEffectiveMs !== undefined
+        ? mappedEffectiveMs
+        : currentTimeRef.current;
       const sourceDurationMs = Number.isFinite(video?.duration)
         ? (video?.duration || 0) * 1000
         : 0;
-      const isPastSourceVideoEnd = sourceDurationMs > 0 && projectTimeMs >= sourceDurationMs - 50;
+      const mainTrackDurationMs = editingRenderPlan?.durationMs ?? sourceDurationMs;
+      const isPastSourceVideoEnd = mainTrackDurationMs > 0 && projectTimeMs >= mainTrackDurationMs - 50;
       if (blackTailGraphicsRef.current) {
         blackTailGraphicsRef.current.visible = isPastSourceVideoEnd;
       }
