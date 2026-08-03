@@ -1,8 +1,12 @@
 # TOSCREEN × Screen Studio 全功能审计
 
-审计日期：2026-08-03
+审计日期：2026-08-04
 审计对象：当前工作区 `/Users/viosson/AITD/1_PROJECTS/P28_TOSCREEN`
 对标范围：Screen Studio 官方 Guide 与 Changelog 中公开的录制、编辑、视觉包装、音频、字幕、项目和导出能力。
+
+当前集成基线：`codex/phase1-integration@e628f0f`
+
+实时更新规则：只有功能已合入集成分支，并由统筹 Session 完成独立验证后，才把对应行更新为 `Completed`；仅在执行 Agent 分支中完成、尚未合入或尚未验证的功能继续保持 `Not completed`。
 
 ## 状态口径
 
@@ -17,15 +21,15 @@
 
 | 功能域 | Completed | Not completed | 当前判断 |
 |---|---:|---:|---|
-| 录制系统 | 3 | 9 | 全屏录制主链存在，录制来源和媒体控制仍不完整 |
-| 基础剪辑 | 5 | 5 | 可以完成基础剪除与画布裁剪，不是完整多片段剪辑器 |
-| Focus 与光标 | 7 | 6 | 已经是当前最完整、最有产品价值的模块 |
-| 视觉包装 | 4 | 4 | 常用画布包装已完成，演示增强能力缺失 |
-| 音频与字幕 | 4 | 4 | 基础音频轨道可用，字幕和音频生产工具缺失 |
+| 录制系统 | 11 | 1 | Display、Window、Area、Camera、音频设备与录制控制已形成闭环；iPhone/iPad 屏幕采集仍未完成 |
+| 基础剪辑 | 10 | 0 | Split、删除、重排、变速、自动加速和 Undo/Redo 已进入统一时间映射 |
+| Focus 与光标 | 13 | 0 | Focus、光标可见性与点击演示效果已形成完整编辑闭环 |
+| 视觉包装 | 8 | 0 | Mask、Highlight、快捷键卡片和 Presenter 摄像头已进入预览与导出 |
+| 音频与字幕 | 5 | 3 | 录制双轨已完成；音乐、转录与字幕仍在待集成分支 |
 | 项目与预设 | 3 | 4 | 自动保存和恢复已具备，项目管理尚未成型 |
 | 导出与分享 | 5 | 4 | 本地 MP4 导出主链存在，发布分享能力缺失 |
-| 稳定性与验收 | 2 | 4 | 多项核心契约通过，但当前完整审计仍为红色 |
-| **合计** | **33** | **40** | **已有明确编辑器基础，但还不能称为完整 Screen Studio** |
+| 稳定性与验收 | 5 | 1 | 完整机器审计、控件 Wiring 与 Electron 直接启动契约已恢复绿色；真实用户整链验收仍待完成 |
+| **合计** | **60** | **13** | **已完成第一批核心功能集成，第二批项目、字幕与发布能力仍在集成中** |
 
 功能数量只是审计索引，不代表每项工作量相等。例如“字幕系统”明显比“增加一个导出选项”更大。
 
@@ -36,15 +40,15 @@
 | 1 | 整个显示器录制 | Completed | 使用 macOS ScreenCaptureKit 原生录制并生成 MOV | 仍需纳入最终整机回归，但主链已存在 |
 | 2 | 原生 60 FPS 录制 | Completed | 录制器默认以 60 FPS 启动 | 后续需要补长时间录制性能基准 |
 | 3 | 鼠标、点击与输入事件采集 | Completed | 独立 sidecar 记录鼠标位置、点击和键盘输入事件 | 已能供光标渲染和 Auto Focus 使用 |
-| 4 | 单窗口录制 | Not completed | 启动栏可以选择 Window，并能打开来源选择器 | 当前原生录制没有可靠地限制到所选窗口，不能按产品能力验收 |
-| 5 | 自定义区域录制 | Not completed | 启动栏已有 Area 入口 | 点击仍是 `Area selection coming soon`，没有区域框选和录制范围传递 |
-| 6 | iPhone / iPad 录制 | Not completed | 启动栏已有 Device 入口 | 点击仍是占位逻辑，没有设备发现、预览或录制 |
-| 7 | 摄像头录制 | Not completed | 启动栏展示 Camera 状态位置 | 当前固定显示 `No camera`，没有设备选择、画面采集和录制轨 |
-| 8 | 麦克风选择、开关和电平 | Not completed | 底层录制器固定尝试包含麦克风 | 用户无法选择设备、开关、查看电平或处理权限失败 |
-| 9 | 系统音频选择与开关 | Not completed | 底层录制器固定尝试包含系统音频，录制后可发现伴随音频 | 启动栏无法控制，失败时也没有明确反馈 |
-| 10 | 录制倒计时 | Not completed | 有开始录制按钮 | 没有倒计时、准备状态和倒计时取消 |
-| 11 | 暂停、继续、重录和取消 | Not completed | 支持开始与停止 | 缺少录制中的完整控制和异常退出恢复 |
-| 12 | 录制权限引导 | Not completed | 系统调用会触发相关权限需求 | 没有屏幕、麦克风、摄像头权限状态页和修复路径 |
+| 4 | 单窗口录制 | Completed | 所选 Electron DesktopCapturer Window ID 会传给 ScreenCaptureKit 原生录制器并限制到目标窗口 | `audit:recording-session` 与 Recording contract 已通过 |
+| 5 | 自定义区域录制 | Completed | Area 入口提供跨显示器可拖动、可缩放的区域选择框，并传递绝对坐标到原生录制 | 已覆盖负坐标显示器与区域边界 |
+| 6 | iPhone / iPad 录制 | Not completed | 已能发现和使用 Continuity Camera 视频设备 | 这只覆盖 iPhone 作为摄像头，不等于 iPhone/iPad 屏幕采集；USB/设备屏幕录制协议仍未实现 |
+| 7 | 摄像头录制 | Completed | 可发现、预览和选择 Camera/Continuity Camera，并生成独立 Presenter Camera 素材和轨道 | Recording 与 Presentation 资产契约已联通 |
+| 8 | 麦克风选择、开关和电平 | Completed | 录制启动栏支持麦克风设备选择、开关、电平和权限状态 | 选择结果进入原生录制参数并生成独立麦克风素材 |
+| 9 | 系统音频选择与开关 | Completed | 录制前可独立开关系统音频，并在失败时返回明确状态 | 录制结果以独立系统音频素材恢复 |
+| 10 | 录制倒计时 | Completed | 开始前提供倒计时、准备状态和取消入口 | 状态与实际录制启动时点分离 |
+| 11 | 暂停、继续、重录和取消 | Completed | 原生录制支持分段暂停/继续、取消与重录清理 | 媒体、音频、摄像头和 sidecar 临时文件按同一生命周期处理 |
+| 12 | 录制权限引导 | Completed | 显示屏幕、麦克风和摄像头权限状态，并提供请求和打开系统设置的修复路径 | 权限 IPC 与录制启动栏已联通 |
 
 ## 2. 基础剪辑
 
@@ -55,11 +59,11 @@
 | 15 | Trim 剪除区间 | Completed | 可以增加、移动、调整和删除 Trim 区间 | 预览和导出共享时间映射 |
 | 16 | 画面 Crop | Completed | 有可视化裁剪控件和归一化 Crop 数据 | Crop 能进入项目设置和导出参数 |
 | 17 | 输出画幅比例 | Completed | 支持 16:9、9:16、1:1、4:3、4:5 | 已进入项目保存和导出尺寸计算 |
-| 18 | 主视频任意 Split | Not completed | Focus 区间可以 Split，Main Track 也能按剪除结果显示片段 | 尚不是用户可在任意位置切开主视频的正式 Split 工具 |
-| 19 | 主视频片段重新排序 | Not completed | 项目模型具备多 Clip 扩展基础 | 当前 Main Track 不能自由拖动重排多个视频片段 |
-| 20 | 区间变速 | Not completed | 导出器内部存在正常速率播放控制 | 没有 Speed Region、速度控制 UI、时间映射和音频同步闭环 |
-| 21 | 自动加速输入过程 | Not completed | 已采集 typing 事件，Auto Focus 会使用输入意图 | typing 事件尚未转换为自动变速区间 |
-| 22 | Undo / Redo 编辑历史 | Not completed | 各模块能独立修改状态 | 没有统一命令栈、撤销/重做入口和跨模块历史 |
+| 18 | 主视频任意 Split | Completed | Playhead 可在任意有效位置切开 Main Clip，并保留源时间与项目时间映射 | Editing Session 与产品运行时审计通过 |
+| 19 | 主视频片段重新排序 | Completed | Main Clip 支持拖动重排、删除，并按项目顺序生成统一 Render Plan | Preview、时间轴和 Export 共用相同片段顺序 |
+| 20 | 区间变速 | Completed | Speed Region 支持创建、移动、缩放和倍率设置，音视频使用统一有效时间映射 | 变速后的项目时长与导出尾部契约通过 |
+| 21 | 自动加速输入过程 | Completed | typing 事件会映射到项目时间并生成/更新自动 Speed Region | 输入加速与手工区间共用 Editing Session |
+| 22 | Undo / Redo 编辑历史 | Completed | Split、删除、重排和 Speed 命令进入统一 Undo/Redo 历史 | 快捷键、按钮与项目保存状态已联通 |
 
 ## 3. Focus 与光标
 
@@ -72,12 +76,12 @@
 | 27 | 分割 Focus | Completed | 可在 Playhead 位置将一个 Focus 分成两段 | 具备最小时长与边界检查 |
 | 28 | Focus 磁吸和防重叠 | Completed | 使用像素阈值磁吸，Focus 不能互相重叠 | `timeline-magnetic-snap` 验证通过 |
 | 29 | 光标平滑与独立渲染 | Completed | 原生事件时钟、插值、静止噪声处理和遮罩裁切已实现 | Preview 与导出均有独立光标渲染路径 |
-| 30 | Focus 深度完整控制 | Not completed | 已有多档 Zoom 深度和属性面板 | 当前 `screenstudio-control-wiring` 审计认为深度控制契约不完整，修复并实机验收前不能算完成 |
-| 31 | Instant Zoom | Not completed | 已有普通 Focus 过渡 | 没有无入场动画的 Instant 模式和切换入口 |
-| 32 | Auto Focus 总开关 | Not completed | 可以生成、删除 Focus | 没有清晰的项目级“启用/关闭自动 Focus”设置 |
-| 33 | Focus 复制与粘贴 | Not completed | Focus 数据结构可复制 | 没有复制、粘贴、跨项目粘贴交互 |
-| 34 | 分段隐藏光标 | Not completed | 光标全局渲染可控 | 没有 Cursor Visibility Region 或区间编辑 |
-| 35 | 点击 Ripple、Shockwave 与点击音效 | Not completed | 已采集点击按下状态 | 尚未形成可配置的点击视觉效果和声音效果 |
+| 30 | Focus 深度完整控制 | Completed | 六档 Focus 深度可在属性面板编辑，并进入项目保存、预览与导出 | `audit:screenstudio-control-wiring` 和 `audit:focus-30-35` 通过 |
+| 31 | Instant Zoom | Completed | Focus 可切换 Instant 模式，跳过普通入场插值 | 预览与导出使用同一动画语义 |
+| 32 | Auto Focus 总开关 | Completed | 提供项目级 Auto Focus 开关并持久化 | 关闭后不会自动生成 Focus，已有手工 Focus 保留 |
+| 33 | Focus 复制与粘贴 | Completed | Focus 支持复制、粘贴并在目标时间生成新 ID 区间 | 复制内容经过边界和重叠处理 |
+| 34 | 分段隐藏光标 | Completed | Cursor Visibility Region 可新增、拖动、缩放和删除 | 项目模型、时间线、预览和导出已联通 |
+| 35 | 点击 Ripple、Shockwave 与点击音效 | Completed | 点击效果支持 Ripple、Shockwave、Pulse 和点击音频 | 样式与声音使用录制点击事件并进入 Preview/Export |
 
 ## 4. 视觉包装
 
@@ -87,10 +91,10 @@
 | 37 | Padding、圆角和阴影 | Completed | Layout 控件和渲染器均有对应参数 | 当前控制契约测试需更新或修复，但核心渲染能力存在 |
 | 38 | 背景模糊与运动模糊 | Completed | Preview 和 Export 均有对应效果参数 | 仍需做不同画幅下的视觉回归 |
 | 39 | 文字、图片、图形和箭头标注 | Completed | 有 Annotation Track、属性面板、预览与导出渲染 | 已进入项目模型 roundtrip |
-| 40 | Mask 敏感信息 | Not completed | 可使用普通图形覆盖内容 | 没有真正的 Blur/Mask 类型、跟随区域和正式导出语义 |
-| 41 | Highlight 区域 | Not completed | 项目扩展模型出现了 `highlight` 动作字段 | 没有用户可用的 Highlight 工具、时间线和正式渲染闭环 |
-| 42 | 显示键盘快捷键 | Not completed | 录制器已经采集 keydown 事件 | 没有快捷键卡片生成、样式、区间编辑与导出 |
-| 43 | 摄像头布局与动态切换 | Not completed | 项目模型有 Camera/Presenter 扩展字段 | 没有摄像头素材、圆形/矩形布局和动态切换闭环 |
+| 40 | Mask 敏感信息 | Completed | Mask 支持 Blur 与 Cover、位置和尺寸编辑，并可用关键帧跟随区域 | 时间线、画布、属性面板、项目保存和 Export 已联通 |
+| 41 | Highlight 区域 | Completed | Highlight 可在画布和时间线创建、移动、缩放与删除 | Preview 和 Export 使用相同高亮渲染 |
+| 42 | 显示键盘快捷键 | Completed | 录制 keydown/keyup 会合并为带修饰键快照的快捷键卡片 | 卡片支持区间编辑、保存、预览与导出 |
+| 43 | 摄像头布局与动态切换 | Completed | Presenter Camera 使用独立素材和轨道，支持圆形/矩形、Fit、Opacity 与区间切换 | Recording 生成的 `presenter-camera` 可直接恢复到 Presentation |
 
 ## 5. 音频与字幕
 
@@ -100,7 +104,7 @@
 | 45 | 导入外部音频 | Completed | 可增加独立 Audio Region 并参与时间线 | 支持文件引用和 Blob 恢复 |
 | 46 | 音频波形 | Completed | 有波形解析、缓存与时间线展示 | 波形布局已有验证脚本 |
 | 47 | 音量与音量包络 | Completed | 音频区域具有音量数据和包络编辑 | Preview/Export 音频设置验证通过 |
-| 48 | 麦克风与系统音频独立分轨 | Not completed | 录制器会尝试同时采集两种音频 | 用户无法在录制前分别选择，录制后也没有稳定、明确的双轨产品语义 |
+| 48 | 麦克风与系统音频独立分轨 | Completed | 录制前可分别控制系统音频和麦克风，录制后生成具有明确 role 的独立素材与 Audio Region | Preview、Mixer、Project Model 和 Export 保留双轨语义 |
 | 49 | 内置背景音乐库 | Not completed | 可以导入自己的音频文件 | 没有内置音乐、试听、分类和授权信息 |
 | 50 | 自动语音转录 | Not completed | 项目模型预留了 transcriptId 等字段 | 没有 Whisper 执行、语言选择、进度和错误处理 |
 | 51 | 字幕编辑、样式与动画 | Not completed | 项目模型允许 subtitle/caption 扩展类型 | 没有字幕轨、文本编辑器、样式、断句和导出渲染 |
@@ -137,22 +141,22 @@
 |---:|---|---|---|---|
 | 68 | TypeScript 静态检查 | Completed | 当前 `tsc --noEmit` 通过 | 不代表 GUI 和真实媒体路径全部通过 |
 | 69 | 项目、时间域、渲染和音频核心契约 | Completed | 多个 Project Model、Duration、Preview/Export、Audio 验证通过 | 这些主要是机器契约验证，不等于用户验收 |
-| 70 | 完整 Phase 1 审计 | Not completed | 审计可以运行并通过前面多项检查 | 当前在 `timeline-lane-wrapping` 失败，Camera 与 Focus 轨道结构发生冲突 |
-| 71 | Screen Studio 控件 Wiring 审计 | Not completed | 控件组件和底层参数存在 | Zoom、Cursor、Layout 当前未满足既有控制契约 |
-| 72 | Electron Editor 直接启动契约 | Not completed | Editor 与 HUD 的返回生命周期检查通过 | 直接 Editor Window 契约检查失败，需先定位当前入口设计是否变更 |
+| 70 | 完整 Phase 1 审计 | Completed | `npm run audit:phase1` 在当前集成提交完整返回 `status: ok` | 2026-08-04 独立重跑覆盖 TypeScript、Project Model、Timeline、Recording、Preview/Export 和音频契约 |
+| 71 | Screen Studio 控件 Wiring 审计 | Completed | Zoom、Cursor、Background、Layout 与 Motion Blur 控件契约全部通过 | `audit:screenstudio-control-wiring` 返回 `status: ok` |
+| 72 | Electron Editor 直接启动契约 | Completed | 开发入口可以直接创建 Editor Window，并保留 Vite HMR、录制恢复和时间轴结构 | `audit:electron-editor-runtime` 返回 `status: ok` |
 | 73 | 完整真实用户验收 | Not completed | 已有录制素材、项目 sidecar 和机器审计记录 | 尚未完成从录制、编辑、保存、重开到最终导出的整链路用户签字验收 |
 
 ## 当前产品边界
 
-当前已经可以完成：
+当前集成分支已经可以完成：
 
-> 全屏录制或导入视频 → 自动/手动 Focus → Trim → Crop/画幅 → 背景与圆角阴影 → 光标美化 → 标注 → 基础音频 → 本地 MP4 导出。
+> Display / Window / Area 录制或导入视频 → 摄像头与双音轨 → Main Clip Split / 删除 / 重排 / Speed / Undo → 自动/手动 Focus → Cursor 与点击演示 → Mask / Highlight / 快捷键 / Presenter → 画布包装与标注 → 本地 MP4 导出。
 
-当前还不能稳定完成：
+当前仍未在集成分支完成：
 
-> 自由选择所有录制来源 → 摄像头与音频设备控制 → 完整多片段剪辑与变速 → 字幕 → Mask/Highlight/按键演示 → Preset → 在线分享。
+> iPhone/iPad 屏幕录制 → 内置音乐、自动转录和字幕 → Save As / Recent Projects / 便携项目包 / Preset → GIF / 批量导出 / Quick Share / 原始素材提取 → 最终真实用户整链验收。
 
-因此，TOSCREEN 不是“所有功能都没完成”。当前已有 **33 项明确完成能力**，尤其是 Focus、光标、画布包装、项目恢复和本地导出已经形成了有价值的编辑器核心；下一步应该补齐 Screen Studio 主线闭环，而不是推翻现有实现。
+当前已有 **60 项明确完成能力**，还有 **13 项** 保持 `Not completed`。Recording 音频/字幕与 Editing 项目/预设已经在各自 Agent 分支完成初步验证，但在统筹合入前不会提前改表；每次合入并复验后，本表会继续实时更新。
 
 ## 第一阶段建议顺序
 
