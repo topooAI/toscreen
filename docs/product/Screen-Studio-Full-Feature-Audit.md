@@ -4,7 +4,7 @@
 审计对象：当前工作区 `/Users/viosson/AITD/1_PROJECTS/P28_TOSCREEN`
 对标范围：Screen Studio 官方 Guide 与 Changelog 中公开的录制、编辑、视觉包装、音频、字幕、项目和导出能力。
 
-当前集成基线：`codex/phase1-integration@7a9e22e`
+当前集成基线：`codex/phase1-integration@38e6699`
 
 实时更新规则：只有功能已合入集成分支，并由统筹 Session 完成独立验证后，才把对应行更新为 `Completed`；仅在执行 Agent 分支中完成、尚未合入或尚未验证的功能继续保持 `Not completed`。
 
@@ -26,10 +26,10 @@
 | Focus 与光标 | 13 | 0 | Focus、光标可见性与点击演示效果已形成完整编辑闭环 |
 | 视觉包装 | 8 | 0 | Mask、Highlight、快捷键卡片和 Presenter 摄像头已进入预览与导出 |
 | 音频与字幕 | 6 | 2 | 录制双轨与内置音乐已完成；转录跨架构和可见字幕轨仍在补齐 |
-| 项目与预设 | 4 | 3 | Preset 已完成；Save As、Recent Projects 与便携包等待媒体恢复修复后再验收 |
+| 项目与预设 | 6 | 1 | Recent Projects、便携包与 Preset 已完成；Save As 等待系统对话框实机验收 |
 | 导出与分享 | 5 | 4 | 本地 MP4 导出主链存在，发布分享能力缺失 |
 | 稳定性与验收 | 5 | 1 | 完整机器审计、控件 Wiring 与 Electron 直接启动契约已恢复绿色；真实用户整链验收仍待完成 |
-| **合计** | **62** | **11** | **已完成第一批核心功能集成，第二批项目、字幕与发布能力仍在集成中** |
+| **合计** | **64** | **9** | **录制、剪辑、Presentation 与项目主链已基本集成，字幕、发布和最终验收仍在推进** |
 
 功能数量只是审计索引，不代表每项工作量相等。例如“字幕系统”明显比“增加一个导出选项”更大。
 
@@ -117,8 +117,8 @@
 | 53 | 项目模型保存与恢复 | Completed | Focus、Trim、Annotation、Audio、Canvas、Cursor 等可以 roundtrip | 模型 smoke、restore 和 roundtrip 检查通过 |
 | 54 | 项目数据校验与兼容结构 | Completed | 有独立 validator、资产、轨道、Clip 与 Scene 模型 | 一部分第二阶段字段仅属于结构预留，不代表功能完成 |
 | 55 | Save As 和项目命名 | Not completed | 会在原视频附近保存 sidecar | 没有完整另存为、项目命名和目标文件夹流程 |
-| 56 | Recent Projects 项目首页 | Not completed | 启动后可以进入最近录制结果 | 没有成熟的最近项目列表、搜索、删除和丢失素材状态 |
-| 57 | 可移植项目包 | Not completed | 项目会记录素材路径 | 仍依赖本机路径，不能可靠打包给另一台设备或另一个用户 |
+| 56 | Recent Projects 项目首页 | Completed | Electron 启动进入 Projects 首页，支持搜索、名称/时间/时长排序、打开、移除、确认删除、缺失/损坏/备份恢复状态和 Relink | 实际 Package Import 后关闭并从 Recent 重开成功；打开项目会恢复包内媒体，不沿用旧全局路径 |
+| 57 | 可移植项目包 | Completed | `.toscreenpkg` 包含 Project Model、用户素材、相对清单、SHA-256 与版本；导入先校验并通过临时目录原子迁移 | 实际 MOV 包导入后恢复 screen、proxy、系统音频、麦克风与 Presenter；拒绝 POSIX、Windows drive、UNC 和正反斜杠穿越 |
 | 58 | 创建、应用和分享 Preset | Completed | 可创建、更新、删除、应用和设为默认，并支持 `.toscreenpreset` 导入/导出 | Preset 只保存 Canvas、Export、Focus、Cursor、Click、Presentation、Caption 与 Layout 样式，不携带媒体和时间线；合入后 `audit:projects-presets` 通过 |
 
 ## 7. 导出与分享
@@ -156,7 +156,7 @@
 
 > iPhone/iPad 屏幕录制 → 内置音乐、自动转录和字幕 → Save As / Recent Projects / 便携项目包 / Preset → GIF / 批量导出 / Quick Share / 原始素材提取 → 最终真实用户整链验收。
 
-当前已有 **62 项明确完成能力**，还有 **11 项** 保持 `Not completed`。内置音乐与 Preset 已合入并复验；自动转录仍需补双架构 helper，字幕仍需补可见时间线轨。Save As、Recent Projects 与便携项目包主体已合入，但发现导入后媒体水合与跨平台路径安全缺口，修复并复验前继续保持 `Not completed`。
+当前已有 **64 项明确完成能力**，还有 **9 项** 保持 `Not completed`。内置音乐、Recent Projects、便携项目包与 Preset 已合入并复验；自动转录仍需补双架构 helper，字幕仍需补可见时间线轨，Save As 仍需系统保存对话框实机验收。
 
 ## 第一阶段建议顺序
 
