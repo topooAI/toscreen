@@ -111,6 +111,22 @@ const originalInput: LegacyEditorProjectInput = {
     ],
     speedSections: [{ id: 'speed-typing', projectStartMs: 500, projectEndMs: 1500, rate: 4, origin: 'typing' }],
   },
+  presentationEffects: [{
+    id: "mask-roundtrip-1",
+    kind: "mask",
+    startMs: 3000,
+    endMs: 6000,
+    bounds: { x: 20, y: 25, width: 30, height: 18 },
+    mode: "blur",
+    blurPx: 18,
+    color: "#111827",
+    radius: 10,
+  }, {
+    id: "cursor-hide-roundtrip-1",
+    kind: "cursor-hide",
+    startMs: 7000,
+    endMs: 7600,
+  }],
   now: new Date("2026-06-30T00:00:00.000Z"),
 };
 
@@ -145,6 +161,7 @@ const secondProject = createProjectFromLegacyEditorState({
   aspectRatio: restored.aspectRatio,
   exportQuality: restored.exportQuality,
   editingDocument: restored.editingDocument,
+  presentationEffects: restored.presentationEffects,
   now: new Date("2026-06-30T00:00:00.000Z"),
 });
 assertValidProject(secondProject, "secondProject");
@@ -161,6 +178,7 @@ console.log(JSON.stringify({
   audioRegions: secondSettings.timeline.audioRegions.length,
   cursorPoints: secondSettings.cursor.data.length,
   exportQuality: secondSettings.exportSettings.quality,
+  presentationEffects: secondSettings.effects.presentation.length,
 }, null, 2));
 
 function assertValidProject(project: unknown, label: string) {

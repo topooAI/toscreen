@@ -8,6 +8,7 @@ type AudioMixerExportConfig = ExportConfig & {
   trimRegions?: TrimRegion[];
   projectDurationMs?: number;
   editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
+  cursorData?: Array<{ timestamp?: number; timestampMs?: number; isClick?: boolean; type?: string }>;
 };
 
 export class AudioMixerExporter {
@@ -144,6 +145,17 @@ export class AudioMixerExporter {
       }
 
       onProgress?.(50);
+
+      // Synthetic click track: deterministic and asset-free so preview/export use the same event clock.
+      for (const point of this.config.cursorData ?? []) {
+        if (!(point.isClick || point.type === 'click' || point.type === 'mousedown')) continue;
+        const clickTime = Number(point.timestamp ?? point.timestampMs) / 1000;
+        if (!Number.isFinite(clickTime) || clickTime < 0 || clickTime >= effectiveDuration) continue;
+        const oscillator = offlineCtx.createOscillator(); const gain = offlineCtx.createGain();
+        oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1150, clickTime); oscillator.frequency.exponentialRampToValueAtTime(520, clickTime + .045);
+        gain.gain.setValueAtTime(.12, clickTime); gain.gain.exponentialRampToValueAtTime(.001, clickTime + .055);
+        oscillator.connect(gain); gain.connect(offlineCtx.destination); oscillator.start(clickTime); oscillator.stop(clickTime + .06);
+      }
 
       // 4. Decode and Schedule External Audio Regions
       for (let i = 0; i < this.audioRegions.length; i++) {

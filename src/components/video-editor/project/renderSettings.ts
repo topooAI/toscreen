@@ -14,6 +14,7 @@ import { resolveCursorStyle } from "../types";
 import { restoreLegacyEditorStateFromProjectModel } from "./legacyAdapter";
 import type { VideoEditorProject } from "./types";
 import type { EditingDocument } from "../editing";
+import type { PresentationEffectRegion } from "../presentation/types";
 
 export interface ProjectRenderSettings {
   durationMs: number;
@@ -45,6 +46,7 @@ export interface ProjectRenderSettings {
   };
   effects: {
     motionBlurEnabled: boolean;
+    presentation: PresentationEffectRegion[];
   };
   exportSettings: {
     quality: ExportQuality;
@@ -75,6 +77,7 @@ export interface ProjectAutosaveSnapshot {
   cursorCustomImage: string | null;
   cursorCustomImages: CursorCustomImageMap;
   cursorOffset: number;
+  presentationEffects: PresentationEffectRegion[];
 }
 
 export function getProjectRenderSettings(project: VideoEditorProject): ProjectRenderSettings {
@@ -111,6 +114,7 @@ export function getProjectRenderSettings(project: VideoEditorProject): ProjectRe
     },
     effects: {
       motionBlurEnabled: restored.motionBlurEnabled ?? true,
+      presentation: restored.presentationEffects ?? [],
     },
     exportSettings: {
       quality: restored.exportQuality,
@@ -152,6 +156,7 @@ export function createProjectAutosaveSnapshot(
     cursorCustomImage: renderSettings.cursor.customImage,
     cursorCustomImages: renderSettings.cursor.customImages,
     cursorOffset: renderSettings.cursor.offsetMs,
+    presentationEffects: renderSettings.effects.presentation,
   };
 }
 

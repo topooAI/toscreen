@@ -7,6 +7,7 @@ import { AudioEncoderWrapper } from './audioEncoder';
 import { resolveEditingExportDurations, resolveExportDurationSeconds, shouldRenderMainTrackFrame } from './duration';
 import type { ZoomRegion, CropRegion, TrimRegion, AnnotationRegion, AudioRegion, CursorCustomImageMap, CursorStylePreset } from '@/components/video-editor/types';
 import type { createEditingRenderPlan } from '@/components/video-editor/editing';
+import type { PresentationEffectRegion } from '@/components/video-editor/presentation/types';
 
 interface VideoExporterConfig extends ExportConfig {
   editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
@@ -35,6 +36,7 @@ interface VideoExporterConfig extends ExportConfig {
   cursorCustomImages?: CursorCustomImageMap;
   cursorOffset?: number;
   onProgress?: (progress: ExportProgress) => void;
+  presentationEffects?: PresentationEffectRegion[];
 }
 
 export class VideoExporter {
@@ -112,6 +114,7 @@ export class VideoExporter {
         cursorCustomImages: this.config.cursorCustomImages,
         cursorOffset: this.config.cursorOffset,
         cursorMediaDurationMs: videoInfo.duration * 1000,
+        presentationEffects: this.config.presentationEffects,
       });
       await this.renderer.initialize();
 

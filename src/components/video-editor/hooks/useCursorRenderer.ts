@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { Application, Container, Ticker } from "pixi.js";
 import { CursorDataPoint } from "../types";
 import type { CursorCustomImageMap, CursorStylePreset } from "../types";
+import type { PresentationEffectRegion } from "../presentation/types";
+import { isCursorHiddenAt } from "../presentation/presentationEffects";
 import { prepareCursorTrack, sampleCursorTrack } from "../videoPlayback/cursorTrack";
 import { cursorElementMarkup, normalizeCursorVisualType } from "../videoPlayback/cursorVisuals";
 
@@ -19,6 +21,7 @@ interface UseCursorRendererProps {
   cursorCustomImages?: CursorCustomImageMap;
   cursorOffset?: number;
   mediaDurationMs?: number;
+  presentationEffects?: PresentationEffectRegion[];
 }
 
 export function useCursorRenderer({
@@ -35,6 +38,7 @@ export function useCursorRenderer({
   cursorCustomImages = {},
   cursorOffset = 0,
   mediaDurationMs,
+  presentationEffects = [],
 }: UseCursorRendererProps) {
   const clickAnimationStateRef = useRef({ timeSinceClick: 999, isAnimating: false });
   const preparedCursorData = useMemo(
@@ -48,12 +52,14 @@ export function useCursorRenderer({
   const cursorStyleRef = useRef(cursorStyle);
   const cursorCustomImagesRef = useRef(cursorCustomImages);
   const cursorOffsetRef = useRef(cursorOffset);
+  const presentationEffectsRef = useRef(presentationEffects);
 
   useEffect(() => { cursorSizeRef.current = cursorSize; }, [cursorSize]);
   useEffect(() => { showVectorCursorRef.current = showVectorCursor; }, [showVectorCursor]);
   useEffect(() => { cursorStyleRef.current = cursorStyle; }, [cursorStyle]);
   useEffect(() => { cursorCustomImagesRef.current = cursorCustomImages; }, [cursorCustomImages]);
   useEffect(() => { cursorOffsetRef.current = cursorOffset; }, [cursorOffset]);
+  useEffect(() => { presentationEffectsRef.current = presentationEffects; }, [presentationEffects]);
 
   useEffect(() => {
     if (!pixiReady || !appRef.current || !videoRef.current || preparedCursorData.length === 0) return;
@@ -276,6 +282,7 @@ export function useCursorRenderer({
         }
       }
 
+      if (isCursorHiddenAt(presentationEffectsRef.current, currentTimeMs)) isVisible = false;
       cursor.style.display = isVisible ? 'block' : 'none';
       if (!isVisible) return;
 

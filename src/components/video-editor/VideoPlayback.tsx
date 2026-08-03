@@ -18,6 +18,9 @@ import { MOCK_CURSOR_DATA } from "./mockCursorData";
 import { applyZoomTransform } from "./videoPlayback/zoomTransform";
 import { sampleCameraMotion } from "./videoPlayback/cameraMotion";
 import type { createEditingRenderPlan } from './editing';
+import { PresentationOverlay } from "./presentation/PresentationOverlay";
+import type { PresentationEffectRegion } from "./presentation/types";
+import { useClickSound } from "./presentation/useClickSound";
 
 interface VideoPlaybackProps {
   editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
@@ -57,6 +60,7 @@ interface VideoPlaybackProps {
   cursorData?: any[];
   cursorOffset?: number;
   isLayoutResizing?: boolean;
+  presentationEffects?: PresentationEffectRegion[];
 }
 
 export interface VideoPlaybackRef {
@@ -106,6 +110,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
   cursorOffset = 0,
   isLayoutResizing = false,
   editingRenderPlan,
+  presentationEffects = [],
 }, ref) => {
   // 1. Refs for DOM elements
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -217,7 +222,9 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
     cursorCustomImages,
     cursorOffset,
     mediaDurationMs: sourceDurationMs,
+    presentationEffects,
   });
+  useClickSound(cursorData, Math.round(currentTime * 1000), isPlaying);
 
   // 4. Props-to-Ref synchronization
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -892,6 +899,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
           })()}
         </div>
       )}
+      {pixiReady && videoReady && <PresentationOverlay effects={presentationEffects} cursorData={cursorData.length ? mappedCursorData : []} timeMs={Math.round(currentTime * 1000)} />}
       <video
         ref={videoRef}
         src={videoPath}

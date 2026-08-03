@@ -53,6 +53,9 @@ import {
 import { createProductCameraRegion } from './videoPlayback/cameraMotion';
 import { useEditingSession } from './hooks/useEditingSession';
 import { createEditingRenderPlan } from './editing';
+import { PresentationToolbar } from './presentation/PresentationToolbar';
+import type { PresentationEffectRegion } from './presentation/types';
+import { recordedShortcutEffects } from './presentation/presentationEffects';
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -83,6 +86,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [selectedTrimId, setSelectedTrimId] = useState<string | null>(null);
   const [annotationRegions, setAnnotationRegions] = useState<AnnotationRegion[]>([]);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [presentationEffects, setPresentationEffects] = useState<PresentationEffectRegion[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -266,7 +270,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     ...zoomRegions.map((region) => (editingRenderPlan.timeMap.mapSourceToEffective(region.endMs) ?? 0) / 1000),
     ...annotationRegions.map((region) => (editingRenderPlan.timeMap.mapSourceToEffective(region.endMs) ?? 0) / 1000),
     ...audioRegions.filter((region) => !region.isOriginal || region.isDetached).map((region) => region.endMs / 1000),
-  ), [editingRenderPlan, zoomRegions, annotationRegions, audioRegions]);
+    ...presentationEffects.map((region) => region.endMs / 1000),
+  ), [editingRenderPlan, zoomRegions, annotationRegions, audioRegions, presentationEffects]);
 
   const currentProjectModel = useMemo(() => createProjectFromLegacyEditorState({
     videoPath,
@@ -296,6 +301,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     aspectRatio,
     exportQuality,
     editingDocument: editingSession.document,
+    presentationEffects,
   }), [
     videoPath,
     originalVideoPath,
@@ -324,6 +330,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     aspectRatio,
     exportQuality,
     editingSession.document,
+    presentationEffects,
   ]);
 
   const currentRenderSettings = useMemo(
@@ -559,6 +566,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         setTrimRegions(restored.trimRegions);
         editingSession.restore(restored.editingDocument);
         setAnnotationRegions(restored.annotationRegions);
+        setPresentationEffects(restored.presentationEffects ?? []);
         setAudioRegions(restored.audioRegions);
         setCropRegion(restored.cropRegion);
         setWallpaper(restored.wallpaper);
@@ -595,6 +603,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       editingSession.restore(migrateLegacyTrimsToEditingDocument(project.trimRegions, legacySourceDurationMs));
     }
     if (project.annotationRegions) setAnnotationRegions(project.annotationRegions);
+    if (Array.isArray(project.presentationEffects)) setPresentationEffects(project.presentationEffects);
     if (project.audioRegions) {
       const restoredAudio = project.audioRegions.map((ar: any) => ({
         ...ar,
@@ -1315,6 +1324,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         if (mounted && result.success && result.clicks && result.clicks.length > 0) {
           console.log(`[AutoZoom] Found ${result.clicks.length} clicks, applying automatically.`);
           setCursorData(result.clicks); // Save actual cursor coordinates array
+          setPresentationEffects((current) => current.length > 0 ? current : recordedShortcutEffects(result.clicks ?? []));
           // Loading telemetry must never overwrite a restored or manually edited timeline.
           // Auto-zoom generation is an explicit command through the sidebar button.
         } else {
@@ -1441,6 +1451,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         cursorStyle: renderSettings.cursor.style,
         cursorCustomImages: renderSettings.cursor.customImages,
         cursorOffset: renderSettings.cursor.offsetMs,
+        presentationEffects: renderSettings.effects.presentation,
         onProgress: (progress: ExportProgress) => {
           setExportProgress(progress);
         },
@@ -1811,6 +1822,14 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                       cursorData={currentRenderSettings.cursor.data}
                       cursorOffset={currentRenderSettings.cursor.offsetMs}
                       isLayoutResizing={isLayoutResizing}
+                      presentationEffects={currentRenderSettings.effects.presentation}
+                    />
+                    <PresentationToolbar
+                      timeMs={Math.round(currentTime * 1000)}
+                      durationMs={Math.round(projectDuration * 1000)}
+                      effects={presentationEffects}
+                      onAdd={(effect) => setPresentationEffects((current) => [...current, effect])}
+                      onRemove={(id) => setPresentationEffects((current) => current.filter((effect) => effect.id !== id))}
                     />
                   </div>
                 </div>

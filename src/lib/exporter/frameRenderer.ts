@@ -9,6 +9,9 @@ import { prepareCursorTrack, sampleCursorTrack } from '@/components/video-editor
 import { drawCursorVisual } from '@/components/video-editor/videoPlayback/cursorVisuals';
 import { clampFocusToStage as clampFocusToStageUtil, videoFocusToStage } from '@/components/video-editor/videoPlayback/focusUtils';
 import { renderAnnotations } from './annotationRenderer';
+import { clickProgress, isCursorHiddenAt } from '@/components/video-editor/presentation/presentationEffects';
+import type { PresentationEffectRegion } from '@/components/video-editor/presentation/types';
+import { renderPresentationEffects } from './presentationRenderer';
 
 interface FrameRenderConfig {
   width: number;
@@ -35,6 +38,7 @@ interface FrameRenderConfig {
   cursorCustomImages?: CursorCustomImageMap;
   cursorOffset?: number;
   cursorMediaDurationMs?: number;
+  presentationEffects?: PresentationEffectRegion[];
 }
 
 interface AnimationState {
@@ -513,9 +517,24 @@ export class FrameRenderer {
         scaleFactor
       );
     }
+    if (this.compositeCtx && this.config.presentationEffects?.length) {
+      renderPresentationEffects(this.compositeCtx, this.config.presentationEffects, this.config.width, this.config.height, timeMs);
+    }
 
     // Render cursor on top of annotations
-    if (this.config.showVectorCursor !== false && this.config.cursorData && this.config.cursorData.length > 0 && this.compositeCtx) {
+    if (this.compositeCtx && this.config.cursorData?.length) {
+      const ripple = clickProgress(this.cursorTrack, timeMs);
+      if (ripple) {
+        const radius = 11 + ripple.progress * 36;
+        this.compositeCtx.save();
+        this.compositeCtx.globalAlpha = 1 - ripple.progress;
+        this.compositeCtx.strokeStyle = '#ffffff'; this.compositeCtx.lineWidth = 3;
+        this.compositeCtx.fillStyle = 'rgba(13,153,255,.20)';
+        this.compositeCtx.beginPath(); this.compositeCtx.arc(ripple.point.cx * this.config.width, ripple.point.cy * this.config.height, radius, 0, Math.PI * 2); this.compositeCtx.fill(); this.compositeCtx.stroke();
+        this.compositeCtx.restore();
+      }
+    }
+    if (this.config.showVectorCursor !== false && this.config.cursorData && this.config.cursorData.length > 0 && this.compositeCtx && !isCursorHiddenAt(this.config.presentationEffects ?? [], timeMs)) {
       this.renderCursor(timeMs);
     }
   }

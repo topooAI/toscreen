@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import { resolveCursorStyle } from "../types";
 import { createInitialEditingDocument, type EditingDocument } from "../editing";
+import type { PresentationEffectRegion } from "../presentation/types";
 import type {
   ProjectAsset,
   ProjectClip,
@@ -60,6 +61,7 @@ export interface LegacyEditorProjectInput {
   exportQuality: ExportQuality;
   editingDocument?: EditingDocument;
   now?: Date;
+  presentationEffects?: PresentationEffectRegion[];
 }
 
 export interface LegacyProjectDurationInput {
@@ -69,6 +71,7 @@ export interface LegacyProjectDurationInput {
   trimRegions: TrimRegion[];
   annotationRegions: AnnotationRegion[];
   audioRegions: AudioRegion[];
+  presentationEffects?: PresentationEffectRegion[];
 }
 
 export interface LegacyEditorRestoredState {
@@ -96,6 +99,7 @@ export interface LegacyEditorRestoredState {
   cursorCustomImages?: CursorCustomImageMap;
   cursorOffset?: number;
   editingDocument: EditingDocument;
+  presentationEffects?: PresentationEffectRegion[];
 }
 
 export function calculateLegacyProjectDurationSeconds(input: LegacyProjectDurationInput): number {
@@ -111,6 +115,7 @@ export function calculateLegacyProjectDurationSeconds(input: LegacyProjectDurati
         ? Math.min(safeEndMs(region.endMs), sourceDurationMs)
         : safeEndMs(region.endMs)
     )),
+    ...(input.presentationEffects ?? []).map((region) => safeEndMs(region.endMs)),
   ];
 
   return Math.max(0, ...candidatesMs) / 1000;
@@ -430,6 +435,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
     legacyState: {
       trimRegions: input.trimRegions,
       motionBlurEnabled: input.motionBlurEnabled,
+      presentationEffects: input.presentationEffects ?? [],
     },
   };
 }
@@ -467,6 +473,9 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
   const legacyMotionBlurEnabled = typeof project.legacyState?.motionBlurEnabled === "boolean"
     ? project.legacyState.motionBlurEnabled
     : undefined;
+  const presentationEffects = Array.isArray(project.legacyState?.presentationEffects)
+    ? project.legacyState.presentationEffects as PresentationEffectRegion[]
+    : [];
 
   return {
     editingDocument,
@@ -497,6 +506,7 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
     shadowIntensity: project.canvas.shadow.intensity,
     showBlur: project.canvas.background.showBlur,
     motionBlurEnabled: legacyMotionBlurEnabled,
+    presentationEffects,
     borderRadius: project.canvas.borderRadius,
     padding: project.canvas.padding,
     aspectRatio: project.canvas.aspectRatio,
