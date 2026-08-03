@@ -9,6 +9,7 @@ const expect = (label: string, condition: boolean) => assertions.push([label, co
 const hook = read('src/hooks/useScreenRecorder.ts')
 const launch = read('src/components/launch/LaunchWindow.tsx')
 const native = read('electron/nativeRecorder.ts')
+const iosDeviceCapture = read('electron/iosDeviceCapture.ts')
 const handlers = read('electron/ipc/handlers.ts')
 const preload = read('electron/preload.ts')
 
@@ -18,7 +19,7 @@ expect('microphone device and switches are real inputs', launch.includes('enumer
 expect('microphone meter uses Web Audio analyser', launch.includes('createAnalyser()') && launch.includes('getByteFrequencyData'))
 expect('system audio is configurable', launch.includes('includeSystemAudio: systemAudioOn') && native.includes('includeSystemAudio: sessionOptions.includeSystemAudio'))
 expect('camera capture becomes a presenter handoff', launch.includes('cameraDeviceId: cameraId') && native.includes('captureCamera: sessionOptions.captureCamera'))
-expect('iPhone and iPad use real video-device discovery and preview', launch.includes('/iphone|ipad/i') && launch.includes('getUserMedia({ video:'))
+expect('iPhone and iPad use real wired screen discovery and preview', launch.includes('discoverIOSScreenDevices') && launch.includes('startIOSDevicePreview') && launch.includes("selectedType==='Device'") && iosDeviceCapture.includes("['preview',deviceId]") && iosDeviceCapture.includes("['record',deviceId,recordingOutput]"))
 expect('microphone and system audio remain separate stems', hook.includes('storeRecordedAudio') && native.includes('-system-audio.webm'))
 expect('countdown and lifecycle controls are wired', hook.includes('countdownSeconds') && hook.includes('pauseRecording') && hook.includes('resumeRecording') && hook.includes('cancelRecording') && hook.includes('retakeRecording'))
 expect('cancel discards captured artifacts', hook.includes('discardRecordingArtifacts') && handlers.includes('discard-recording-artifacts'))
