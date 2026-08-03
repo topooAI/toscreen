@@ -115,12 +115,12 @@ invalidProject.assets = [
   { id: "", type: "spreadsheet", name: "", sourceUrl: "file:///bad.xlsx" },
 ];
 invalidProject.tracks = [
-  { id: "", type: "subtitle", name: "", order: Number.NaN },
+  { id: "", type: "spreadsheet", name: "", order: Number.NaN },
 ];
 invalidProject.clips = [
   {
     id: "",
-    type: "subtitle",
+    type: "spreadsheet",
     trackId: "missing-track",
     startMs: 0,
     endMs: 1000,
