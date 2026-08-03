@@ -21,6 +21,7 @@ import type {
   ProjectTrack,
   VideoEditorProject,
 } from "./types";
+import { subtitleToAnnotation, type SubtitleRegion } from '../mediaFeatures'
 
 const TRACK_IDS = {
   video: "track-video-main",
@@ -43,6 +44,7 @@ export interface LegacyEditorProjectInput {
   trimRegions: TrimRegion[];
   annotationRegions: AnnotationRegion[];
   audioRegions: AudioRegion[];
+  subtitleRegions?: SubtitleRegion[];
   cursorData: CursorDataPoint[];
   cursorSize: number;
   cursorSmoothing: boolean;
@@ -74,6 +76,7 @@ export interface LegacyProjectDurationInput {
   annotationRegions: AnnotationRegion[];
   audioRegions: AudioRegion[];
   presentationEffects?: PresentationEffectRegion[];
+  subtitleRegions?: SubtitleRegion[];
 }
 
 export interface LegacyEditorRestoredState {
@@ -83,6 +86,7 @@ export interface LegacyEditorRestoredState {
   trimRegions: TrimRegion[];
   annotationRegions: AnnotationRegion[];
   audioRegions: AudioRegion[];
+  subtitleRegions?: SubtitleRegion[];
   cropRegion: CropRegion;
   wallpaper: string;
   shadowIntensity: number;
@@ -119,6 +123,7 @@ export function calculateLegacyProjectDurationSeconds(input: LegacyProjectDurati
         : safeEndMs(region.endMs)
     )),
     ...(input.presentationEffects ?? []).map((region) => safeEndMs(region.endMs)),
+    ...(input.subtitleRegions || []).map(region => safeEndMs(region.endMs)),
   ];
 
   return Math.max(0, ...candidatesMs) / 1000;
@@ -317,6 +322,11 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
       },
     });
   });
+  if ((input.subtitleRegions || []).length) tracks.push({ id: 'track-subtitle-main', type: 'annotation', name: 'Subtitles', order: 2.5 });
+  ;(input.subtitleRegions || []).forEach(region => {
+    const annotation = subtitleToAnnotation(region)
+    clips.push({ id: region.id, type: 'annotation', trackId: 'track-subtitle-main', startMs: region.startMs, endMs: region.endMs, name: region.text, props: { sourceRegion: annotation }, legacy: { source: 'VideoEditor', regionId: region.id, regionType: 'annotation' } })
+  })
 
   input.audioRegions.forEach((region) => {
     const isAttachedOriginal = region.isOriginal && !region.isDetached && sourceDurationMs > 0;
@@ -440,6 +450,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
       motionBlurEnabled: input.motionBlurEnabled,
       presentationEffects: input.presentationEffects ?? [],
       autoFocusEnabled: input.autoFocusEnabled ?? true,
+      subtitleRegions: input.subtitleRegions || [],
     },
   };
 }
@@ -486,6 +497,7 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
   return {
     editingDocument,
     companionAudioPath,
+    subtitleRegions: Array.isArray(project.legacyState?.subtitleRegions) ? project.legacyState.subtitleRegions as SubtitleRegion[] : [],
     cameraPath: project.assets.find(asset => asset.metadata?.role === 'presenter-camera')?.filePath || null,
     zoomRegions: project.clips.flatMap((clip): ZoomRegion[] => {
       if (clip.type !== "camera" || clip.props.mode !== "zoom") return [];

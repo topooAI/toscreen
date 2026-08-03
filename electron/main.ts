@@ -20,6 +20,7 @@ import {
 } from './windows'
 import { registerIpcHandlers } from './ipc/handlers'
 import { registerPreferenceIpcHandlers } from './preferences'
+import { registerTranscriptionHandlers } from './transcription'
 
 // Electron 30 + macOS Metal/ANGLE can intermittently lose the GPU context after
 // ScreenCaptureKit recording. Prefer the GL ANGLE backend in development so the
@@ -364,5 +365,6 @@ app.whenReady().then(async () => {
       }
     }
   )
+  registerTranscriptionHandlers(() => mainWindow)
   createInitialWindow()
 })

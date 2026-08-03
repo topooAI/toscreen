@@ -24,6 +24,8 @@ declare namespace NodeJS {
 // Used in Renderer process, expose in `preload.ts`
 interface Window {
   electronAPI: {
+    resolveBundledMusic: (fileName: string) => Promise<{ success: boolean; url?: string; error?: string }>
+    listBundledMusic: () => Promise<{ success: boolean; manifest?: { tracks: Array<any> }; error?: string }>
     getSources: (opts: Electron.SourcesOptions) => Promise<ProcessedDesktopSource[]>
     switchToEditor: () => Promise<void>
     openSourceSelector: () => Promise<void>
@@ -65,6 +67,9 @@ interface Window {
     onProxyGenerationProgress: (callback: (percent: number) => void) => () => void;
     saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean; error?: string; message?: string }>;
     loadProject: (videoPath: string) => Promise<{ success: boolean; project?: any; projectPath?: string; message?: string }>;
+    transcribeAudio: (input: { paths: string[]; language: string }) => Promise<{ success: boolean; segments?: Array<{ startMs: number; endMs: number; text: string }>; error?: string; cancelled?: boolean }>
+    cancelTranscription: () => Promise<boolean>
+    onTranscriptionProgress: (callback: (event: unknown) => void) => () => void
   }
 }
 

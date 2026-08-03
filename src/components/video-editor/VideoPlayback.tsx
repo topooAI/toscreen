@@ -888,9 +888,9 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
                 onSelectAnnotation(clickedId);
               }
             };
-            return sorted.map((annotation) => (
-              <AnnotationOverlay
-                key={annotation.id}
+            return sorted.map((annotation) => {
+              const progress = Math.max(0, Math.min(1, (currentTime * 1000 - annotation.startMs) / 220));
+              return <div key={annotation.id} style={{ position: 'absolute', inset: 0, opacity: annotation.animation === 'fade' ? progress : 1, transform: annotation.animation === 'pop' ? `scale(${.78 + .22 * (1 - Math.pow(1-progress,3))})` : undefined }}><AnnotationOverlay
                 annotation={annotation}
                 isSelected={annotation.id === selectedAnnotationId}
                 containerWidth={overlayRef.current?.clientWidth || 800}
@@ -900,8 +900,8 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
                 onClick={handleAnnotationClick}
                 zIndex={annotation.zIndex}
                 isSelectedBoost={annotation.id === selectedAnnotationId}
-              />
-            ));
+              /></div>
+            });
           })()}
         </div>
       )}

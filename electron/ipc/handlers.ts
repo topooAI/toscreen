@@ -470,6 +470,20 @@ export function registerIpcHandlers(
     }
   })
 
+  ipcMain.handle('resolve-bundled-music', async (_, fileName: string) => {
+    const safeName = path.basename(fileName)
+    if (safeName !== fileName || !safeName.endsWith('.wav')) return { success: false, error: 'Invalid bundled music file' }
+    const root = app.isPackaged ? path.join(process.resourcesPath, 'music') : path.join(app.getAppPath(), 'public', 'music')
+    const filePath = path.join(root, safeName)
+    try { await fs.access(filePath); return { success: true, url: `toscreen://${filePath}` } }
+    catch { return { success: false, error: 'Bundled music asset is missing' } }
+  })
+  ipcMain.handle('list-bundled-music', async () => {
+    const root = app.isPackaged ? path.join(process.resourcesPath, 'music') : path.join(app.getAppPath(), 'public', 'music')
+    try { return { success: true, manifest: JSON.parse(await fs.readFile(path.join(root, 'LICENSES.json'), 'utf8')) } }
+    catch { return { success: false, error: 'Bundled music manifest is missing' } }
+  })
+
   ipcMain.handle('save-exported-video', async (_, videoData: ArrayBuffer, fileName: string) => {
     try {
       const result = await dialog.showSaveDialog({

@@ -57,6 +57,8 @@ import { PresentationToolbar } from './presentation/PresentationToolbar';
 import type { PresentationEffectRegion } from './presentation/types';
 import { recordedShortcutEffects } from './presentation/presentationEffects';
 import { expandPendingPresenterDuration, presenterEffectFromCameraPath } from './project/presenterContract';
+import { MediaFeaturesPanel } from './MediaFeaturesPanel';
+import { type SubtitleRegion } from './mediaFeatures';
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -94,6 +96,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [audioRegions, setAudioRegions] = useState<AudioRegion[]>([]);
+  const [subtitleRegions, setSubtitleRegions] = useState<SubtitleRegion[]>([]);
+  const [showMediaFeatures, setShowMediaFeatures] = useState(false);
 
   // HEALER: Automatically fix corrupted audio regions trapped in memory
   useEffect(() => {
@@ -274,7 +278,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     ...annotationRegions.map((region) => (editingRenderPlan.timeMap.mapSourceToEffective(region.endMs) ?? 0) / 1000),
     ...audioRegions.filter((region) => !region.isOriginal || region.isDetached).map((region) => region.endMs / 1000),
     ...presentationEffects.map((region) => region.endMs / 1000),
-  ), [editingRenderPlan, zoomRegions, annotationRegions, audioRegions, presentationEffects]);
+    ...subtitleRegions.map((region) => region.endMs / 1000),
+  ), [editingRenderPlan, zoomRegions, annotationRegions, audioRegions, presentationEffects, subtitleRegions]);
 
   const currentProjectModel = useMemo(() => createProjectFromLegacyEditorState({
     videoPath,
@@ -287,6 +292,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     trimRegions,
     annotationRegions,
     audioRegions,
+    subtitleRegions,
     cursorData,
     cursorSize,
     cursorSmoothing,
@@ -317,6 +323,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     trimRegions,
     annotationRegions,
     audioRegions,
+    subtitleRegions,
     cursorData,
     cursorSize,
     cursorSmoothing,
@@ -577,6 +584,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         const cameraAsset = project.projectModel.assets?.find((asset: any) => asset.metadata?.role === 'camera' || asset.metadata?.role === 'presenter-camera' || asset.metadata?.sourceKind === 'camera');
         setPresentationEffects(cameraAsset && !restoredPresentation.some(effect => effect.kind === 'presenter') ? [...restoredPresentation, { id: `presenter-${cameraAsset.id}`, kind: 'presenter', startMs: 0, endMs: project.projectModel.durationMs, sourceUrl: cameraAsset.filePath ? toFileUrl(cameraAsset.filePath) : cameraAsset.sourceUrl, posterDataUrl: cameraAsset.metadata?.posterDataUrl, sourceStartMs: Number(cameraAsset.metadata?.sourceStartMs ?? 0), shape: 'circle', bounds: { x: 76, y: 68, width: 18, height: 24 }, visible: true, opacity: 1, fit: 'cover' } as PresentationEffectRegion] : restoredPresentation);
         setAudioRegions(restored.audioRegions);
+        setSubtitleRegions(restored.subtitleRegions || []);
         setCropRegion(restored.cropRegion);
         setWallpaper(restored.wallpaper);
         setShadowIntensity(restored.shadowIntensity);
@@ -1983,6 +1991,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       </div>
 
       <Toaster theme={theme} className="pointer-events-auto" />
+      <button className="absolute right-3 top-3 z-50 rounded bg-zinc-900 px-3 py-2 text-xs" onClick={() => setShowMediaFeatures(value => !value)}>Music & Subtitles</button>
+      {showMediaFeatures && <div className="absolute right-0 top-12 bottom-0 z-40"><MediaFeaturesPanel currentTimeMs={Math.round(currentTime * 1000)} audioRegions={audioRegions} onAddAudio={handleAudioAdded} subtitles={subtitleRegions} onChangeSubtitles={setSubtitleRegions} /></div>}
 
       <ExportDialog
         isOpen={showExportDialog}

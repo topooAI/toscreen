@@ -142,6 +142,7 @@ export interface AnnotationRegion {
   style: AnnotationTextStyle;
   zIndex: number;
   figureData?: FigureData;
+  animation?: 'none' | 'fade' | 'pop';
 }
 
 export const DEFAULT_ANNOTATION_POSITION: AnnotationPosition = {

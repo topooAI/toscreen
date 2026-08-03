@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // ask main process for the correct base path (production vs dev)
     return await ipcRenderer.invoke('get-asset-base-path')
   },
+  resolveBundledMusic: (fileName: string) => ipcRenderer.invoke('resolve-bundled-music', fileName),
+  listBundledMusic: () => ipcRenderer.invoke('list-bundled-music'),
   getSources: async (opts: Electron.SourcesOptions) => {
     return await ipcRenderer.invoke('get-sources', opts)
   },
@@ -117,5 +119,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const listener = (_event: any, percent: number) => callback(percent)
     ipcRenderer.on('proxy-generation-progress', listener)
     return () => ipcRenderer.removeListener('proxy-generation-progress', listener)
+  }
+  ,transcribeAudio: (input: { paths: string[]; language: string }) => ipcRenderer.invoke('transcription-start', input),
+  cancelTranscription: () => ipcRenderer.invoke('transcription-cancel'),
+  onTranscriptionProgress: (callback: (event: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, value: unknown) => callback(value)
+    ipcRenderer.on('transcription-progress', listener)
+    return () => ipcRenderer.removeListener('transcription-progress', listener)
   }
 })

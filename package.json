@@ -91,7 +91,8 @@
     "audit:presentation": "tsx scripts/verify-presentation-session.ts",
     "audit:presentation-ui": "tsx scripts/verify-presentation-ui-integration.ts",
     "audit:focus-30-35": "tsx scripts/verify-focus-30-35.ts",
-    "audit:presentation-recording-contract": "tsx scripts/verify-presentation-recording-contract.ts"
+    "audit:presentation-recording-contract": "tsx scripts/verify-presentation-recording-contract.ts",
+    "audit:audio-captions": "tsx scripts/test-audio-captions.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

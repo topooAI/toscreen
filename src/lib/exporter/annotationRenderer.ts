@@ -286,6 +286,13 @@ export async function renderAnnotations(
     const width = (annotation.size.width / 100) * canvasWidth;
     const height = (annotation.size.height / 100) * canvasHeight;
     
+    const enterProgress = Math.max(0, Math.min(1, (currentTimeMs - annotation.startMs) / 220));
+    ctx.save();
+    if (annotation.animation === 'fade') ctx.globalAlpha *= enterProgress;
+    if (annotation.animation === 'pop') {
+      const scale = .78 + .22 * (1 - Math.pow(1 - enterProgress, 3));
+      ctx.translate(x + width / 2, y + height / 2); ctx.scale(scale, scale); ctx.translate(-(x + width / 2), -(y + height / 2));
+    }
     switch (annotation.type) {
       case 'text':
         renderText(ctx, annotation, x, y, width, height, scaleFactor);
@@ -311,5 +318,6 @@ export async function renderAnnotations(
         }
         break;
     }
+    ctx.restore();
   }
 }

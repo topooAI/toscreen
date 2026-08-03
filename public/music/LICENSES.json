@@ -1,0 +1,11 @@
+{
+  "license": "CC0-1.0",
+  "creator": "ToScreen project",
+  "dedication": "These two original, procedurally generated compositions are owned by the ToScreen project and dedicated to the public domain under CC0 1.0. They contain no sampled or third-party recordings.",
+  "generatedBy": "scripts/generate-cc0-music-assets.mjs",
+  "verification": { "format": "PCM WAV 44.1 kHz stereo 16-bit", "sha256": { "calm-pulse.wav": "f2ff1f713530608bb687cfe36a2f9f2d1bc6cab9207283aab034a237a746318a", "bright-steps.wav": "99e0c58f1a3840755a3de3899bdfa2a7436779f1eeaa7a62e6cfad275cbd72c2" } },
+  "tracks": [
+    { "id": "calm-pulse", "title": "Calm Pulse", "file": "calm-pulse.wav", "category": "Ambient", "durationSeconds": 12, "source": "Original procedural composition created for ToScreen", "license": "CC0-1.0" },
+    { "id": "bright-steps", "title": "Bright Steps", "file": "bright-steps.wav", "category": "Upbeat", "durationSeconds": 12, "source": "Original procedural composition created for ToScreen", "license": "CC0-1.0" }
+  ]
+}

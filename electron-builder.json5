@@ -22,6 +22,8 @@
     "!LICENSE"
   ],
   "extraResources": [
+    { "from": "public/transcriber", "to": "transcriber" },
+    { "from": "public/music", "to": "music" },
     {
       "from": "public/wallpapers",
       "to": "assets/wallpapers"
@@ -33,6 +35,7 @@
       "NSMicrophoneUsageDescription": "ToScreen uses the selected microphone while recording your screen.",
       "NSCameraUsageDescription": "ToScreen checks camera access so you can prepare camera-enabled recordings.",
       "NSScreenCaptureUsageDescription": "ToScreen records the display, window, or custom area you choose."
+      ,"NSSpeechRecognitionUsageDescription": "ToScreen transcribes selected project audio locally into editable subtitles."
     },
     "target": [
       {
