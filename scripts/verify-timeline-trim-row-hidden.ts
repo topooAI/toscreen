@@ -40,7 +40,7 @@ const requiredEditorNeedles = [
   "})) : []",
   "if (!isTrimTrackVisible) {",
   "const segments = editingSession",
-  "editingSession.document.clips.map((clip, index) => {",
+  "editingSession.document.clips.flatMap((clip, index) => {",
   ": buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective)",
   "segments.forEach((segment) => {",
   "const videoItems = isTrimTrackVisible ? videos : mainClips",

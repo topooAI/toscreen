@@ -41,10 +41,12 @@ const checks = [
     ],
   },
   {
-    area: "electron-localhost-dev-url",
+    area: "electron-renderer-source-selection",
     file: "electronWindows",
     needles: [
-      "process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'",
+      "const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL\n",
+      "if (VITE_DEV_SERVER_URL)",
+      "win.loadFile(path.join(RENDERER_DIST, 'index.html')",
     ],
   },
   {
