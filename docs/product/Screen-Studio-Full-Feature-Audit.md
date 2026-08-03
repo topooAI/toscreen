@@ -108,7 +108,7 @@
 | 47 | 音量与音量包络 | Completed | 音频区域具有音量数据和包络编辑 | Preview/Export 音频设置验证通过 |
 | 48 | 麦克风与系统音频独立分轨 | Completed | 录制前可分别控制系统音频和麦克风，录制后生成具有明确 role 的独立素材与 Audio Region | Preview、Mixer、Project Model 和 Export 保留双轨语义 |
 | 49 | 内置背景音乐库 | Completed | 提供两首项目自有 CC0 WAV、授权与 SHA-256 清单、搜索、分类、试听和加入 Audio Track | 开发与打包资源解析、项目保存和音频混合契约已通过 |
-| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper 已是 arm64+x86_64 universal binary；语言/来源选择、进度、取消和错误处理已合入，两个架构均可实际启动 | 尚未用一段真实语音完成“识别 → 生成字幕 → 编辑 → 保存 → 导出”的端到端验收，完成前不提前改为 Completed |
+| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper 已是 arm64+x86_64 universal binary；语言/来源选择、进度、取消和错误处理已合入，两个架构均可实际启动 | 真实语音验收已进入正式 Editor，但 macOS 当前返回 Speech Recognition 未授权/拒绝；允许 ToScreen 语音识别后仍需完成“识别 → 生成字幕 → 编辑 → 保存 → 导出”闭环 |
 | 51 | 字幕编辑、样式与动画 | Completed | 独立 Subtitle 时间线行支持选择、拖动、左右 Resize 和删除；面板支持文本、时间、字体、字号、颜色、位置、对齐、Split/Merge 和 Fade/Pop | Timeline、Panel、Project Model、Preview、Export 共用字幕状态；三轮保存恢复幂等和 Preview/Export 契约通过 |
 
 ## 6. 项目、设置与预设
@@ -134,7 +134,7 @@
 | 63 | 导出进度、取消和成功反馈 | Completed | 有进度条、取消按钮、错误和成功状态 | 仍需做大文件实际取消的破坏性回归 |
 | 64 | GIF 导出 | Completed | Export Dialog 支持范围、尺寸、FPS、循环、进度、取消、错误和保存，并使用真实 GIF 编码路径 | 独立验收生成 `GIF89a`、160×90、10 帧、1 秒的实际文件 |
 | 65 | 批量导出 | Completed | 串行队列支持当前项目、已保存项目和多个 Preset，并持久化任务状态 | 已验证串行执行、失败隔离、重试、取消和应用重启恢复 |
-| 66 | Quick Share、在线链接、私密链接和评论 | Not completed | Topoo Account、R2 multipart 断点上传、Public/Unlisted/Private、过期/撤销、分享历史、观看页和评论权限代码已合入，Worker 契约测试通过 | 尚未创建并绑定正式 D1/R2、配置 Topoo Auth 回调与生产域名，也未完成公网真实账号、上传、观看和评论验收，部署前不标 Completed |
+| 66 | Quick Share、在线链接、私密链接和评论 | Not completed | 已在 Topoo Cloudflare 账户创建独立 `toscreen-share` D1 与 `toscreen-share-media` R2，部署 Worker、签名 Secret 和 `share.topoo.ai`；公网 health=200、匿名上传=401；Topoo Auth 入口已按现有 `/github/start` 与 `auth_token` 回调协议修正 | 仍需在正式 Electron 中用真实 Topoo 用户完成登录、视频上传/续传、Public/Unlisted/Private、播放、评论、撤销和重启恢复验收，闭环前不标 Completed |
 | 67 | 提取原始录制文件 | Completed | 用户可一键提取 screen、系统音频、麦克风、Presenter、cursor/click sidecar 和真实 project sidecar | 受控 role/type 清单会去重并逐项记录分类、状态、大小和 SHA-256；缺失素材显式报告，代理不会冒充原始文件 |
 
 ## 8. 稳定性、运行时与验收

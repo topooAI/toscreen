@@ -1,6 +1,12 @@
 name = "toscreen-share"
+account_id = "e12dd07e3951d3a5683b89fefd58085b"
 main = "src/index.ts"
 compatibility_date = "2026-08-01"
+workers_dev = true
+
+[[routes]]
+pattern = "share.topoo.ai"
+custom_domain = true
 
 [[r2_buckets]]
 binding = "MEDIA"

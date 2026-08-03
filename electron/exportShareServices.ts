@@ -11,7 +11,7 @@ import {validateTopooCallback} from '../shared/topooAuthState';
 
 const tokenPath = () => path.join(app.getPath('userData'), 'topoo-session.bin');
 const authStatePath = () => path.join(app.getPath('userData'),'topoo-auth-state.json');
-export async function beginTopooSignIn(){const state=crypto.randomBytes(24).toString('hex');await fs.writeFile(authStatePath(),JSON.stringify({state,expiresAt:Date.now()+10*60_000}),{mode:0o600});return `https://auth.topoo.ai/api/auth/signin?callbackUrl=${encodeURIComponent(`toscreen://auth/callback?state=${state}`)}&state=${state}`;}
+export async function beginTopooSignIn(){const state=crypto.randomBytes(24).toString('hex');await fs.writeFile(authStatePath(),JSON.stringify({state,expiresAt:Date.now()+10*60_000}),{mode:0o600});const redirect=`toscreen://auth/callback?state=${state}`;return `https://auth.topoo.ai/api/auth/github/start?redirect=${encodeURIComponent(redirect)}&entrance=toscreen`;}
 export async function consumeTopooCallback(rawUrl:string){let expected:any;try{expected=JSON.parse(await fs.readFile(authStatePath(),'utf8'));}catch{throw new Error('No pending Topoo sign-in');}await fs.rm(authStatePath(),{force:true});await storeTopooToken(validateTopooCallback(rawUrl,expected));}
 export async function storeTopooToken(token: string) {
   if (!safeStorage.isEncryptionAvailable()) throw new Error('OS protected storage is unavailable');

@@ -22,3 +22,5 @@ wrangler deploy --config wrangler.generated.toml
 ```
 
 Configure `VITE_TOPOO_SHARE_URL` for the desktop build. Configure Topoo Auth to allow `toscreen://auth/callback`; the callback contains the short-lived desktop session token, which Electron immediately encrypts with `safeStorage`. No token or API key belongs in source control.
+
+Production is deployed in the same Cloudflare account as Topoo Auth and Topoo Cloud, with isolated resources `toscreen-share` (D1) and `toscreen-share-media` (R2). The public service route is `https://share.topoo.ai`; keep `wrangler.generated.toml` local because it contains deployment-specific binding IDs.
