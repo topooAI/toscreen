@@ -931,6 +931,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     setSelectedZoomId(id);
     if (id) {
       setSelectedPresentationId(null);
+      setSelectedSubtitleId(null);
       setSelectedTrimId(null);
       setSelectedAnnotationId(null);
       setSelectedAudioId(null);
@@ -942,6 +943,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     setSelectedTrimId(id);
     if (id) {
       setSelectedPresentationId(null);
+      setSelectedSubtitleId(null);
       setSelectedZoomId(null);
       setSelectedAnnotationId(null);
       setSelectedAudioId(null);
@@ -972,11 +974,12 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       setSelectedVideoId(null);
     }
   }, []);
-  const handleSelectSubtitle = useCallback((id: string | null) => { setSelectedSubtitleId(id); if (id) { setSelectedZoomId(null); setSelectedTrimId(null); setSelectedAnnotationId(null); setSelectedAudioId(null); setSelectedVideoId(null) } }, []);
+  const handleSelectSubtitle = useCallback((id: string | null) => { setSelectedSubtitleId(id); if (id) { setSelectedPresentationId(null); setSelectedZoomId(null); setSelectedTrimId(null); setSelectedAnnotationId(null); setSelectedAudioId(null); setSelectedVideoId(null) } }, []);
 
   const handleSelectPresentation = useCallback((id: string | null) => {
     setSelectedPresentationId(id);
     if (id) {
+      setSelectedSubtitleId(null);
       setSelectedZoomId(null);
       setSelectedTrimId(null);
       setSelectedAnnotationId(null);
