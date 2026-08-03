@@ -5,6 +5,7 @@ import path from 'node:path'
 import { RECORDINGS_DIR } from '../main'
 import { mouseTracker } from '../mouseTracker'
 import { mergeSegmentEvents } from '../recordingTimeline'
+import { beginTopooSignIn, chooseGifPath, clearTopooToken, encodeGif, extractOriginals, fetchTopooSession, openLocalPath, quickShare,shareApi } from '../exportShareServices'
 
 import {
   isNativeRecordingAvailable,
@@ -125,6 +126,8 @@ export function registerIpcHandlers(
     await writeRecentIndex(recentIndexPath, [entry, ...recent.filter(item => item.projectPath !== projectPath)].slice(0, 100))
     return entry
   }
+  const gifControllers = new Map<string, AbortController>();
+  const shareControllers = new Map<string, AbortController>();
   // Try to auto-select the primary screen
   (async () => {
     try {
@@ -154,6 +157,27 @@ export function registerIpcHandlers(
       appIcon: source.appIcon ? source.appIcon.toDataURL() : null
     }))
   })
+
+  ipcMain.handle('export-gif', async (event, id: string, videoData: ArrayBuffer, options) => {
+    const outputPath = await chooseGifPath(`toscreen-${Date.now()}.gif`); if (!outputPath) return { cancelled: true };
+    const controller = new AbortController(); gifControllers.set(id, controller);
+    try { return await encodeGif(videoData, options, outputPath, percentage => event.sender.send('export-gif-progress', { id, percentage }), controller.signal); }
+    finally { gifControllers.delete(id); }
+  });
+  ipcMain.handle('cancel-gif', (_, id: string) => { gifControllers.get(id)?.abort(); return { success: true }; });
+  ipcMain.handle('list-saved-projects',async()=>{const names=(await fs.readdir(RECORDINGS_DIR)).filter(name=>name.endsWith('.project.json'));return Promise.all(names.map(async name=>{const filePath=path.join(RECORDINGS_DIR,name);try{const raw=JSON.parse(await fs.readFile(filePath,'utf8'));return{path:filePath,id:raw.projectModel?.id??filePath,name:raw.projectModel?.name??name,updatedAt:raw.projectModel?.updatedAt};}catch{return null;}})).then(items=>items.filter(Boolean));});
+  ipcMain.handle('load-saved-project',async(_,filePath:string)=>JSON.parse(await fs.readFile(filePath,'utf8')));
+  ipcMain.handle('choose-batch-output-directory',async()=>{const result=await dialog.showOpenDialog({properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0];});
+  ipcMain.handle('save-batch-output',async(_,data:ArrayBuffer,outputPath:string)=>{await fs.mkdir(path.dirname(outputPath),{recursive:true});await fs.writeFile(outputPath,Buffer.from(data));return{success:true,path:outputPath};});
+  ipcMain.handle('encode-gif-to-path',async(event,id:string,data:ArrayBuffer,options,outputPath:string)=>{const controller=new AbortController();gifControllers.set(id,controller);try{return await encodeGif(data,options,outputPath,percentage=>event.sender.send('export-gif-progress',{id,percentage}),controller.signal);}finally{gifControllers.delete(id);}});
+  ipcMain.handle('extract-originals', (_, sources, manifest, originalPath?:string) => {const controlled=[...sources];if(originalPath){controlled.push({kind:'raw-cursor-sidecar',path:nativeCursorPathForMediaPath(originalPath),classification:'sidecar'});controlled.push({kind:'raw-click-sidecar',path:`${originalPath}.clicks.json`,classification:'sidecar'});controlled.push({kind:'project-sidecar',path:projectPathForMediaPath(originalPath),required:true,classification:'sidecar'});}return extractOriginals(controlled, manifest);});
+  ipcMain.handle('open-local-path', (_, target: string) => openLocalPath(target));
+  ipcMain.handle('topoo-session', () => fetchTopooSession());
+  ipcMain.handle('topoo-sign-in', async () => { await shell.openExternal(await beginTopooSignIn()); return { state: 'pending' }; });
+  ipcMain.handle('topoo-sign-out', async () => { await clearTopooToken(); return { state: 'signed-out' }; });
+  ipcMain.handle('quick-share', async (event, id:string,filePath:string,input) => {const controller=new AbortController();shareControllers.set(id,controller);try{return await quickShare(filePath,{...input,onProgress:(percentage:number)=>event.sender.send('quick-share-progress',{id,percentage})},controller.signal);}finally{shareControllers.delete(id);}});
+  ipcMain.handle('cancel-quick-share',(_,id:string)=>{shareControllers.get(id)?.abort();return{success:true};});
+  ipcMain.handle('share-api',(_,serviceUrl:string,method:string,apiPath:string,body?:unknown)=>shareApi(serviceUrl,method,apiPath,body));
 
   ipcMain.handle('select-source', (_, source) => {
     selectedSource = source

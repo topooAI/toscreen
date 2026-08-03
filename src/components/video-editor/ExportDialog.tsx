@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, Download, Loader2, X } from 'lucide-react';
 import { Button } from "../ui/button";
 import type { ExportProgress, ExportQuality } from '../../lib/exporter';
+import type {ExportQueueItem} from '@/lib/exportQueue';import {BatchExportPanel} from './BatchExportPanel';
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -13,6 +14,15 @@ interface ExportDialogProps {
   onQualityChange: (quality: ExportQuality) => void;
   onStart: () => void;
   onCancel?: () => void;
+  format: 'mp4' | 'gif';
+  onFormatChange: (format: 'mp4' | 'gif') => void;
+  gifOptions: { startMs: number; endMs: number; width: number; fps: number; loop: number };
+  onGifOptionsChange: (options: { startMs: number; endMs: number; width: number; fps: number; loop: number }) => void;
+  onExtractOriginals: () => void;
+  onQuickShare?: (visibility: 'public' | 'unlisted' | 'private', expiresAt: string | null) => void;
+  currentProjectId:string;onRunBatchItem:(item:ExportQueueItem,signal:AbortSignal,progress:(value:number)=>void)=>Promise<void>;
+  shareProgress: number | null;
+  onCancelShare: () => void;
 }
 
 const QUALITY_OPTIONS: Array<{ value: ExportQuality; label: string; description: string }> = [
@@ -31,17 +41,15 @@ export function ExportDialog({
   onQualityChange,
   onStart,
   onCancel,
+  format, onFormatChange, gifOptions, onGifOptionsChange, onExtractOriginals, onQuickShare, currentProjectId,onRunBatchItem, shareProgress, onCancelShare,
 }: ExportDialogProps) {
   const [showSuccess, setShowSuccess] = useState(false);
+  const [shareVisibility, setShareVisibility] = useState<'public' | 'unlisted' | 'private'>('unlisted');
+  const [shareExpiry, setShareExpiry] = useState('');
 
   useEffect(() => {
     if (!isExporting && progress && progress.percentage >= 100 && !error) {
       setShowSuccess(true);
-      const timer = setTimeout(() => {
-        setShowSuccess(false);
-        onClose();
-      }, 2000);
-      return () => clearTimeout(timer);
     }
   }, [isExporting, progress, error, onClose]);
 
@@ -80,11 +88,13 @@ export function ExportDialog({
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#34B27B]/12 text-[#34B27B]">
                 <Check className="h-4 w-4" />
               </div>
-              <div className="text-[12px] font-medium text-[var(--ui-text-primary)]">Video saved successfully</div>
+              <div className="text-[12px] font-medium text-[var(--ui-text-primary)]">Export saved successfully</div>
               <div className="mt-1 text-[10px] text-[var(--ui-text-tertiary)]">Your exported file is ready.</div>
+              {onQuickShare && <><select value={shareVisibility} onChange={e=>setShareVisibility(e.target.value as typeof shareVisibility)} className="mt-3 h-8 w-full rounded bg-[var(--ui-control)] px-2 text-[10px]"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select><label className="mt-2 w-full text-left text-[9px] text-[var(--ui-text-tertiary)]">Optional expiry<input type="datetime-local" value={shareExpiry} onChange={e=>setShareExpiry(e.target.value)} className="mt-1 h-8 w-full rounded bg-[var(--ui-control)] px-2 text-[10px]"/></label>{shareProgress===null?<Button onClick={()=>onQuickShare(shareVisibility,shareExpiry?new Date(shareExpiry).toISOString():null)} className="mt-2 h-8 w-full">Quick Share / Retry upload</Button>:<><div className="mt-2 text-[10px]">Uploading {shareProgress.toFixed(0)}%</div><Button variant="outline" onClick={onCancelShare} className="mt-2 h-8 w-full">Cancel upload</Button></>}</>}
             </div>
           ) : isExporting ? (
             <div className="space-y-4">
+              <section><div className="mb-2 text-[10px] font-medium text-[var(--ui-text-secondary)]">Format</div><div className="grid grid-cols-2 gap-1">{(['mp4','gif'] as const).map(value => <Button key={value} variant={format===value?'default':'outline'} onClick={() => onFormatChange(value)} className="h-8 uppercase">{value}</Button>)}</div></section>
               <div className="flex items-center gap-3">
                 <Loader2 className="h-4 w-4 animate-spin text-[#0D99FF]" />
                 <div className="min-w-0 flex-1">
@@ -132,6 +142,7 @@ export function ExportDialog({
                   ))}
                 </div>
               </section>
+              {format === 'gif' && <section className="grid grid-cols-2 gap-2 text-[10px]"><label>Start ms<input className="mt-1 h-8 w-full rounded bg-[var(--ui-control)] px-2" type="number" min={0} value={gifOptions.startMs} onChange={e=>onGifOptionsChange({...gifOptions,startMs:Number(e.target.value)})}/></label><label>End ms<input className="mt-1 h-8 w-full rounded bg-[var(--ui-control)] px-2" type="number" min={1} value={gifOptions.endMs} onChange={e=>onGifOptionsChange({...gifOptions,endMs:Number(e.target.value)})}/></label><label>Width<input className="mt-1 h-8 w-full rounded bg-[var(--ui-control)] px-2" type="number" min={160} max={1920} value={gifOptions.width} onChange={e=>onGifOptionsChange({...gifOptions,width:Number(e.target.value)})}/></label><label>FPS<select className="mt-1 h-8 w-full rounded bg-[var(--ui-control)] px-2" value={gifOptions.fps} onChange={e=>onGifOptionsChange({...gifOptions,fps:Number(e.target.value)})}><option>10</option><option>15</option><option>20</option><option>30</option></select></label><label>Loop<select className="mt-1 h-8 w-full rounded bg-[var(--ui-control)] px-2" value={gifOptions.loop} onChange={e=>onGifOptionsChange({...gifOptions,loop:Number(e.target.value)})}><option value={0}>Forever</option><option value={1}>Once</option><option value={3}>3 times</option></select></label></section>}
 
               {error && (
                 <div className="rounded-[5px] border border-red-500/15 bg-red-500/8 px-3 py-2 text-[10px] text-red-500">
@@ -144,8 +155,10 @@ export function ExportDialog({
                 className="h-8 w-full gap-2 rounded-[5px] bg-[#0D99FF] text-[11px] font-semibold text-white hover:bg-[#0B87E3]"
               >
                 <Download className="h-3.5 w-3.5" />
-                Export Video
+                Export {format.toUpperCase()}
               </Button>
+              <Button variant="outline" onClick={onExtractOriginals} className="h-8 w-full">Extract original recording files</Button>
+              <BatchExportPanel currentProjectId={currentProjectId} onRunItem={onRunBatchItem}/>
             </div>
           )}
         </div>

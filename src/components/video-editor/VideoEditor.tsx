@@ -37,6 +37,7 @@ import {
   generateAutoZooms,
 } from "@/lib/autoZoom/generator";
 import { VideoExporter, type ExportProgress, type ExportQuality } from "@/lib/exporter";
+import type {ExportQueueItem} from '@/lib/exportQueue';
 import { type AspectRatio, getAspectRatioValue } from "@/utils/aspectRatioUtils";
 import { getAssetPath } from "@/lib/assetPath";
 import { loadEditorPreferences, type AppTheme } from "@/lib/editorPreferences";
@@ -244,6 +245,12 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [cursorOffset, setCursorOffset] = useState(0);
   const [cursorData, setCursorData] = useState<any[]>([]);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'mp4' | 'gif'>('mp4');
+  const [gifOptions, setGifOptions] = useState({ startMs: 0, endMs: 5000, width: 960, fps: 15, loop: 0 });
+  const [lastExportPath, setLastExportPath] = useState<string | null>(null);
+  const [shareProgress,setShareProgress]=useState<number|null>(null);
+  const shareIdRef=useRef<string|null>(null);
+  const gifExportIdRef = useRef<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(editorDefaults.aspectRatio);
   const [exportQuality, setExportQuality] = useState<ExportQuality>(editorDefaults.exportQuality);
   const [isFullScreenBinding, setIsFullScreenBinding] = useState(true);
@@ -1454,7 +1461,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     return () => { mounted = false; };
   }, [originalVideoPath]); 
 
-  const handleExport = useCallback(async () => {
+  const handleExport = useCallback(async (override?: { format?: 'mp4' | 'gif'; quality?: ExportQuality; gifOptions?: typeof gifOptions }) => {
     if (!videoPath) {
       toast.error('No video loaded');
       return;
@@ -1502,14 +1509,17 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       let exportHeight: number;
       let bitrate: number;
 
-      if (renderSettings.exportSettings.quality === 'source') {
+      const effectiveQuality = override?.quality ?? renderSettings.exportSettings.quality;
+      const effectiveFormat = override?.format ?? exportFormat;
+      const effectiveGifOptions = override?.gifOptions ?? gifOptions;
+      if (effectiveQuality === 'source') {
         // Use source resolution
         exportWidth = sourceWidth;
         exportHeight = sourceHeight;
         bitrate = 30_000_000;
       } else {
         // Use quality-based target resolution
-        const targetHeight = renderSettings.exportSettings.quality === 'medium' ? 720 : 1080;
+        const targetHeight = effectiveQuality === 'medium' ? 720 : 1080;
 
         // Calculate dimensions maintaining aspect ratio
         exportHeight = Math.floor(targetHeight / 2) * 2; // Ensure even
@@ -1576,13 +1586,18 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       if (result.success && result.blob) {
         const arrayBuffer = await result.blob.arrayBuffer();
         const timestamp = Date.now();
-        const fileName = `export-${timestamp}.mp4`;
-
-        const saveResult = await window.electronAPI.saveExportedVideo(arrayBuffer, fileName);
+        let saveResult: any;
+        if (effectiveFormat === 'gif') {
+          const id = crypto.randomUUID(); gifExportIdRef.current = id;
+          const removeProgress = window.electronAPI.onGifProgress(value => { if (value.id === id) setExportProgress(current => ({ currentFrame: value.percentage, totalFrames: 100, percentage: value.percentage, estimatedTimeRemaining: current?.estimatedTimeRemaining ?? 0 })); });
+          try { saveResult = await window.electronAPI.exportGif(id, arrayBuffer, { ...effectiveGifOptions, endMs: Math.min(effectiveGifOptions.endMs, renderSettings.durationMs) }); } finally { removeProgress(); gifExportIdRef.current = null; }
+        } else saveResult = await window.electronAPI.saveExportedVideo(arrayBuffer, `export-${timestamp}.mp4`);
 
         if (saveResult.cancelled) {
           toast.info('Export cancelled');
         } else if (saveResult.success) {
+          setLastExportPath(saveResult.path ?? null);
+          setExportProgress({ currentFrame: 100, totalFrames: 100, percentage: 100, estimatedTimeRemaining: 0 });
           toast.success(`Video exported successfully to ${saveResult.path}`);
         } else {
           setExportError(saveResult.message || 'Failed to save video');
@@ -1605,7 +1620,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       setIsExporting(false);
       exporterRef.current = null;
     }
-  }, [videoPath, originalVideoPath, runtimeAudioRegions, isPlaying, currentProjectModel, currentRenderSettings]);
+  }, [videoPath, originalVideoPath, runtimeAudioRegions, isPlaying, currentProjectModel, currentRenderSettings, exportFormat, gifOptions]);
 
   const handleCancelExport = useCallback(() => {
     if (exporterRef.current) {
@@ -1616,7 +1631,21 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       setExportProgress(null);
       setExportError(null);
     }
+    if (gifExportIdRef.current) void window.electronAPI.cancelGif(gifExportIdRef.current);
   }, []);
+
+  const handleExtractOriginals = useCallback(async () => {
+    const roles=new Map<string,string>([['screen-recording','screen-original'],['system-audio','system-audio'],['microphone','microphone'],['presenter-camera','presenter-camera'],['cursor-data','raw-cursor-sidecar']]);
+    const sources=currentProjectModel.assets.flatMap(asset=>{const role=String(asset.metadata?.role??asset.metadata?.sourceKind??asset.type);const kind=roles.get(role);if(!kind||!asset.filePath)return[];return[{kind,path:asset.filePath,required:kind==='screen-original',classification:kind.includes('sidecar')?'sidecar' as const:'original' as const}];});
+    if(originalVideoPath&&!sources.some(source=>source.kind==='screen-original'))sources.unshift({kind:'screen-original',path:originalVideoPath,required:true,classification:'original'});
+    const result = await window.electronAPI.extractOriginals(sources, currentProjectModel,originalVideoPath); if (result.cancelled) return; const missing = result.items.filter((item: any) => item.status !== 'copied'); toast.success(`Extracted ${result.items.length - missing.length} files${missing.length ? `; ${missing.length} missing` : ''}`); if (result.destination) void window.electronAPI.openLocalPath(result.destination);
+  }, [currentProjectModel, originalVideoPath]);
+
+  const handleQuickShare = useCallback(async (visibility: 'public' | 'unlisted' | 'private',expiresAt:string|null) => {
+    if (!lastExportPath) return;const id=crypto.randomUUID();shareIdRef.current=id;setShareProgress(0);const remove=window.electronAPI.onQuickShareProgress(value=>{if(value.id===id)setShareProgress(value.percentage);});try { const result = await window.electronAPI.quickShare(id,lastExportPath, { title: currentProjectModel.name, visibility, expiresAt, serviceUrl: import.meta.env.VITE_TOPOO_SHARE_URL || 'https://share.topoo.ai' }); toast.success(`Share ready: ${result.url}`); if (result.url) await window.electronAPI.openExternalUrl(result.url); } catch (error) { toast.error(`Upload paused; retry resumes completed parts. ${String(error)}`); }finally{remove();shareIdRef.current=null;setShareProgress(null);}
+  }, [currentProjectModel.name, lastExportPath]);
+
+  const runBatchItem=useCallback(async(item:ExportQueueItem,signal:AbortSignal,progress:(value:number)=>void)=>{const raw=item.projectPath?await window.electronAPI.loadSavedProject(item.projectPath):{projectModel:currentProjectModel};const project=raw.projectModel??raw;const validation=validateVideoEditorProject(project);if(!validation.valid)throw new Error(`Invalid saved project: ${validation.errors.join(', ')}`);const settings=getProjectRenderSettings(project);const screenAsset=project.assets.find((asset:any)=>asset.type==='screen-recording'&&asset.filePath);if(!screenAsset?.filePath)throw new Error('Saved project has no original screen asset');const screenClip=project.clips.find((clip:any)=>clip.type==='screen-recording');const sourceDurationMs=Math.max(1,Number(screenClip?.sourceEndMs??settings.durationMs)-Number(screenClip?.sourceStartMs??0));const plan=createEditingRenderPlan(settings.timeline.editingDocument,sourceDurationMs);const exporter=new VideoExporter({editingRenderPlan:plan,videoUrl:toFileUrl(screenAsset.filePath),projectDurationMs:settings.durationMs,width:item.width,height:item.height,frameRate:30,bitrate:item.quality==='medium'?8_000_000:15_000_000,wallpaper:settings.canvas.wallpaper,zoomRegions:settings.timeline.zoomRegions,trimRegions:settings.timeline.trimRegions,annotationRegions:settings.timeline.annotationRegions,audioRegions:resolveExportAudioRegions(settings.timeline.audioRegions,settings.timeline.audioRegions),showShadow:settings.canvas.shadowIntensity>0,shadowIntensity:settings.canvas.shadowIntensity,showBlur:settings.canvas.showBlur,motionBlurEnabled:settings.effects.motionBlurEnabled,borderRadius:settings.canvas.borderRadius,padding:settings.canvas.padding,cropRegion:settings.canvas.cropRegion,cursorData:settings.cursor.data,cursorSize:settings.cursor.size,cursorSmoothing:settings.cursor.smoothing,showVectorCursor:settings.cursor.showVectorCursor,cursorStyle:settings.cursor.style,cursorCustomImages:settings.cursor.customImages,cursorOffset:settings.cursor.offsetMs,presentationEffects:settings.effects.presentation,onProgress:value=>progress(value.percentage)});signal.addEventListener('abort',()=>exporter.cancel(),{once:true});const result=await exporter.export();if(!result.success||!result.blob)throw new Error(result.error||'Batch render failed');const safeName=String(project.name||project.id).replace(/[^a-z0-9_-]+/gi,'-');const base=`${item.outputDirectory}/${safeName}-${item.width}x${item.height}-${item.id.slice(0,6)}`;const data=await result.blob.arrayBuffer();if(item.format==='gif'){const id=crypto.randomUUID();signal.addEventListener('abort',()=>void window.electronAPI.cancelGif(id),{once:true});await window.electronAPI.encodeGifToPath(id,data,{startMs:0,endMs:settings.durationMs,width:item.width,fps:15,loop:0},`${base}.gif`);}else await window.electronAPI.saveBatchOutput(data,`${base}.mp4`);},[currentProjectModel]);
 
   const memoizedSidebar = useMemo(() => (
           <Sidebar
@@ -2080,8 +2109,18 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         error={exportError}
         quality={exportQuality}
         onQualityChange={setExportQuality}
-        onStart={handleExport}
+        onStart={() => handleExport()}
         onCancel={handleCancelExport}
+        format={exportFormat}
+        onFormatChange={setExportFormat}
+        gifOptions={{ ...gifOptions, endMs: gifOptions.endMs || Math.round(projectDuration * 1000) }}
+        onGifOptionsChange={setGifOptions}
+        onExtractOriginals={handleExtractOriginals}
+        onQuickShare={lastExportPath ? handleQuickShare : undefined}
+        currentProjectId={currentProjectModel.id}
+        onRunBatchItem={runBatchItem}
+        shareProgress={shareProgress}
+        onCancelShare={()=>{if(shareIdRef.current)void window.electronAPI.cancelQuickShare(shareIdRef.current);}}
       />
     </div>
   );

@@ -52,6 +52,24 @@ interface Window {
     getCurrentVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string; cameraPath?: string; microphonePath?: string }>
     clearCurrentVideoPath: () => Promise<{ success: boolean }>
     getPlatform: () => Promise<string>
+    exportGif: (id: string, videoData: ArrayBuffer, options: { startMs: number; endMs: number; width: number; fps: number; loop: number }) => Promise<{ success?: boolean; cancelled?: boolean; path?: string; size?: number }>
+    cancelGif: (id: string) => Promise<{ success: boolean }>
+    listSavedProjects:()=>Promise<Array<{path:string;id:string;name:string;updatedAt?:string}>>
+    loadSavedProject:(path:string)=>Promise<any>
+    chooseBatchOutputDirectory:()=>Promise<string|null>
+    saveBatchOutput:(data:ArrayBuffer,outputPath:string)=>Promise<{success:boolean;path:string}>
+    encodeGifToPath:(id:string,data:ArrayBuffer,options:unknown,outputPath:string)=>Promise<any>
+    onGifProgress: (callback: (value: { id: string; percentage: number }) => void) => () => void
+    extractOriginals: (sources: Array<{ kind: string; path?: string | null; required?: boolean; classification?: 'original'|'sidecar'|'proxy' }>, manifest: unknown,originalPath?:string|null) => Promise<any>
+    openLocalPath: (target: string) => Promise<string>
+    topooSession: () => Promise<any>
+    topooSignIn: () => Promise<any>
+    topooSignOut: () => Promise<any>
+    onTopooSessionChanged: (callback: () => void) => () => void
+    quickShare: (id:string,filePath: string, input: unknown) => Promise<any>
+    cancelQuickShare:(id:string)=>Promise<{success:boolean}>
+    onQuickShareProgress:(callback:(value:{id:string;percentage:number})=>void)=>()=>void
+    shareApi:(serviceUrl:string,method:string,path:string,body?:unknown)=>Promise<any>
     getEditorPreferencesSync: () => unknown
     saveEditorPreferences: (preferences: unknown) => Promise<{ success: boolean; preferences?: unknown; error?: string }>
     resetEditorPreferences: () => Promise<{ success: boolean; preferences?: unknown; error?: string }>

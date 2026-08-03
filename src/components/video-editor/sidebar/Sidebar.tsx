@@ -27,6 +27,7 @@ import { CursorControls } from "./CursorControls";
 import { CameraMotionControls } from "./CameraMotionControls";
 import type { PresentationEffectRegion } from "../presentation/types";
 import { PresentationSettingsPanel } from "../presentation/PresentationSettingsPanel";
+import { TopooUserPill } from '../TopooUserPill';
 
 interface SidebarProps {
     selected: string;
@@ -102,13 +103,13 @@ export function Sidebar(props: SidebarProps) {
     const header = (title: string) => (
         <div className="h-11 shrink-0 flex items-center justify-between px-3 border-b border-[var(--ui-border)]">
             <span className="text-[12px] font-semibold text-[var(--ui-text-primary)]">{title}</span>
-            <Button
+            <div className="flex items-center gap-2"><TopooUserPill/><Button
                 type="button"
                 onClick={props.onExport}
                 className="h-[26px] rounded-[5px] bg-[#0D99FF] px-3 text-[12px] font-semibold text-white shadow-none hover:bg-[#0B87E3] active:bg-[#0878CC] transition-colors"
             >
                 Export
-            </Button>
+            </Button></div>
         </div>
     );
 

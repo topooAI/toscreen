@@ -1,0 +1,12 @@
+name = "toscreen-share"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "toscreen-share-media"
+
+[vars]
+AUTH_SESSION_URL = "https://auth.topoo.ai/api/auth/session"
+PUBLIC_BASE_URL = "https://share.topoo.ai"
+# Set PLAYBACK_SIGNING_SECRET with: wrangler secret put PLAYBACK_SIGNING_SECRET

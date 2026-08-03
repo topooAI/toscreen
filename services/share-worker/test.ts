@@ -1,0 +1,8 @@
+import assert from 'node:assert/strict';
+import worker, { canDeleteComment, canView,validPart } from './src/index';
+assert.equal(canView({ visibility:'public', revoked:0, owner_id:'a' }),true); assert.equal(canView({visibility:'private',revoked:0,owner_id:'a'},'b',false),false); assert.equal(canView({visibility:'private',revoked:0,owner_id:'a'},'b',true),true); assert.equal(canView({visibility:'public',revoked:1,owner_id:'a'}),false);
+assert.equal(canDeleteComment({owner_id:'owner'},{author_id:'author'},'author'),true); assert.equal(canDeleteComment({owner_id:'owner'},{author_id:'author'},'other'),false);
+assert.equal(canView({visibility:'private',revoked:0,owner_id:'owner'},'owner',false),true);assert.equal(canView({visibility:'private',revoked:0,owner_id:'owner'},null,false),false);assert.equal(canView({visibility:'public',revoked:0,owner_id:'owner',expires_at:new Date(Date.now()-1).toISOString()}),false);assert.equal(validPart(1,8*1024*1024),true);assert.equal(validPart(0,10),false);assert.equal(validPart(1,9*1024*1024),false);
+const response=await worker.fetch(new Request('https://share.topoo.ai/health'),{} as any); assert.equal(response.status,200); assert.deepEqual(await response.json(),{ok:true});
+const viewer=await worker.fetch(new Request('https://share.topoo.ai/s/demo'),{} as any);const html=await viewer.text();assert.match(viewer.headers.get('content-security-policy')??'',/default-src 'self'/);assert.match(html,/replaceChildren/);assert.doesNotMatch(html,/comments\.innerHTML/);
+console.log(JSON.stringify({status:'ok',worker:true,policies:['public','unlisted','private','revoked','comment-owner']}));

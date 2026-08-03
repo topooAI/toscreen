@@ -75,6 +75,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPlatform: () => {
     return ipcRenderer.invoke('get-platform')
   },
+  exportGif: (id: string, videoData: ArrayBuffer, options: unknown) => ipcRenderer.invoke('export-gif', id, videoData, options),
+  cancelGif: (id: string) => ipcRenderer.invoke('cancel-gif', id),
+  listSavedProjects:()=>ipcRenderer.invoke('list-saved-projects'),
+  loadSavedProject:(path:string)=>ipcRenderer.invoke('load-saved-project',path),
+  chooseBatchOutputDirectory:()=>ipcRenderer.invoke('choose-batch-output-directory'),
+  saveBatchOutput:(data:ArrayBuffer,outputPath:string)=>ipcRenderer.invoke('save-batch-output',data,outputPath),
+  encodeGifToPath:(id:string,data:ArrayBuffer,options:unknown,outputPath:string)=>ipcRenderer.invoke('encode-gif-to-path',id,data,options,outputPath),
+  onGifProgress: (callback: (value: { id: string; percentage: number }) => void) => { const listener = (_: unknown, value: { id: string; percentage: number }) => callback(value); ipcRenderer.on('export-gif-progress', listener); return () => ipcRenderer.removeListener('export-gif-progress', listener); },
+  extractOriginals: (sources: unknown[], manifest: unknown, originalPath?:string) => ipcRenderer.invoke('extract-originals', sources, manifest, originalPath),
+  openLocalPath: (target: string) => ipcRenderer.invoke('open-local-path', target),
+  topooSession: () => ipcRenderer.invoke('topoo-session'),
+  topooSignIn: () => ipcRenderer.invoke('topoo-sign-in'),
+  topooSignOut: () => ipcRenderer.invoke('topoo-sign-out'),
+  onTopooSessionChanged: (callback: () => void) => { const listener = () => callback(); ipcRenderer.on('topoo-session-changed', listener); return () => ipcRenderer.removeListener('topoo-session-changed', listener); },
+  quickShare: (id: string, filePath: string, input: unknown) => ipcRenderer.invoke('quick-share', id, filePath, input),
+  cancelQuickShare: (id:string) => ipcRenderer.invoke('cancel-quick-share',id),
+  onQuickShareProgress: (callback:(value:{id:string;percentage:number})=>void) => { const listener=(_:unknown,value:{id:string;percentage:number})=>callback(value); ipcRenderer.on('quick-share-progress',listener); return()=>ipcRenderer.removeListener('quick-share-progress',listener); },
+  shareApi:(serviceUrl:string,method:string,path:string,body?:unknown)=>ipcRenderer.invoke('share-api',serviceUrl,method,path,body),
   getEditorPreferencesSync: () => {
     return ipcRenderer.sendSync('get-editor-preferences-sync')
   },
