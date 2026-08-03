@@ -402,6 +402,21 @@ const steps: AuditStep[] = [
     command: npmCommand,
     args: ["run", "audit:projects-presets"],
   },
+  {
+    id: "ios-device-capture",
+    command: npmCommand,
+    args: ["run", "audit:ios-device-capture"],
+  },
+  {
+    id: "export-share",
+    command: npmCommand,
+    args: ["run", "audit:export-share"],
+  },
+  {
+    id: "share-worker",
+    command: npmCommand,
+    args: ["run", "audit:share-worker"],
+  },
 ];
 
 const results: Array<{ id: string; status: "ok" | "failed"; exitCode: number | null }> = [];

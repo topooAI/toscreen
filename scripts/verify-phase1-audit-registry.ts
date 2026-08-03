@@ -87,6 +87,9 @@ const requiredAuditScripts = [
   "audit:preview-audio-render-settings",
   "audit:audio-captions",
   "audit:projects-presets",
+  "audit:ios-device-capture",
+  "audit:export-share",
+  "audit:share-worker",
   "audit:phase1-registry",
 ];
 

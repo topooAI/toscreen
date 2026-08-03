@@ -4,7 +4,7 @@
 审计对象：当前工作区 `/Users/viosson/AITD/1_PROJECTS/P28_TOSCREEN`
 对标范围：Screen Studio 官方 Guide 与 Changelog 中公开的录制、编辑、视觉包装、音频、字幕、项目和导出能力。
 
-当前集成基线：`codex/phase1-integration@a90e48d`
+当前集成基线：`codex/phase1-integration@4044623`
 
 实时更新规则：只有功能已合入集成分支，并由统筹 Session 完成独立验证后，才把对应行更新为 `Completed`；仅在执行 Agent 分支中完成、尚未合入或尚未验证的功能继续保持 `Not completed`。
 
@@ -21,15 +21,15 @@
 
 | 功能域 | Completed | Not completed | 当前判断 |
 |---|---:|---:|---|
-| 录制系统 | 11 | 1 | Display、Window、Area、Camera、音频设备与录制控制已形成闭环；iPhone/iPad 屏幕采集仍未完成 |
+| 录制系统 | 11 | 1 | Display、Window、Area、Camera、音频设备与录制控制已形成闭环；iPhone/iPad 有线屏幕采集已实现但缺少真机验收 |
 | 基础剪辑 | 10 | 0 | Split、删除、重排、变速、自动加速和 Undo/Redo 已进入统一时间映射 |
 | Focus 与光标 | 13 | 0 | Focus、光标可见性与点击演示效果已形成完整编辑闭环 |
 | 视觉包装 | 8 | 0 | Mask、Highlight、快捷键卡片和 Presenter 摄像头已进入预览与导出 |
 | 音频与字幕 | 7 | 1 | 双轨、内置音乐与完整字幕编辑已完成；自动转录等待真实语音端到端验收 |
-| 项目与预设 | 6 | 1 | Recent Projects、便携包与 Preset 已完成；Save As 等待系统对话框实机验收 |
-| 导出与分享 | 5 | 4 | 本地 MP4 导出主链存在，发布分享能力缺失 |
+| 项目与预设 | 7 | 0 | Save As、Recent Projects、便携包与 Preset 均已完成并通过实际文件验收 |
+| 导出与分享 | 8 | 1 | MP4、GIF、批量队列与原始素材提取已完成；在线分享仍待正式服务部署 |
 | 稳定性与验收 | 5 | 1 | 完整机器审计、控件 Wiring 与 Electron 直接启动契约已恢复绿色；真实用户整链验收仍待完成 |
-| **合计** | **65** | **8** | **录制、剪辑、Presentation、字幕与项目主链已基本集成，发布和最终验收仍在推进** |
+| **合计** | **69** | **4** | **本地产品主链已基本完成；剩余为真机录屏、自动转录端到端、在线分享部署和最终验收** |
 
 功能数量只是审计索引，不代表每项工作量相等。例如“字幕系统”明显比“增加一个导出选项”更大。
 
@@ -42,7 +42,7 @@
 | 3 | 鼠标、点击与输入事件采集 | Completed | 独立 sidecar 记录鼠标位置、点击和键盘输入事件 | 已能供光标渲染和 Auto Focus 使用 |
 | 4 | 单窗口录制 | Completed | 所选 Electron DesktopCapturer Window ID 会传给 ScreenCaptureKit 原生录制器并限制到目标窗口 | `audit:recording-session` 与 Recording contract 已通过 |
 | 5 | 自定义区域录制 | Completed | Area 入口提供跨显示器可拖动、可缩放的区域选择框，并传递绝对坐标到原生录制 | 已覆盖负坐标显示器与区域边界 |
-| 6 | iPhone / iPad 录制 | Not completed | 已能发现和使用 Continuity Camera 视频设备 | 这只覆盖 iPhone 作为摄像头，不等于 iPhone/iPad 屏幕采集；USB/设备屏幕录制协议仍未实现 |
+| 6 | iPhone / iPad 录制 | Not completed | 已实现 AVFoundation `.external` / `.muxed` 有线设备屏幕发现、状态、预览、录制、取消和 Editor 恢复链；Continuity Camera 不会冒充屏幕源 | universal helper 与无设备运行验证通过，但本机未发现有线 iPhone/iPad，尚缺至少 5 秒真机录制、锁屏/断开和恢复验收 |
 | 7 | 摄像头录制 | Completed | 可发现、预览和选择 Camera/Continuity Camera，并生成独立 Presenter Camera 素材和轨道 | Recording 与 Presentation 资产契约已联通 |
 | 8 | 麦克风选择、开关和电平 | Completed | 录制启动栏支持麦克风设备选择、开关、电平和权限状态 | 选择结果进入原生录制参数并生成独立麦克风素材 |
 | 9 | 系统音频选择与开关 | Completed | 录制前可独立开关系统音频，并在失败时返回明确状态 | 录制结果以独立系统音频素材恢复 |
@@ -116,7 +116,7 @@
 | 52 | 项目自动保存 | Completed | 编辑状态变化后 1 秒 debounce 保存 sidecar | 保存失败会写日志，但缺少用户恢复提示 |
 | 53 | 项目模型保存与恢复 | Completed | Focus、Trim、Annotation、Audio、Canvas、Cursor 等可以 roundtrip | 模型 smoke、restore 和 roundtrip 检查通过 |
 | 54 | 项目数据校验与兼容结构 | Completed | 有独立 validator、资产、轨道、Clip 与 Scene 模型 | 一部分第二阶段字段仅属于结构预留，不代表功能完成 |
-| 55 | Save As 和项目命名 | Not completed | 会在原视频附近保存 sidecar | 没有完整另存为、项目命名和目标文件夹流程 |
+| 55 | Save As 和项目命名 | Completed | 使用 macOS 系统保存对话框选择名称与目录，保存后标题、当前项目路径、自动保存和显式保存均切换到新文件 | 已实际验证覆盖确认、取消不切换路径、旧文件不再写入、退出后从 Recent 重开并恢复真实 MOV 与最新设置 |
 | 56 | Recent Projects 项目首页 | Completed | Electron 启动进入 Projects 首页，支持搜索、名称/时间/时长排序、打开、移除、确认删除、缺失/损坏/备份恢复状态和 Relink | 实际 Package Import 后关闭并从 Recent 重开成功；打开项目会恢复包内媒体，不沿用旧全局路径 |
 | 57 | 可移植项目包 | Completed | `.toscreenpkg` 包含 Project Model、用户素材、相对清单、SHA-256 与版本；导入先校验并通过临时目录原子迁移 | 实际 MOV 包导入后恢复 screen、proxy、系统音频、麦克风与 Presenter；拒绝 POSIX、Windows drive、UNC 和正反斜杠穿越 |
 | 58 | 创建、应用和分享 Preset | Completed | 可创建、更新、删除、应用和设为默认，并支持 `.toscreenpreset` 导入/导出 | Preset 只保存 Canvas、Export、Focus、Cursor、Click、Presentation、Caption 与 Layout 样式，不携带媒体和时间线；合入后 `audit:projects-presets` 通过 |
@@ -130,10 +130,10 @@
 | 61 | 预览与导出核心渲染设置一致 | Completed | 共用 Render Settings，背景、Focus、Cursor、Annotation 等传入导出 | `screenstudio-core-contract` 通过 |
 | 62 | 导出音频混合 | Completed | Audio Regions 会进入 Audio Mixer Exporter | Preview/Export 音频设置检查通过 |
 | 63 | 导出进度、取消和成功反馈 | Completed | 有进度条、取消按钮、错误和成功状态 | 仍需做大文件实际取消的破坏性回归 |
-| 64 | GIF 导出 | Not completed | Annotation 图片允许导入 GIF | 这不等于导出 GIF；当前导出器只提供视频成片 |
-| 65 | 批量导出 | Not completed | 单项目可以重复执行导出 | 没有队列、多尺寸、多项目批量导出 |
-| 66 | Quick Share、在线链接、私密链接和评论 | Not completed | 本地文件导出完成 | 没有上传服务、链接权限、观看页和评论系统 |
-| 67 | 提取原始录制文件 | Not completed | 原始 MOV、代理、音频和 sidecar 存在磁盘上 | 没有面向用户的一键提取或打开资源包入口 |
+| 64 | GIF 导出 | Completed | Export Dialog 支持范围、尺寸、FPS、循环、进度、取消、错误和保存，并使用真实 GIF 编码路径 | 独立验收生成 `GIF89a`、160×90、10 帧、1 秒的实际文件 |
+| 65 | 批量导出 | Completed | 串行队列支持当前项目、已保存项目和多个 Preset，并持久化任务状态 | 已验证串行执行、失败隔离、重试、取消和应用重启恢复 |
+| 66 | Quick Share、在线链接、私密链接和评论 | Not completed | Topoo Account、R2 multipart 断点上传、Public/Unlisted/Private、过期/撤销、分享历史、观看页和评论权限代码已合入，Worker 契约测试通过 | 尚未创建并绑定正式 D1/R2、配置 Topoo Auth 回调与生产域名，也未完成公网真实账号、上传、观看和评论验收，部署前不标 Completed |
+| 67 | 提取原始录制文件 | Completed | 用户可一键提取 screen、系统音频、麦克风、Presenter、cursor/click sidecar 和真实 project sidecar | 受控 role/type 清单会去重并逐项记录分类、状态、大小和 SHA-256；缺失素材显式报告，代理不会冒充原始文件 |
 
 ## 8. 稳定性、运行时与验收
 
@@ -156,7 +156,7 @@
 
 > iPhone/iPad 屏幕录制 → 内置音乐、自动转录和字幕 → Save As / Recent Projects / 便携项目包 / Preset → GIF / 批量导出 / Quick Share / 原始素材提取 → 最终真实用户整链验收。
 
-当前已有 **65 项明确完成能力**，还有 **8 项** 保持 `Not completed`。内置音乐、字幕、Recent Projects、便携项目包与 Preset 已合入并复验；自动转录 helper 已完成双架构，但仍需真实语音端到端验收，Save As 仍需系统保存对话框实机验收。
+当前已有 **69 项明确完成能力**，还有 **4 项** 保持 `Not completed`。Save As、GIF、批量导出和原始素材提取已合入并复验；剩余是 iPhone/iPad 真机录屏、自动转录真实语音端到端、Quick Share 正式服务部署，以及最终真实用户整链验收。
 
 ## 第一阶段建议顺序
 
