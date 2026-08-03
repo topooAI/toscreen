@@ -90,7 +90,8 @@
     "audit:preview-audio-render-settings": "tsx scripts/verify-preview-audio-render-settings.ts",
     "audit:presentation": "tsx scripts/verify-presentation-session.ts",
     "audit:presentation-ui": "tsx scripts/verify-presentation-ui-integration.ts",
-    "audit:focus-30-35": "tsx scripts/verify-focus-30-35.ts"
+    "audit:focus-30-35": "tsx scripts/verify-focus-30-35.ts",
+    "audit:presentation-recording-contract": "tsx scripts/verify-presentation-recording-contract.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

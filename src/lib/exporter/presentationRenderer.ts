@@ -27,7 +27,7 @@ export function renderPresentationEffects(ctx: CanvasRenderingContext2D, effects
     if (effect.kind === 'presenter') {
       if (!effect.visible) continue;
       const image = media.get(effect.id); if (!image) continue;
-      const x = effect.bounds.x / 100 * width, y = effect.bounds.y / 100 * height, w = effect.bounds.width / 100 * width, h = effect.bounds.height / 100 * height; ctx.save(); ctx.beginPath(); if (effect.shape === 'circle') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); else ctx.roundRect(x, y, w, h, 12); ctx.clip(); ctx.drawImage(image, x, y, w, h); ctx.restore();
+      const x = effect.bounds.x / 100 * width, y = effect.bounds.y / 100 * height, w = effect.bounds.width / 100 * width, h = effect.bounds.height / 100 * height; ctx.save(); ctx.globalAlpha = effect.opacity ?? 1; ctx.beginPath(); if (effect.shape === 'circle') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); else ctx.roundRect(x, y, w, h, 12); ctx.clip(); ctx.drawImage(image, x, y, w, h); ctx.restore();
       continue;
     }
     const sampledBounds = effect.kind === 'mask' ? sampleEffectBounds(effect, timeMs) : effect.bounds;

@@ -58,7 +58,9 @@ export interface CursorDataPoint {
   cy: number;
   isClick?: boolean;
   isPointerDown?: boolean;
-  type?: 'click' | 'mousedown' | 'mouseup' | 'drag' | 'move' | 'keydown' | 'wheel';
+  type?: 'click' | 'mousedown' | 'mouseup' | 'drag' | 'move' | 'keydown' | 'keyup' | 'wheel';
+  data?: { keycode?: number; heldKeycodes?: number[]; [key: string]: unknown };
+  modifiers?: { meta: boolean; ctrl: boolean; alt: boolean; shift: boolean };
   cursorType?: string;
 }
 

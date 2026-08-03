@@ -13,6 +13,7 @@ import type {
 import { resolveCursorStyle } from "../types";
 import { createInitialEditingDocument, type EditingDocument } from "../editing";
 import type { PresentationEffectRegion } from "../presentation/types";
+import { mergePresentationEffects, restorePresenterEffectsFromProjectModel } from './presenterContract';
 import type {
   ProjectAsset,
   ProjectClip,
@@ -476,9 +477,10 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
   const legacyMotionBlurEnabled = typeof project.legacyState?.motionBlurEnabled === "boolean"
     ? project.legacyState.motionBlurEnabled
     : undefined;
-  const presentationEffects = Array.isArray(project.legacyState?.presentationEffects)
+  const legacyPresentationEffects = Array.isArray(project.legacyState?.presentationEffects)
     ? project.legacyState.presentationEffects as PresentationEffectRegion[]
     : [];
+  const presentationEffects = mergePresentationEffects(legacyPresentationEffects, restorePresenterEffectsFromProjectModel(project));
   const autoFocusEnabled = project.legacyState?.autoFocusEnabled !== false;
 
   return {

@@ -25,10 +25,12 @@ export function clickProgress(points: CursorDataPoint[], timeMs: number, duratio
   return best;
 }
 
-const KEY_LABELS: Record<number, string> = { 8: '⌫', 9: '⇥', 13: '↵', 16: '⇧', 17: '⌃', 18: '⌥', 27: 'Esc', 32: 'Space', 91: '⌘', 93: '⌘' };
+const KEY_LABELS: Record<number, string> = { 1: 'Esc', 14: '⌫', 15: '⇥', 28: '↵', 57: 'Space', 8: '⌫', 9: '⇥', 13: '↵', 16: '⇧', 17: '⌃', 18: '⌥', 27: 'Esc', 32: 'Space', 91: '⌘', 93: '⌘' };
+const UIOHOOK_LETTERS: Record<number, string> = { 30: 'A', 48: 'B', 46: 'C', 32: 'D', 18: 'E', 33: 'F', 34: 'G', 35: 'H', 23: 'I', 36: 'J', 37: 'K', 38: 'L', 50: 'M', 49: 'N', 24: 'O', 25: 'P', 16: 'Q', 19: 'R', 31: 'S', 20: 'T', 22: 'U', 47: 'V', 17: 'W', 45: 'X', 21: 'Y', 44: 'Z' };
+export const keyLabelForCode = (code: number) => KEY_LABELS[code] ?? UIOHOOK_LETTERS[code] ?? (code >= 65 && code <= 90 ? String.fromCharCode(code) : `Key ${code}`);
 export function recordedShortcutEffects(points: Array<CursorDataPoint & { timestampMs?: number; data?: { keycode?: number } }>): PresentationEffectRegion[] {
   return points.filter(point => point.type === 'keydown' && Number.isFinite(point.data?.keycode)).map((point, index) => {
-    const code = Number(point.data?.keycode); const label = KEY_LABELS[code] ?? (code >= 65 && code <= 90 ? String.fromCharCode(code) : `Key ${code}`);
+    const code = Number(point.data?.keycode); const label = keyLabelForCode(code);
     const startMs = Number(point.timestamp ?? point.timestampMs ?? 0);
     const modifiers = (point as typeof point & { modifiers?: { meta?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean } }).modifiers;
     const keys = [...(modifiers?.meta ? ['⌘'] : []), ...(modifiers?.ctrl ? ['⌃'] : []), ...(modifiers?.alt ? ['⌥'] : []), ...(modifiers?.shift ? ['⇧'] : []), label];

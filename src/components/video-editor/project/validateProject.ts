@@ -1066,7 +1066,7 @@ function validateCursorPoint(value: unknown, label: string, errors: string[]) {
   }
   if (
     point.type !== undefined
-    && !isOneOf(point.type, ["click", "mousedown", "mouseup", "drag", "move", "keydown", "wheel"])
+    && !isOneOf(point.type, ["click", "mousedown", "mouseup", "drag", "move", "keydown", "keyup", "wheel"])
   ) {
     errors.push(`${label}.type is invalid.`);
   }

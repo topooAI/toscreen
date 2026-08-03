@@ -2,8 +2,9 @@ import { screen } from 'electron';
 import * as fs from 'fs/promises';
 import { uIOhook, UiohookMouseEvent } from 'uiohook-napi';
 import { NativeInputClock } from '../shared/cursorClock';
+import { updateHeldKeyState, type ModifierSnapshot } from '../shared/keyboardModifiers';
 
-export type EventType = 'click' | 'mousedown' | 'mouseup' | 'drag' | 'keydown' | 'wheel' | 'move';
+export type EventType = 'click' | 'mousedown' | 'mouseup' | 'drag' | 'keydown' | 'keyup' | 'wheel' | 'move';
 
 export interface MouseClickEvent {
     timestamp: number;  // milliseconds from recording start
@@ -15,6 +16,7 @@ export interface MouseClickEvent {
     cy: number;
     type: EventType;
     data?: any;         // optional metadata (e.g., keycode)
+    modifiers?: ModifierSnapshot;
 }
 
 export interface RecordingBounds {
@@ -36,6 +38,7 @@ class MouseTracker {
     private lastRecordedY = -1;
     private primaryButtonDown = false;
     private nativeClock = new NativeInputClock();
+    private heldKeycodes = new Set<number>();
 
     constructor() {
         this.handleInputCheck();
@@ -62,6 +65,7 @@ class MouseTracker {
         this.startTime = Date.now();
         this.events = [];
         this.nativeClock.reset();
+        this.heldKeycodes.clear();
 
         // If no bounds provided, use primary display dimensions
         if (bounds) {
@@ -82,6 +86,7 @@ class MouseTracker {
         this.lastRecordedX = initialPosition.x;
         this.lastRecordedY = initialPosition.y;
         this.primaryButtonDown = false;
+        this.heldKeycodes.clear();
 
         // Initialize uiohook
         this.startGlobalTracking();
@@ -221,13 +226,21 @@ class MouseTracker {
         uIOhook.on('keydown', (e) => {
             if (!this.isTracking) return;
             // Record typing at the current cursor position
+            const modifiers = updateHeldKeyState(this.heldKeycodes, 'keydown', e.keycode);
             this.addEvent(
                 this.lastX,
                 this.lastY,
                 'keydown',
-                { keycode: e.keycode },
+                { keycode: e.keycode, heldKeycodes: [...this.heldKeycodes] },
                 this.captureNativeEventTime(e.time),
+                modifiers,
             );
+        });
+
+        uIOhook.on('keyup', (e) => {
+            if (!this.isTracking) return;
+            const modifiers = updateHeldKeyState(this.heldKeycodes, 'keyup', e.keycode);
+            this.addEvent(this.lastX, this.lastY, 'keyup', { keycode: e.keycode, heldKeycodes: [...this.heldKeycodes] }, this.captureNativeEventTime(e.time), modifiers);
         });
 
         uIOhook.on('wheel', (e) => {
@@ -257,7 +270,7 @@ class MouseTracker {
         return this.nativeClock.observe(rawEventTime, Date.now(), process.platform) ?? undefined;
     }
 
-    addEvent(x: number, y: number, type: EventType, data?: any, nativeTimeMs?: number): void {
+    addEvent(x: number, y: number, type: EventType, data?: any, nativeTimeMs?: number, modifiers?: ModifierSnapshot): void {
         if (!this.isTracking || !this.recordingBounds) {
             return;
         }
@@ -280,17 +293,9 @@ class MouseTracker {
             cx,
             cy,
             type,
-            data
+            data,
+            modifiers,
         };
-
-        // Debouncing logic for keydown to prevent flooding
-        if (type === 'keydown') {
-            const lastEvent = this.events[this.events.length - 1];
-            if (lastEvent && lastEvent.type === 'keydown' && (timestamp - lastEvent.timestamp < 100)) {
-                // Too fast, maybe update last event data instead of pushing new one
-                return;
-            }
-        }
 
         this.events.push(event);
     }

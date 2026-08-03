@@ -13,7 +13,7 @@ export function PresentationToolbar({ timeMs, durationMs, effects, onAdd, onRemo
     { title: 'Hide Cursor', icon: EyeOff, add: () => onAdd({ ...span(), kind: 'cursor-visibility', visible: false }) },
     { title: 'Show Shortcut', icon: Keyboard, add: () => onAdd({ ...span(), kind: 'keystroke', keys: ['⌘', 'K'], placement: 'bottom', style: 'dark', durationMs: 900 }) },
     { title: 'Click Effect', icon: MousePointerClick, add: () => onAdd({ ...span(), kind: 'click-effect', style: 'ripple', intensity: 1, size: 1, soundEnabled: true, soundVolume: .7 }) },
-    { title: 'Presenter', icon: Video, add: () => onAdd({ ...span(), kind: 'presenter', bounds: { x: 76, y: 68, width: 18, height: 24 }, sourceStartMs: 0, shape: 'circle', visible: true, fit: 'cover' }) },
+    { title: 'Presenter', icon: Video, add: () => onAdd({ ...span(), kind: 'presenter', bounds: { x: 76, y: 68, width: 18, height: 24 }, sourceStartMs: 0, shape: 'circle', visible: true, opacity: 1, fit: 'cover' }) },
   ];
   return <div className="absolute right-2 top-2 z-[1000] flex gap-1 rounded-lg border border-white/10 bg-black/55 p-1 backdrop-blur-md">
     {buttons.map(({ title, icon: Icon, add }) => <Button key={title} type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/80 hover:bg-white/15 hover:text-white" title={title} aria-label={title} onClick={add}><Icon className="h-3.5 w-3.5" /></Button>)}

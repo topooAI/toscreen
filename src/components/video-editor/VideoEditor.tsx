@@ -56,6 +56,7 @@ import { createEditingRenderPlan } from './editing';
 import { PresentationToolbar } from './presentation/PresentationToolbar';
 import type { PresentationEffectRegion } from './presentation/types';
 import { recordedShortcutEffects } from './presentation/presentationEffects';
+import { presenterEffectFromCameraPath } from './project/presenterContract';
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -573,8 +574,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         editingSession.restore(restored.editingDocument);
         setAnnotationRegions(restored.annotationRegions);
         const restoredPresentation = restored.presentationEffects ?? [];
-        const cameraAsset = project.projectModel.assets?.find((asset: any) => asset.metadata?.role === 'camera' || asset.metadata?.sourceKind === 'camera');
-        setPresentationEffects(cameraAsset && !restoredPresentation.some(effect => effect.kind === 'presenter') ? [...restoredPresentation, { id: `presenter-${cameraAsset.id}`, kind: 'presenter', startMs: 0, endMs: project.projectModel.durationMs, sourceUrl: cameraAsset.filePath ? toFileUrl(cameraAsset.filePath) : cameraAsset.sourceUrl, posterDataUrl: cameraAsset.metadata?.posterDataUrl, sourceStartMs: Number(cameraAsset.metadata?.sourceStartMs ?? 0), shape: 'circle', bounds: { x: 76, y: 68, width: 18, height: 24 }, visible: true, fit: 'cover' } as PresentationEffectRegion] : restoredPresentation);
+        const cameraAsset = project.projectModel.assets?.find((asset: any) => asset.metadata?.role === 'camera' || asset.metadata?.role === 'presenter-camera' || asset.metadata?.sourceKind === 'camera');
+        setPresentationEffects(cameraAsset && !restoredPresentation.some(effect => effect.kind === 'presenter') ? [...restoredPresentation, { id: `presenter-${cameraAsset.id}`, kind: 'presenter', startMs: 0, endMs: project.projectModel.durationMs, sourceUrl: cameraAsset.filePath ? toFileUrl(cameraAsset.filePath) : cameraAsset.sourceUrl, posterDataUrl: cameraAsset.metadata?.posterDataUrl, sourceStartMs: Number(cameraAsset.metadata?.sourceStartMs ?? 0), shape: 'circle', bounds: { x: 76, y: 68, width: 18, height: 24 }, visible: true, opacity: 1, fit: 'cover' } as PresentationEffectRegion] : restoredPresentation);
         setAudioRegions(restored.audioRegions);
         setCropRegion(restored.cropRegion);
         setWallpaper(restored.wallpaper);
@@ -613,7 +614,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     }
     if (project.annotationRegions) setAnnotationRegions(project.annotationRegions);
     if (Array.isArray(project.presentationEffects)) setPresentationEffects(project.presentationEffects);
-    else if (project.cameraSourceUrl || project.cameraPosterDataUrl) setPresentationEffects([{ id: 'presenter-recording', kind: 'presenter', startMs: 0, endMs: Math.round((project.projectDurationSeconds ?? project.duration ?? 0) * 1000), sourceUrl: project.cameraSourceUrl, posterDataUrl: project.cameraPosterDataUrl, sourceStartMs: Number(project.cameraSourceStartMs ?? 0), shape: 'circle', bounds: { x: 76, y: 68, width: 18, height: 24 }, visible: true, fit: 'cover' }]);
+    else if (project.cameraSourceUrl || project.cameraPosterDataUrl) setPresentationEffects([{ id: 'presenter-recording', kind: 'presenter', startMs: 0, endMs: Math.round((project.projectDurationSeconds ?? project.duration ?? 0) * 1000), sourceUrl: project.cameraSourceUrl, posterDataUrl: project.cameraPosterDataUrl, sourceStartMs: Number(project.cameraSourceStartMs ?? 0), shape: 'circle', bounds: { x: 76, y: 68, width: 18, height: 24 }, visible: true, opacity: 1, fit: 'cover' }]);
     if (project.audioRegions) {
       const restoredAudio = project.audioRegions.map((ar: any) => ({
         ...ar,
@@ -739,6 +740,11 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
               });
             }
           }
+          const livePresenter = presenterEffectFromCameraPath((result as any).cameraPath, Number((result as any).durationMs ?? (result as any).cameraDurationMs ?? 1), []);
+          if (livePresenter) setPresentationEffects(current => {
+            const deduped = presenterEffectFromCameraPath((result as any).cameraPath, livePresenter.endMs, current);
+            return deduped ? [...current, deduped] : current;
+          });
         } else {
           setError('No recordings found. Please start a new recording to begin editing.');
         }

@@ -8,6 +8,6 @@ export type PresentationEffectRegion =
   | (TimedEffect & { kind: 'cursor-visibility'; visible: boolean })
   | (TimedEffect & { kind: 'click-effect'; style: RippleStyle; intensity: number; size: number; soundEnabled: boolean; soundVolume: number })
   | (TimedEffect & { kind: 'keystroke'; keys: string[]; placement: 'bottom' | 'center' | 'top-left' | 'top-right'; style: 'dark' | 'light' | 'accent'; durationMs: number })
-  | (TimedEffect & { kind: 'presenter'; sourceUrl?: string; posterDataUrl?: string; sourceStartMs: number; shape: 'circle' | 'rectangle'; bounds: PresentationBounds; visible: boolean; fit: 'cover' | 'contain' });
+  | (TimedEffect & { kind: 'presenter'; sourceUrl?: string; posterDataUrl?: string; sourceStartMs: number; shape: 'circle' | 'rectangle'; bounds: PresentationBounds; visible: boolean; opacity: number; fit: 'cover' | 'contain' });
 
 export const DEFAULT_PRESENTATION_BOUNDS: PresentationBounds = { x: 35, y: 35, width: 30, height: 20 };
