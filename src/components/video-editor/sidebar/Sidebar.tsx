@@ -1,31 +1,42 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
-import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/button";
-import { Bug, Crop, Download, Star, X } from "lucide-react";
-import type { ZoomDepth, CropRegion, AnnotationRegion, AnnotationType } from "../types";
+import { Switch } from "../../ui/switch";
+import {
+    Check,
+    ChevronDown,
+    Crop,
+    Scissors,
+    X,
+} from "lucide-react";
+import type { ZoomDepth, CropRegion, AnnotationRegion, AnnotationType, CursorCustomImageMap, CursorStylePreset, CameraMotionPreset } from "../types";
 import { CropControl } from "../CropControl";
 import { AnnotationSettingsPanel } from "../AnnotationSettingsPanel";
-import { type AspectRatio } from "../../../utils/aspectRatioUtils";
-import type { ExportQuality } from "../../../lib/exporter";
+import { type AspectRatio, getAspectRatioLabel } from "../../../utils/aspectRatioUtils";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "../../ui/dropdown-menu";
 
 import { BackgroundControls } from "./BackgroundControls";
 import { LayoutControls } from "./LayoutControls";
 import { ZoomControls } from "./ZoomControls";
 import { CursorControls } from "./CursorControls";
+import { CameraMotionControls } from "./CameraMotionControls";
 
 interface SidebarProps {
     selected: string;
     onWallpaperChange: (path: string) => void;
-    // Zoom props
     selectedZoomDepth?: ZoomDepth | null;
     onZoomDepthChange?: (depth: ZoomDepth) => void;
     selectedZoomId?: string | null;
     onZoomDelete?: (id: string) => void;
-    // Trim props
+    selectedCameraMotion?: CameraMotionPreset | null;
+    onCameraMotionChange?: (motion: CameraMotionPreset) => void;
     selectedTrimId?: string | null;
     onTrimDelete?: (id: string) => void;
-    // Layout props
     padding?: number;
     onPaddingChange?: (padding: number) => void;
     borderRadius?: number;
@@ -36,16 +47,12 @@ interface SidebarProps {
     onMotionBlurChange?: (enabled: boolean) => void;
     showBlur?: boolean;
     onBlurChange?: (showBlur: boolean) => void;
-    // Crop props
     cropRegion?: CropRegion;
     onCropChange?: (region: CropRegion) => void;
     aspectRatio: AspectRatio;
+    onAspectRatioChange?: (aspectRatio: AspectRatio) => void;
     videoElement?: HTMLVideoElement | null;
-    // Export props
-    exportQuality?: ExportQuality;
-    onExportQualityChange?: (quality: ExportQuality) => void;
     onExport?: () => void;
-    // Annotation props
     selectedAnnotationId?: string | null;
     annotationRegions?: AnnotationRegion[];
     onAnnotationContentChange?: (id: string, content: string) => void;
@@ -53,18 +60,18 @@ interface SidebarProps {
     onAnnotationStyleChange?: (id: string, style: Partial<AnnotationRegion['style']>) => void;
     onAnnotationFigureDataChange?: (id: string, figureData: any) => void;
     onAnnotationDelete?: (id: string) => void;
-    // Actions
-    onAutoZoom?: () => void;
-    // Cursor props
     cursorSize?: number;
     onCursorSizeChange?: (size: number) => void;
     cursorSmoothing?: boolean;
     onCursorSmoothingChange?: (smooth: boolean) => void;
     showVectorCursor?: boolean;
     onShowVectorCursorChange?: (show: boolean) => void;
+    cursorStyle?: CursorStylePreset;
+    onCursorStyleChange?: (style: CursorStylePreset) => void;
+    cursorCustomImages?: CursorCustomImageMap;
+    onCursorCustomImagesChange?: (images: CursorCustomImageMap) => void;
     cursorOffset?: number;
     onCursorOffsetChange?: (offset: number) => void;
-    // Video Clip select & detach
     selectedVideoId?: string | null;
     onSelectVideo?: (id: string | null) => void;
     onSeparateAudio?: () => void;
@@ -73,17 +80,105 @@ interface SidebarProps {
     hasOriginalAudio?: boolean;
 }
 
+const ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1', '4:3', '4:5'];
+
 export function Sidebar(props: SidebarProps) {
     const [showCropDropdown, setShowCropDropdown] = useState(false);
 
-    // 1. Handle Annotation View State
     const selectedAnnotation = props.selectedAnnotationId
-        ? props.annotationRegions?.find(a => a.id === props.selectedAnnotationId)
+        ? props.annotationRegions?.find((annotation) => annotation.id === props.selectedAnnotationId)
         : null;
 
+    const header = (title: string) => (
+        <div className="h-11 shrink-0 flex items-center justify-between px-3 border-b border-[var(--ui-border)]">
+            <span className="text-[12px] font-semibold text-[var(--ui-text-primary)]">{title}</span>
+            <Button
+                type="button"
+                onClick={props.onExport}
+                className="h-[26px] rounded-[5px] bg-[#0D99FF] px-3 text-[12px] font-semibold text-white shadow-none hover:bg-[#0B87E3] active:bg-[#0878CC] transition-colors"
+            >
+                Export
+            </Button>
+        </div>
+    );
+
+    const cropOverlay = showCropDropdown && props.cropRegion && props.onCropChange ? (
+        <>
+            <div
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 animate-in fade-in duration-200"
+                onClick={() => setShowCropDropdown(false)}
+            />
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[60] bg-[var(--ui-inspector-surface)] backdrop-blur-2xl rounded-lg shadow-2xl border border-[var(--ui-border)] p-6 w-[90vw] max-w-5xl max-h-[90vh] overflow-auto animate-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between mb-5">
+                    <div>
+                        <span className="text-[15px] font-semibold text-[var(--ui-text-primary)]">Crop Video</span>
+                        <p className="text-[11px] text-[var(--ui-text-tertiary)] mt-1">Drag each edge to adjust the visible source area.</p>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowCropDropdown(false)}
+                        className="h-7 w-7 text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)] hover:text-[var(--ui-text-primary)]"
+                    >
+                        <X className="w-4 h-4" />
+                    </Button>
+                </div>
+                <CropControl
+                    videoElement={props.videoElement || null}
+                    cropRegion={props.cropRegion}
+                    onCropChange={props.onCropChange}
+                    aspectRatio={props.aspectRatio}
+                />
+                <div className="mt-5 flex justify-end">
+                    <Button
+                        onClick={() => setShowCropDropdown(false)}
+                        className="h-8 rounded-[5px] bg-[#0D99FF] px-4 text-[11px] text-white hover:bg-[#0B87E3]"
+                    >
+                        Done
+                    </Button>
+                </div>
+            </div>
+        </>
+    ) : null;
+
+    const inspector = (
+        title: string,
+        content: ReactNode,
+        options?: { contentClassName?: string },
+    ) => (
+        <div className="ui-glass-surface flex-[2] min-w-0 bg-[var(--ui-inspector-surface)] border border-[var(--ui-border)] rounded-lg flex flex-col h-full overflow-hidden">
+            {header(title)}
+            <div className={options?.contentClassName ?? "flex-1 min-h-0 overflow-y-auto custom-scrollbar"}>
+                {content}
+            </div>
+            {cropOverlay}
+        </div>
+    );
+
+    const cursorInspector = (
+        <section className="px-4 py-3 border-t border-[var(--ui-border)]">
+            <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Cursor</h3>
+            <CursorControls
+                cursorSize={props.cursorSize}
+                onCursorSizeChange={props.onCursorSizeChange}
+                cursorSmoothing={props.cursorSmoothing}
+                onCursorSmoothingChange={props.onCursorSmoothingChange}
+                showVectorCursor={props.showVectorCursor}
+                onShowVectorCursorChange={props.onShowVectorCursorChange}
+                cursorStyle={props.cursorStyle}
+                onCursorStyleChange={props.onCursorStyleChange}
+                cursorCustomImages={props.cursorCustomImages}
+                onCursorCustomImagesChange={props.onCursorCustomImagesChange}
+                cursorOffset={props.cursorOffset}
+                onCursorOffsetChange={props.onCursorOffsetChange}
+            />
+        </section>
+    );
+
     if (selectedAnnotation && props.onAnnotationContentChange && props.onAnnotationTypeChange && props.onAnnotationStyleChange && props.onAnnotationDelete) {
-        return (
-            <div className="flex-[2] min-w-0 bg-[#09090b] border border-white/5 rounded-2xl flex flex-col shadow-xl h-full overflow-hidden">
+        return inspector(
+            'Annotation',
+            <>
                 <AnnotationSettingsPanel
                     annotation={selectedAnnotation}
                     onContentChange={(content) => props.onAnnotationContentChange!(selectedAnnotation.id, content)}
@@ -92,251 +187,169 @@ export function Sidebar(props: SidebarProps) {
                     onFigureDataChange={props.onAnnotationFigureDataChange ? (figureData) => props.onAnnotationFigureDataChange!(selectedAnnotation.id, figureData) : undefined}
                     onDelete={() => props.onAnnotationDelete!(selectedAnnotation.id)}
                 />
-            </div>
+                {cursorInspector}
+            </>,
         );
     }
 
-    // 1.5 Handle Video Clip Select & Audio Detachment Panel
     if ((props.selectedVideoId || props.isOriginalAudioSelected) && props.onSelectVideo) {
-        return (
-            <div className="flex-[2] min-w-0 bg-[#09090b] border border-white/5 rounded-2xl flex flex-col shadow-xl h-full overflow-hidden p-5 space-y-6">
-                <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                    <span className="text-sm font-semibold text-white/90">Main Clip 属性</span>
-                    <Button 
-                        onClick={() => {
-                            props.onSelectVideo?.(null);
-                            props.onSelectAudio?.(null);
-                        }}
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-slate-400 hover:text-white"
-                    >
-                        <X className="w-4 h-4" />
-                    </Button>
-                </div>
-                
-                <div className="space-y-4 flex-1">
-                    <div className="space-y-1">
-                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">片段状态</span>
-                        <p className="text-xs text-slate-300">选中的是视频主轨片段 (Main Track Clip)</p>
-                    </div>
-                    
-                    {props.hasOriginalAudio && props.onSeparateAudio && (
-                        <div className="space-y-3 pt-4 border-t border-white/5 animate-in fade-in duration-200">
-                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">音频分离</span>
-                            <p className="text-xs text-slate-400 leading-relaxed">
-                                当前原声音频已“手风琴式”挂载在视频片段顶部。您可以点击分离音频，将其解绑并下沉到独立的下方轨道以进行自由的异步剪辑。
-                            </p>
-                            <Button
-                                onClick={props.onSeparateAudio}
-                                variant="outline"
-                                className="w-full gap-2 bg-[#FF00B7]/10 text-[#FF00B7] border-[#FF00B7]/20 hover:bg-[#FF00B7]/20 hover:border-[#FF00B7]/30 transition-all h-10 font-semibold text-xs rounded-xl"
-                            >
-                                <Star className="w-3.5 h-3.5 fill-[#FF00B7]" />
-                                分离音频 (Separate Audio)
-                            </Button>
-                        </div>
-                    )}
-                </div>
-            </div>
+        const isAudio = Boolean(props.isOriginalAudioSelected && !props.selectedVideoId);
+        return inspector(
+            isAudio ? 'Audio' : 'Video',
+            <>
+                {!isAudio && (
+                    <section className="px-4 py-3">
+                        <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Source</h3>
+                        <Button
+                            onClick={() => setShowCropDropdown(true)}
+                            variant="outline"
+                            className="w-full justify-start gap-2 h-8 rounded-[5px] bg-[var(--ui-control)] text-[12px] text-[var(--ui-text-secondary)] border border-transparent shadow-none hover:border-[var(--ui-border)] hover:bg-[var(--ui-control-hover)]"
+                        >
+                            <Crop className="w-3.5 h-3.5" strokeWidth={1.6} />
+                            Crop
+                        </Button>
+                    </section>
+                )}
+                {props.hasOriginalAudio && props.onSeparateAudio && (
+                    <section className={`px-4 py-3 ${isAudio ? '' : 'border-t border-[var(--ui-border)]'}`}>
+                        <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Audio</h3>
+                        <Button
+                            onClick={props.onSeparateAudio}
+                            variant="outline"
+                            className="w-full justify-start gap-2 h-8 rounded-[5px] bg-[var(--ui-control)] text-[12px] text-[var(--ui-text-secondary)] border border-transparent shadow-none hover:border-[var(--ui-border)] hover:bg-[var(--ui-control-hover)]"
+                        >
+                            <Scissors className="w-3.5 h-3.5" strokeWidth={1.6} />
+                            Separate Original Audio
+                        </Button>
+                    </section>
+                )}
+                {cursorInspector}
+            </>,
         );
     }
 
-    // 2. Main Sidebar Layout
-    return (
-        <div className="flex-[2] min-w-0 bg-[#09090b] border border-white/5 rounded-2xl flex flex-col shadow-xl h-full overflow-hidden">
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-8">
+    if (props.selectedZoomId && props.selectedCameraMotion) {
+        return inspector(
+            '运镜',
+            <section className="px-4 py-3">
+                <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-3">Camera Motion</h3>
+                <CameraMotionControls
+                    value={props.selectedCameraMotion}
+                    onChange={(motion) => props.onCameraMotionChange?.(motion)}
+                    onDelete={() => props.onZoomDelete?.(props.selectedZoomId!)}
+                />
+            </section>,
+        );
+    }
 
-                {/* Section: Zoom Controls */}
-                <section>
-                    <h3 className="text-sm font-semibold text-white/90 mb-4 flex items-center gap-2">
-                        Zoom & Focus
-                    </h3>
+    if (props.selectedZoomId) {
+        return inspector(
+            'Focus',
+            <>
+                <section className="px-4 py-3">
+                    <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Zoom</h3>
                     <ZoomControls
                         selectedZoomDepth={props.selectedZoomDepth}
                         onZoomDepthChange={props.onZoomDepthChange}
                         selectedZoomId={props.selectedZoomId}
                         onZoomDelete={props.onZoomDelete}
-                        onAutoZoom={props.onAutoZoom}
                     />
                 </section>
-
-                <div className="h-px bg-white/5 w-full" />
-
-                {/* Section: Cursor Settings */}
-                <section>
-                    <h3 className="text-sm font-semibold text-white/90 mb-4 flex items-center gap-2">
-                        Cursor Settings
-                    </h3>
-                    <CursorControls
-                        cursorSize={props.cursorSize}
-                        onCursorSizeChange={props.onCursorSizeChange}
-                        cursorSmoothing={props.cursorSmoothing}
-                        onCursorSmoothingChange={props.onCursorSmoothingChange}
-                        showVectorCursor={props.showVectorCursor}
-                        onShowVectorCursorChange={props.onShowVectorCursorChange}
-                        cursorOffset={props.cursorOffset}
-                        onCursorOffsetChange={props.onCursorOffsetChange}
-                    />
+                <section className="border-t border-[var(--ui-border)] px-4 py-3">
+                    <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Motion</h3>
+                    <div className="flex min-h-8 items-center justify-between">
+                        <span className="text-[12px] font-medium text-[var(--ui-text-secondary)]">Motion Blur</span>
+                        <Switch
+                            switchSize="sm"
+                            checked={props.motionBlurEnabled}
+                            onCheckedChange={props.onMotionBlurChange}
+                            className="data-[state=checked]:bg-[#0D99FF]"
+                        />
+                    </div>
                 </section>
+                {cursorInspector}
+            </>,
+        );
+    }
 
-                <div className="h-px bg-white/5 w-full" />
-
-                {/* Section: Appearance */}
-                <section>
-                    <h3 className="text-sm font-semibold text-white/90 mb-4">Background</h3>
-                    <BackgroundControls
-                        selected={props.selected}
-                        onWallpaperChange={props.onWallpaperChange}
-                        showBlur={props.showBlur}
-                        onBlurChange={props.onBlurChange}
-                    />
-                </section>
-
-                <div className="h-px bg-white/5 w-full" />
-
-                {/* Section: Layout */}
-                <section>
-                    <h3 className="text-sm font-semibold text-white/90 mb-4">Layout & Effects</h3>
-                    <LayoutControls
-                        padding={props.padding}
-                        onPaddingChange={props.onPaddingChange}
-                        borderRadius={props.borderRadius}
-                        onBorderRadiusChange={props.onBorderRadiusChange}
-                        shadowIntensity={props.shadowIntensity}
-                        onShadowChange={props.onShadowChange}
-                        motionBlurEnabled={props.motionBlurEnabled}
-                        onMotionBlurChange={props.onMotionBlurChange}
-                    />
-                </section>
-
-                <div className="h-px bg-white/5 w-full" />
-
-                {/* Section: Video Actions */}
-                <section className="space-y-4">
-                    <h3 className="text-sm font-semibold text-white/90 mb-2">Video Actions</h3>
-
-                    {/* Crop Trigger */}
+    if (props.selectedTrimId) {
+        return inspector(
+            'Trim',
+            <>
+                <section className="px-4 py-3">
+                    <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Region</h3>
                     <Button
-                        onClick={() => setShowCropDropdown(!showCropDropdown)}
-                        variant="outline"
-                        className="w-full gap-2 bg-white/5 text-slate-200 border-white/10 hover:bg-white/10 hover:border-white/20 hover:text-white h-9 transition-all"
+                        onClick={() => props.onTrimDelete?.(props.selectedTrimId!)}
+                        variant="destructive"
+                        className="w-full justify-start gap-2 h-8 rounded-[5px] bg-red-500/8 text-red-500 border border-red-500/15 hover:bg-red-500/12"
                     >
-                        <Crop className="w-4 h-4" />
-                        Crop Video
+                        <X className="w-3.5 h-3.5" />
+                        Delete Trim Region
                     </Button>
-
-                    {/* Trim Delete (Contextual) */}
-                    {props.selectedTrimId && (
-                        <Button
-                            onClick={() => props.onTrimDelete?.(props.selectedTrimId!)}
-                            variant="destructive"
-                            size="sm"
-                            className="w-full gap-2 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30 transition-all"
-                        >
-                            <X className="w-4 h-4" />
-                            Delete Trim Region
-                        </Button>
-                    )}
                 </section>
-            </div>
+                {cursorInspector}
+            </>,
+        );
+    }
 
-            {/* Footer / Export */}
-            <div className="p-5 border-t border-white/5 bg-[#09090b]">
-                <div className="mb-3 flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-400">Export Quality</span>
-                </div>
-                <div className="mb-4 bg-white/5 border border-white/5 p-1 w-full grid grid-cols-3 h-auto rounded-xl">
-                    {(['medium', 'good', 'source'] as const).map((q) => (
-                        <button
-                            key={q}
-                            onClick={() => props.onExportQualityChange?.(q)}
-                            className={cn(
-                                "py-2 rounded-lg transition-all text-xs font-medium capitalize",
-                                props.exportQuality === q
-                                    ? "bg-white text-black shadow-sm"
-                                    : "text-slate-400 hover:text-slate-200"
-                            )}
-                        >
-                            {q === 'source' ? 'High' : q}
-                        </button>
-                    ))}
-                </div>
-
-                <Button
-                    type="button"
-                    size="lg"
-                    onClick={props.onExport}
-                    className="w-full py-6 text-lg font-semibold flex items-center justify-center gap-3 bg-[#34B27B] text-white rounded-xl shadow-lg shadow-[#34B27B]/20 hover:bg-[#34B27B]/90 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-                >
-                    <Download className="w-5 h-5" />
-                    <span>Export Video</span>
-                </Button>
-
-                <div className="flex gap-2 mt-4 pt-2">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            window.electronAPI?.openExternalUrl('https://github.com/siddharthvaddem/openscreen/issues/new/choose');
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 text-[10px] text-slate-500 hover:text-slate-300 py-2 transition-colors"
-                    >
-                        <Bug className="w-3 h-3" />
-                        <span>Report Bug</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            window.electronAPI?.openExternalUrl('https://github.com/siddharthvaddem/openscreen');
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
-                    >
-                        <Star className="w-3 h-3" />
-                        <span>Star on GitHub</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Crop Overlay */}
-            {showCropDropdown && props.cropRegion && props.onCropChange && (
-                <>
-                    <div
-                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 animate-in fade-in duration-200"
-                        onClick={() => setShowCropDropdown(false)}
-                    />
-                    <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[60] bg-[#09090b] rounded-2xl shadow-2xl border border-white/10 p-8 w-[90vw] max-w-5xl max-h-[90vh] overflow-auto animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between mb-6">
-                            <div>
-                                <span className="text-xl font-bold text-slate-200">Crop Video</span>
-                                <p className="text-sm text-slate-400 mt-2">Drag on each side to adjust the crop area</p>
-                            </div>
+    const canvasInspector = (
+        <>
+            <section className="px-4 py-3">
+                <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Frame</h3>
+                <div className="grid grid-cols-[1fr_112px] items-center gap-3">
+                    <span className="text-[12px] font-medium text-[var(--ui-text-secondary)]">Aspect Ratio</span>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                             <Button
                                 variant="ghost"
-                                size="icon"
-                                onClick={() => setShowCropDropdown(false)}
-                                className="hover:bg-white/10 text-slate-400 hover:text-white"
+                                className="h-7 justify-between rounded-[5px] bg-[var(--ui-control)] px-2 text-[12px] text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)]"
                             >
-                                <X className="w-5 h-5" />
+                                {getAspectRatioLabel(props.aspectRatio)}
+                                <ChevronDown className="h-3 w-3 text-[var(--ui-text-tertiary)]" />
                             </Button>
-                        </div>
-                        <CropControl
-                            videoElement={props.videoElement || null}
-                            cropRegion={props.cropRegion}
-                            onCropChange={props.onCropChange}
-                            aspectRatio={props.aspectRatio}
-                        />
-                        <div className="mt-6 flex justify-end">
-                            <Button
-                                onClick={() => setShowCropDropdown(false)}
-                                size="lg"
-                                className="bg-[#34B27B] hover:bg-[#34B27B]/90 text-white"
-                            >
-                                Done
-                            </Button>
-                        </div>
-                    </div>
-                </>
-            )}
-        </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                            align="end"
+                            sideOffset={4}
+                            className="toscreen-dropdown-menu z-[200] w-[160px] min-w-[160px] rounded-[8px] border-0 p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.18),0_2px_8px_rgba(0,0,0,0.1)] outline-none"
+                        >
+                            {ASPECT_RATIOS.map((ratio) => (
+                                <DropdownMenuItem
+                                    key={ratio}
+                                    onClick={() => props.onAspectRatioChange?.(ratio)}
+                                    className="h-8 rounded-[5px] px-2.5 text-[12px] text-[var(--ui-text-secondary)] focus:bg-[var(--ui-control-hover)] focus:text-[var(--ui-text-primary)]"
+                                >
+                                    <span className="flex-1">{getAspectRatioLabel(ratio)}</span>
+                                    {props.aspectRatio === ratio && <Check className="h-3 w-3 text-[#0D99FF]" />}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </section>
+            {cursorInspector}
+            <section className="border-t border-[var(--ui-border)] px-4 py-3">
+                <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Background</h3>
+                <BackgroundControls
+                    selected={props.selected}
+                    onWallpaperChange={props.onWallpaperChange}
+                    showBlur={props.showBlur}
+                    onBlurChange={props.onBlurChange}
+                />
+            </section>
+            <section className="border-t border-[var(--ui-border)] px-4 py-3">
+                <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Recording</h3>
+                <LayoutControls
+                    padding={props.padding}
+                    onPaddingChange={props.onPaddingChange}
+                    borderRadius={props.borderRadius}
+                    onBorderRadiusChange={props.onBorderRadiusChange}
+                    shadowIntensity={props.shadowIntensity}
+                    onShadowChange={props.onShadowChange}
+                />
+            </section>
+        </>
     );
+
+    return inspector('Canvas', canvasInspector);
 }

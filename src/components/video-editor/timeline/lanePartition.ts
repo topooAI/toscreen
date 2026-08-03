@@ -8,6 +8,8 @@ export interface TimelineLaneAssignment<T extends TimelineLaneItem> {
   trackIndex: number;
 }
 
+const LANE_TOUCH_TOLERANCE_MS = 2;
+
 export function partitionIntoTimelineLanes<T extends TimelineLaneItem>(
   items: readonly T[],
 ): TimelineLaneAssignment<T>[] {
@@ -23,13 +25,12 @@ export function partitionIntoTimelineLanes<T extends TimelineLaneItem>(
   const assignments: TimelineLaneAssignment<T>[] = [];
 
   for (const { item } of sorted) {
-    const reusableLaneIndex = laneEndMs.findIndex((endMs) => item.startMs >= endMs);
+    const reusableLaneIndex = laneEndMs.findIndex((endMs) => item.startMs >= endMs - LANE_TOUCH_TOLERANCE_MS);
     const trackIndex = reusableLaneIndex >= 0 ? reusableLaneIndex : laneEndMs.length;
 
-    laneEndMs[trackIndex] = item.endMs;
+    laneEndMs[trackIndex] = Math.max(laneEndMs[trackIndex] ?? Number.NEGATIVE_INFINITY, item.endMs);
     assignments.push({ item, trackIndex });
   }
 
   return assignments;
 }
-

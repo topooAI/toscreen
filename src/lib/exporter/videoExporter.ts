@@ -5,7 +5,7 @@ import { VideoMuxer } from './muxer';
 import { AudioMixerExporter } from './audioMixerExporter';
 import { AudioEncoderWrapper } from './audioEncoder';
 import { resolveExportDurationSeconds } from './duration';
-import type { ZoomRegion, CropRegion, TrimRegion, AnnotationRegion, AudioRegion } from '@/components/video-editor/types';
+import type { ZoomRegion, CropRegion, TrimRegion, AnnotationRegion, AudioRegion, CursorCustomImageMap, CursorStylePreset } from '@/components/video-editor/types';
 
 interface VideoExporterConfig extends ExportConfig {
   videoUrl: string;
@@ -29,6 +29,8 @@ interface VideoExporterConfig extends ExportConfig {
   cursorSize?: number;
   cursorSmoothing?: boolean;
   showVectorCursor?: boolean;
+  cursorStyle?: CursorStylePreset;
+  cursorCustomImages?: CursorCustomImageMap;
   cursorOffset?: number;
   onProgress?: (progress: ExportProgress) => void;
 }
@@ -100,7 +102,10 @@ export class VideoExporter {
         cursorSize: this.config.cursorSize,
         cursorSmoothing: this.config.cursorSmoothing,
         showVectorCursor: this.config.showVectorCursor,
+        cursorStyle: this.config.cursorStyle,
+        cursorCustomImages: this.config.cursorCustomImages,
         cursorOffset: this.config.cursorOffset,
+        cursorMediaDurationMs: videoInfo.duration * 1000,
       });
       await this.renderer.initialize();
 

@@ -7,15 +7,41 @@ const require = createRequire(import.meta.url)
 // Dynamically import node-mac-recorder to support graceful degradation on non-macOS platforms
 let MacRecorder: any = null
 let recorderInstance: any = null
+let nativeBinding: any = null
 
 try {
   MacRecorder = require('node-mac-recorder')
+  try {
+    const recorderEntry = require.resolve('node-mac-recorder')
+    nativeBinding = require(path.join(path.dirname(recorderEntry), 'build', 'Release', 'mac_recorder.node'))
+  } catch (bindingError) {
+    console.warn('[NativeRecorder] Video start clock is unavailable:', (bindingError as Error).message)
+  }
 } catch (e) {
   console.warn('[NativeRecorder] node-mac-recorder not available on this platform:', (e as Error).message)
 }
 
 let isRecording = false
 let currentOutputPath: string | null = null
+let currentVideoStartTime: number | null = null
+
+async function readVideoStartTime(
+  minimumStartTime: number,
+  timeoutMs = 2500,
+): Promise<number | null> {
+  if (!nativeBinding?.getVideoStartTimestamp) return null
+
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() <= deadline) {
+    const timestamp = Number(nativeBinding.getVideoStartTimestamp())
+    // ScreenCaptureKit resets asynchronously. During that window the native
+    // binding can still expose the previous session's first-frame timestamp.
+    if (Number.isFinite(timestamp) && timestamp >= minimumStartTime) return timestamp
+    await new Promise(resolve => setTimeout(resolve, 16))
+  }
+
+  return null
+}
 
 /**
  * Check if native ScreenCaptureKit recording is available on this platform.
@@ -35,7 +61,7 @@ export async function startNativeRecording(options?: {
   showCursor?: boolean
   fps?: number
   displayId?: number
-}): Promise<{ success: boolean; outputPath?: string; error?: string }> {
+}): Promise<{ success: boolean; outputPath?: string; videoStartTime?: number; error?: string }> {
   if (!MacRecorder) {
     return { success: false, error: 'node-mac-recorder is not available on this platform' }
   }
@@ -60,19 +86,33 @@ export async function startNativeRecording(options?: {
       includeSystemAudio: true,
     })
 
+    const detectedVideoStartTime = await readVideoStartTime(timestamp)
+    // A first encoded frame cannot predate the call that started this session.
+    // Some macOS host-clock conversions report a small negative offset; the
+    // filename/session timestamp is the authoritative lower bound shared by
+    // node-mac-recorder's cursor sidecar.
+    currentVideoStartTime = detectedVideoStartTime && detectedVideoStartTime >= timestamp
+      ? detectedVideoStartTime
+      : timestamp
     isRecording = true
 
     console.log(`[NativeRecorder] Recording started → ${currentOutputPath}`, {
       captureCursor: options?.showCursor ?? false,
       fps: options?.fps ?? 60,
       displayId: options?.displayId ?? null,
+      videoStartTime: currentVideoStartTime,
     })
 
-    return { success: true, outputPath: currentOutputPath }
+    return {
+      success: true,
+      outputPath: currentOutputPath,
+      videoStartTime: currentVideoStartTime || undefined,
+    }
   } catch (error) {
     console.error('[NativeRecorder] Failed to start recording:', error)
     isRecording = false
     currentOutputPath = null
+    currentVideoStartTime = null
     return { success: false, error: String(error) }
   }
 }
@@ -85,6 +125,7 @@ export async function stopNativeRecording(): Promise<{
   success: boolean
   outputPath?: string
   audioOutputPath?: string
+  videoStartTime?: number
   error?: string
 }> {
   if (!recorderInstance || !isRecording) {
@@ -105,17 +146,21 @@ export async function stopNativeRecording(): Promise<{
     isRecording = false
     currentOutputPath = null
     recorderInstance = null
+    const videoStartTime = currentVideoStartTime
+    currentVideoStartTime = null
 
     return { 
       success: true, 
       outputPath: outputPath || undefined,
-      audioOutputPath: result?.audioOutputPath || undefined
+      audioOutputPath: result?.audioOutputPath || undefined,
+      videoStartTime: videoStartTime || undefined,
     }
   } catch (error) {
     console.error('[NativeRecorder] Failed to stop recording:', error)
     isRecording = false
     currentOutputPath = null
     recorderInstance = null
+    currentVideoStartTime = null
     return { success: false, error: String(error) }
   }
 }

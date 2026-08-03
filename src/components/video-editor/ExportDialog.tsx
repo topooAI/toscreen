@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { X, Download, Loader2 } from 'lucide-react';
+import { Check, Download, Loader2, X } from 'lucide-react';
 import { Button } from "../ui/button";
-import type { ExportProgress } from '../../lib/exporter';
+import type { ExportProgress, ExportQuality } from '../../lib/exporter';
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -9,8 +9,17 @@ interface ExportDialogProps {
   progress: ExportProgress | null;
   isExporting: boolean;
   error: string | null;
+  quality: ExportQuality;
+  onQualityChange: (quality: ExportQuality) => void;
+  onStart: () => void;
   onCancel?: () => void;
 }
+
+const QUALITY_OPTIONS: Array<{ value: ExportQuality; label: string; description: string }> = [
+  { value: 'medium', label: 'Medium', description: '720p' },
+  { value: 'good', label: 'Good', description: '1080p' },
+  { value: 'source', label: 'High', description: 'Source' },
+];
 
 export function ExportDialog({
   isOpen,
@@ -18,6 +27,9 @@ export function ExportDialog({
   progress,
   isExporting,
   error,
+  quality,
+  onQualityChange,
+  onStart,
   onCancel,
 }: ExportDialogProps) {
   const [showSuccess, setShowSuccess] = useState(false);
@@ -33,116 +45,110 @@ export function ExportDialog({
     }
   }, [isExporting, progress, error, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) setShowSuccess(false);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
     <>
-      <div 
-        className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 animate-in fade-in duration-200"
+      <div
+        className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm animate-in fade-in duration-150"
         onClick={isExporting ? undefined : onClose}
       />
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[60] bg-[#09090b] rounded-2xl shadow-2xl border border-white/10 p-8 w-[90vw] max-w-md animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            {showSuccess ? (
-              <>
-                <div className="w-12 h-12 rounded-full bg-[#34B27B]/20 flex items-center justify-center ring-1 ring-[#34B27B]/50">
-                  <Download className="w-6 h-6 text-[#34B27B]" />
-                </div>
-                <div>
-                  <span className="text-xl font-bold text-slate-200 block">Export Complete</span>
-                  <span className="text-sm text-slate-400">Your video is ready</span>
-                </div>
-              </>
-            ) : (
-              <>
-                {isExporting ? (
-                  <div className="w-12 h-12 rounded-full bg-[#34B27B]/10 flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 text-[#34B27B] animate-spin" />
-                  </div>
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-                    <Download className="w-6 h-6 text-slate-200" />
-                  </div>
-                )}
-                <div>
-                  <span className="text-xl font-bold text-slate-200 block">
-                    {error ? 'Export Failed' : isExporting ? 'Exporting Video' : 'Export Video'}
-                  </span>
-                  <span className="text-sm text-slate-400">
-                    {error ? 'Please try again' : isExporting ? 'This may take a moment...' : 'Ready to start'}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
+      <div className="ui-glass-surface fixed left-1/2 top-1/2 z-[60] w-[380px] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg border border-[var(--ui-border)] bg-[var(--ui-inspector-surface)] shadow-2xl animate-in zoom-in-95 duration-150">
+        <div className="flex h-11 items-center justify-between border-b border-[var(--ui-border)] px-4">
+          <span className="text-[12px] font-semibold text-[var(--ui-text-primary)]">
+            {showSuccess ? 'Export Complete' : isExporting ? 'Exporting Video' : 'Export Video'}
+          </span>
           {!isExporting && (
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="hover:bg-white/10 text-slate-400 hover:text-white rounded-full"
+              className="h-7 w-7 rounded-[5px] text-[var(--ui-text-tertiary)] hover:bg-[var(--ui-control-hover)] hover:text-[var(--ui-text-primary)]"
             >
-              <X className="w-5 h-5" />
+              <X className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>
 
-        {error && (
-          <div className="mb-6 animate-in slide-in-from-top-2">
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
-              <div className="p-1 bg-red-500/20 rounded-full">
-                <X className="w-3 h-3 text-red-400" />
+        <div className="p-4">
+          {showSuccess ? (
+            <div className="flex min-h-[150px] flex-col items-center justify-center text-center">
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#34B27B]/12 text-[#34B27B]">
+                <Check className="h-4 w-4" />
               </div>
-              <p className="text-sm text-red-400 leading-relaxed">{error}</p>
+              <div className="text-[12px] font-medium text-[var(--ui-text-primary)]">Video saved successfully</div>
+              <div className="mt-1 text-[10px] text-[var(--ui-text-tertiary)]">Your exported file is ready.</div>
             </div>
-          </div>
-        )}
-
-        {isExporting && progress && (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium text-slate-400 uppercase tracking-wider">
-                <span>Progress</span>
-                <span className="font-mono text-slate-200">{progress.percentage.toFixed(0)}%</span>
-              </div>
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                <div
-                  className="h-full bg-[#34B27B] shadow-[0_0_10px_rgba(52,178,123,0.3)] transition-all duration-300 ease-out"
-                  style={{ width: `${Math.min(progress.percentage, 100)}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-                <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Status</div>
-                <div className="text-slate-200 font-medium text-sm flex items-center gap-2 h-[28px]">
-                  <span className="w-2 h-2 rounded-full bg-[#34B27B] animate-pulse" />
-                  Processing
+          ) : isExporting ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-[#0D99FF]" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between text-[10px] text-[var(--ui-text-secondary)]">
+                    <span>Processing</span>
+                    <span className="tabular-nums text-[var(--ui-text-primary)]">{(progress?.percentage ?? 0).toFixed(0)}%</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--ui-control)]">
+                    <div
+                      className="h-full rounded-full bg-[#0D99FF] transition-[width] duration-300"
+                      style={{ width: `${Math.min(progress?.percentage ?? 0, 100)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {onCancel && (
-              <div className="pt-2">
+              {onCancel && (
                 <Button
                   onClick={onCancel}
-                  variant="destructive"
-                  className="w-full py-6 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30 transition-all rounded-xl"
+                  variant="outline"
+                  className="h-8 w-full rounded-[5px] border-[var(--ui-border)] bg-[var(--ui-control)] text-[10px] text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)] hover:text-[var(--ui-text-primary)]"
                 >
                   Cancel Export
                 </Button>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <section>
+                <div className="mb-2 text-[10px] font-medium text-[var(--ui-text-secondary)]">Quality</div>
+                <div className="grid grid-cols-3 gap-1 rounded-[6px] bg-[var(--ui-control)] p-0.5">
+                  {QUALITY_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => onQualityChange(option.value)}
+                      className={`rounded-[4px] px-2 py-2 text-center transition-colors ${
+                        quality === option.value
+                          ? 'bg-[var(--ui-segment-selected)] text-[var(--ui-segment-selected-text)] shadow-sm'
+                          : 'text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
+                      }`}
+                    >
+                      <span className="block text-[10px] font-medium">{option.label}</span>
+                      <span className="mt-0.5 block text-[8px] opacity-60">{option.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
 
-        {showSuccess && (
-          <div className="text-center py-4 animate-in zoom-in-95">
-            <p className="text-lg text-slate-200 font-medium">Video saved successfully!</p>
-          </div>
-        )}
+              {error && (
+                <div className="rounded-[5px] border border-red-500/15 bg-red-500/8 px-3 py-2 text-[10px] text-red-500">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                onClick={onStart}
+                className="h-8 w-full gap-2 rounded-[5px] bg-[#0D99FF] text-[11px] font-semibold text-white hover:bg-[#0B87E3]"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export Video
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );

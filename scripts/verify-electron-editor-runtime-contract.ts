@@ -9,6 +9,7 @@ const files = {
   electronWindows: path.join(repoRoot, "electron", "windows.ts"),
   electronMain: path.join(repoRoot, "electron", "main.ts"),
   electronHandlers: path.join(repoRoot, "electron", "ipc", "handlers.ts"),
+  proxyGenerator: path.join(repoRoot, "electron", "ipc", "proxyGenerator.ts"),
   videoPlayback: path.join(repoRoot, "src", "components", "video-editor", "VideoPlayback.tsx"),
   usePixiApp: path.join(repoRoot, "src", "components", "video-editor", "hooks", "usePixiApp.ts"),
   timelineEditor: path.join(repoRoot, "src", "components", "video-editor", "timeline", "TimelineEditor.tsx"),
@@ -51,7 +52,7 @@ const checks = [
     file: "electronMain",
     needles: [
       "process.env.TOSCREEN_DEV_WINDOW_TYPE === 'editor'",
-      "mainWindow = createEditorWindow()",
+      "registerMainWindow(createEditorWindow(), 'editor')",
     ],
   },
   {
@@ -59,8 +60,22 @@ const checks = [
     file: "electronHandlers",
     needles: [
       "file.startsWith('recording-')",
-      "const proxyPath = path.join(parsed.dir, `${parsed.name}-proxy.mp4`)",
-      "proxyPath: hasProxy ? proxyPath : undefined",
+      "const proxyResult = await generateProxyVideo(videoPath)",
+      "proxyPath: proxyResult.success ? proxyResult.proxyPath : undefined",
+    ],
+  },
+  {
+    area: "recording-proxy-timeline",
+    file: "proxyGenerator",
+    needles: [
+      "PROXY_TIMELINE_VERSION = 4",
+      "const activeProxyJobs = new Map<string, ProxyGenerationJob>()",
+      "const activeJob = activeProxyJobs.get(outputPath)",
+      "return activeJob.promise",
+      "fps=fps=30:start_time=0:round=near,setpts=PTS-STARTPTS",
+      "'-vsync cfr'",
+      "fs.renameSync(temporaryOutputPath, outputPath)",
+      "writeProxyMetadata(inputPath, outputPath)",
     ],
   },
   {

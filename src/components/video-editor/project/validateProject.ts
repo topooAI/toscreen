@@ -1001,6 +1001,23 @@ function validateCursorClipProps(props: Record<string, unknown>, label: string, 
   if (typeof props.vectorCursor !== "boolean") {
     errors.push(`${label} vectorCursor must be boolean.`);
   }
+  if (props.style !== undefined && typeof props.style !== "string") {
+    errors.push(`${label} style must be a string when provided.`);
+  }
+  if (props.customImage !== undefined && typeof props.customImage !== "string") {
+    errors.push(`${label} customImage must be a string when provided.`);
+  }
+  if (props.customImages !== undefined) {
+    if (!isRecord(props.customImages)) {
+      errors.push(`${label} customImages must be an object when provided.`);
+    } else {
+      Object.entries(props.customImages).forEach(([state, image]) => {
+        if (typeof image !== "string") {
+          errors.push(`${label} customImages.${state} must be a string.`);
+        }
+      });
+    }
+  }
   if (!isFiniteNumber(props.offsetMs)) {
     errors.push(`${label} offsetMs must be finite.`);
   }
@@ -1022,6 +1039,18 @@ function validateCursorPoint(value: unknown, label: string, errors: string[]) {
   }
   if (point.isClick !== undefined && typeof point.isClick !== "boolean") {
     errors.push(`${label}.isClick must be boolean.`);
+  }
+  if (point.isPointerDown !== undefined && typeof point.isPointerDown !== "boolean") {
+    errors.push(`${label}.isPointerDown must be boolean.`);
+  }
+  if (
+    point.type !== undefined
+    && !isOneOf(point.type, ["click", "mousedown", "mouseup", "drag", "move", "keydown", "wheel"])
+  ) {
+    errors.push(`${label}.type is invalid.`);
+  }
+  if (point.cursorType !== undefined && typeof point.cursorType !== "string") {
+    errors.push(`${label}.cursorType must be a string.`);
   }
 }
 

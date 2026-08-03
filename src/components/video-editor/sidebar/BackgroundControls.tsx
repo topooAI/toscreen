@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, X } from "lucide-react";
+import { ChevronDown, Upload, X } from "lucide-react";
 import Block from '@uiw/react-color-block';
 import { getAssetPath } from "@/lib/assetPath";
 import { toast } from "sonner";
@@ -62,6 +62,7 @@ export function BackgroundControls({
     const [customImages, setCustomImages] = useState<string[]>([]);
     const [selectedColor, setSelectedColor] = useState('#ADADAD');
     const [gradient, setGradient] = useState<string>(GRADIENTS[0]);
+    const [pickerOpen, setPickerOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -111,25 +112,50 @@ export function BackgroundControls({
         }
     };
 
+    const selectedKind = selected?.startsWith('#')
+        ? 'Color'
+        : selected?.includes('gradient(')
+            ? 'Gradient'
+            : 'Image';
+    const selectedPreviewStyle = selectedKind === 'Image'
+        ? { backgroundImage: `url(${selected})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+        : { background: selected };
+
     return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
-                <div className="text-xs font-medium text-slate-200">Blur Background</div>
+        <div className="space-y-2">
+            <button
+                type="button"
+                onClick={() => setPickerOpen((open) => !open)}
+                className="flex h-7 w-full items-center gap-2 rounded-[5px] bg-[var(--ui-control)] px-2 text-left outline-none transition-colors hover:bg-[var(--ui-control-hover)] focus-visible:ring-1 focus-visible:ring-[#0D99FF]"
+                aria-expanded={pickerOpen}
+            >
+                <span
+                    className="h-5 w-7 shrink-0 rounded-[3px] border border-[var(--ui-border)]"
+                    style={selectedPreviewStyle}
+                />
+                <span className="min-w-0 flex-1 text-[12px] font-medium text-[var(--ui-text-secondary)]">{selectedKind}</span>
+                <span className="text-[11px] text-[var(--ui-text-tertiary)]">Fill</span>
+                <ChevronDown className={`h-3 w-3 text-[var(--ui-text-tertiary)] transition-transform ${pickerOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <div className="flex min-h-8 items-center justify-between">
+                <div className="text-[12px] font-medium text-[var(--ui-text-secondary)]">Blur Background</div>
                 <Switch
+                    switchSize="sm"
                     checked={showBlur}
                     onCheckedChange={onBlurChange}
-                    className="data-[state=checked]:bg-[#34B27B]"
+                    className="data-[state=checked]:bg-[#0D99FF]"
                 />
             </div>
 
-            <Tabs defaultValue="image" className="w-full">
-                <TabsList className="mb-4 bg-white/5 border border-white/5 p-1 w-full grid grid-cols-3 h-auto rounded-xl">
-                    <TabsTrigger value="image" className="data-[state=active]:bg-[#34B27B] data-[state=active]:text-white text-slate-400 py-2 rounded-lg transition-all text-xs">Image</TabsTrigger>
-                    <TabsTrigger value="color" className="data-[state=active]:bg-[#34B27B] data-[state=active]:text-white text-slate-400 py-2 rounded-lg transition-all text-xs">Color</TabsTrigger>
-                    <TabsTrigger value="gradient" className="data-[state=active]:bg-[#34B27B] data-[state=active]:text-white text-slate-400 py-2 rounded-lg transition-all text-xs">Gradient</TabsTrigger>
+            {pickerOpen && <Tabs defaultValue={selectedKind.toLowerCase()} className="w-full">
+                <TabsList className="mb-2 grid h-7 w-full grid-cols-3 rounded-[5px] border-0 bg-[var(--ui-control)] p-0.5">
+                    <TabsTrigger value="image" className="h-6 self-center rounded-[4px] py-0 text-[11px] text-[var(--ui-text-secondary)] shadow-none transition-colors data-[state=active]:bg-[var(--ui-segment-selected)] data-[state=active]:text-[var(--ui-segment-selected-text)] data-[state=active]:shadow-none">Image</TabsTrigger>
+                    <TabsTrigger value="color" className="h-6 self-center rounded-[4px] py-0 text-[11px] text-[var(--ui-text-secondary)] shadow-none transition-colors data-[state=active]:bg-[var(--ui-segment-selected)] data-[state=active]:text-[var(--ui-segment-selected-text)] data-[state=active]:shadow-none">Color</TabsTrigger>
+                    <TabsTrigger value="gradient" className="h-6 self-center rounded-[4px] py-0 text-[11px] text-[var(--ui-text-secondary)] shadow-none transition-colors data-[state=active]:bg-[var(--ui-segment-selected)] data-[state=active]:text-[var(--ui-segment-selected-text)] data-[state=active]:shadow-none">Gradient</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="image" className="mt-0 space-y-3">
+                <TabsContent value="image" className="mt-0 space-y-2">
                     <input
                         type="file"
                         ref={fileInputRef}
@@ -140,9 +166,9 @@ export function BackgroundControls({
                     <Button
                         onClick={() => fileInputRef.current?.click()}
                         variant="outline"
-                        className="w-full gap-2 bg-white/5 text-slate-200 border-white/10 hover:bg-[#34B27B] hover:text-white hover:border-[#34B27B] transition-all h-8 text-xs"
+                        className="h-7 w-full justify-start gap-2 rounded-[5px] border-0 bg-[var(--ui-control)] px-2.5 text-[11px] text-[var(--ui-text-secondary)] shadow-none transition-colors hover:bg-[var(--ui-control-hover)] [&_svg]:size-3"
                     >
-                        <Upload className="w-3 h-3" />
+                        <Upload />
                         Upload Custom
                     </Button>
 
@@ -151,8 +177,8 @@ export function BackgroundControls({
                             <div
                                 key={`custom-${idx}`}
                                 className={cn(
-                                    "aspect-square rounded-md border-2 overflow-hidden cursor-pointer transition-all duration-200 relative group shadow-sm",
-                                    selected === imageUrl ? "border-[#34B27B] ring-2 ring-[#34B27B]/30 scale-105" : "border-white/10 hover:border-[#34B27B]/40 opacity-80 hover:opacity-100 bg-white/5"
+                                    "relative aspect-square cursor-pointer overflow-hidden rounded-[4px] border border-transparent bg-[var(--ui-control)] transition-colors group",
+                                    selected === imageUrl ? "ring-1 ring-[#0D99FF]" : "hover:bg-[var(--ui-control-hover)]"
                                 )}
                                 style={{ backgroundImage: `url(${imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
                                 onClick={() => onWallpaperChange(imageUrl)}
@@ -182,8 +208,8 @@ export function BackgroundControls({
                                 <div
                                     key={path}
                                     className={cn(
-                                        "aspect-square rounded-md border-2 overflow-hidden cursor-pointer transition-all duration-200 shadow-sm",
-                                        isSelected ? "border-[#34B27B] ring-2 ring-[#34B27B]/30 scale-105" : "border-white/10 hover:border-[#34B27B]/40 opacity-80 hover:opacity-100 bg-white/5"
+                                        "aspect-square cursor-pointer overflow-hidden rounded-[4px] border border-transparent bg-[var(--ui-control)] transition-colors",
+                                        isSelected ? "ring-1 ring-[#0D99FF]" : "hover:bg-[var(--ui-control-hover)]"
                                     )}
                                     style={{ backgroundImage: `url(${path})`, backgroundSize: "cover", backgroundPosition: "center" }}
                                     onClick={() => onWallpaperChange(path)}
@@ -211,8 +237,8 @@ export function BackgroundControls({
                             <div
                                 key={g}
                                 className={cn(
-                                    "aspect-square rounded-md border-2 overflow-hidden cursor-pointer transition-all duration-200 shadow-sm",
-                                    gradient === g ? "border-[#34B27B] ring-2 ring-[#34B27B]/30 scale-105" : "border-white/10 hover:border-[#34B27B]/40 opacity-80 hover:opacity-100 bg-white/5"
+                                    "aspect-square cursor-pointer overflow-hidden rounded-[4px] border border-transparent bg-[var(--ui-control)] transition-colors",
+                                    gradient === g ? "ring-1 ring-[#0D99FF]" : "hover:bg-[var(--ui-control-hover)]"
                                 )}
                                 style={{ background: g }}
                                 onClick={() => { setGradient(g); onWallpaperChange(g); }}
@@ -220,7 +246,7 @@ export function BackgroundControls({
                         ))}
                     </div>
                 </TabsContent>
-            </Tabs>
+            </Tabs>}
         </div>
     );
 }

@@ -1,12 +1,14 @@
 import { screen } from 'electron';
 import * as fs from 'fs/promises';
 import { uIOhook, UiohookMouseEvent } from 'uiohook-napi';
+import { NativeInputClock } from '../shared/cursorClock';
 
-export type EventType = 'click' | 'keydown' | 'wheel' | 'move';
+export type EventType = 'click' | 'mousedown' | 'mouseup' | 'drag' | 'keydown' | 'wheel' | 'move';
 
 export interface MouseClickEvent {
     timestamp: number;  // milliseconds from recording start
     absoluteTime: number; // absolute UTC timestamp (ms)
+    nativeTimeMs?: number; // native monotonic event timestamp (ms)
     x: number;          // absolute screen coordinates
     y: number;
     cx: number;         // normalized coordinates (0-1)
@@ -32,6 +34,8 @@ class MouseTracker {
     private lastMoveTime = 0;
     private lastRecordedX = -1;
     private lastRecordedY = -1;
+    private primaryButtonDown = false;
+    private nativeClock = new NativeInputClock();
 
     constructor() {
         this.handleInputCheck();
@@ -57,6 +61,7 @@ class MouseTracker {
         this.isTracking = true;
         this.startTime = Date.now();
         this.events = [];
+        this.nativeClock.reset();
 
         // If no bounds provided, use primary display dimensions
         if (bounds) {
@@ -70,6 +75,13 @@ class MouseTracker {
                 height: primaryDisplay.bounds.height,
             };
         }
+
+        const initialPosition = screen.getCursorScreenPoint();
+        this.lastX = initialPosition.x;
+        this.lastY = initialPosition.y;
+        this.lastRecordedX = initialPosition.x;
+        this.lastRecordedY = initialPosition.y;
+        this.primaryButtonDown = false;
 
         // Initialize uiohook
         this.startGlobalTracking();
@@ -90,6 +102,7 @@ class MouseTracker {
         }
 
         this.isTracking = false;
+        this.primaryButtonDown = false;
         this.stopGlobalTracking();
 
         const capturedEvents = [...this.events];
@@ -109,12 +122,22 @@ class MouseTracker {
      */
     async exportToFile(outputPath: string, events: MouseClickEvent[], bounds: RecordingBounds | null, videoStartTime?: number): Promise<void> {
         // If absolute start time of the video is provided, align all event timestamps to perfectly eliminate IPC/negotiation delays!
-        const processedEvents = videoStartTime
-            ? events.map(e => ({
-                ...e,
-                timestamp: e.absoluteTime - videoStartTime
-            }))
-            : events;
+        const timelineStartTime = videoStartTime || this.startTime;
+        const processedEvents = events
+            .map(e => {
+                const absoluteTime = e.nativeTimeMs !== undefined
+                    ? (this.nativeClock.toEpoch(e.nativeTimeMs) ?? e.absoluteTime)
+                    : e.absoluteTime;
+                return {
+                    ...e,
+                    absoluteTime,
+                    timestamp: absoluteTime - timelineStartTime,
+                };
+            })
+            // Input monitoring starts before ScreenCaptureKit so no input is
+            // missed. Events before the first encoded frame do not belong to
+            // the media timeline and must not leak into playback.
+            .filter(e => !videoStartTime || e.timestamp >= 0);
 
         const data = {
             recordingBounds: bounds,
@@ -151,29 +174,39 @@ class MouseTracker {
         // Pre-initialize recorded position to current mouse pos to avoid t=0 jumps
         this.lastRecordedX = this.lastX;
         this.lastRecordedY = this.lastY;
-        this.lastMoveTime = Date.now();
+        this.lastMoveTime = 0;
 
         uIOhook.on('mousedown', (e: UiohookMouseEvent) => {
             if (!this.isTracking) return;
             if (e.button === 1) {
-                this.addEvent(e.x, e.y, 'click');
+                this.primaryButtonDown = true;
+                this.addEvent(e.x, e.y, 'mousedown', undefined, this.captureNativeEventTime(e.time));
             }
         });
 
-        const handleMoveOrDrag = (x: number, y: number) => {
+        uIOhook.on('mouseup', (e: UiohookMouseEvent) => {
+            if (!this.isTracking) return;
+            if (e.button === 1) {
+                this.primaryButtonDown = false;
+                this.addEvent(e.x, e.y, 'mouseup', undefined, this.captureNativeEventTime(e.time));
+            }
+        });
+
+        const handleMoveOrDrag = (x: number, y: number, rawEventTime: number) => {
             this.lastX = x;
             this.lastY = y;
 
             if (!this.isTracking) return;
 
-            const now = Date.now();
+            const nativeTimeMs = this.captureNativeEventTime(rawEventTime);
+            const now = nativeTimeMs ?? Date.now();
             const timeElapsed = now - this.lastMoveTime;
 
             // Target 60fps sampling rate (minimum 16ms between consecutive logs)
             // only recording actual coordinate updates to avoid file bloat when stationary
             if (timeElapsed >= 16) {
                 if (x !== this.lastRecordedX || y !== this.lastRecordedY) {
-                    this.addEvent(x, y, 'move');
+                    this.addEvent(x, y, this.primaryButtonDown ? 'drag' : 'move', undefined, nativeTimeMs);
                     this.lastRecordedX = x;
                     this.lastRecordedY = y;
                     this.lastMoveTime = now;
@@ -182,22 +215,30 @@ class MouseTracker {
         };
 
         uIOhook.on('mousemove', (e: UiohookMouseEvent) => {
-            handleMoveOrDrag(e.x, e.y);
-        });
-
-        uIOhook.on('mousedrag' as any, (e: UiohookMouseEvent) => {
-            handleMoveOrDrag(e.x, e.y);
+            handleMoveOrDrag(e.x, e.y, e.time);
         });
 
         uIOhook.on('keydown', (e) => {
             if (!this.isTracking) return;
             // Record typing at the current cursor position
-            this.addEvent(this.lastX, this.lastY, 'keydown', { keycode: e.keycode });
+            this.addEvent(
+                this.lastX,
+                this.lastY,
+                'keydown',
+                { keycode: e.keycode },
+                this.captureNativeEventTime(e.time),
+            );
         });
 
         uIOhook.on('wheel', (e) => {
             if (!this.isTracking) return;
-            this.addEvent(this.lastX, this.lastY, 'wheel', { amount: e.amount, rotation: e.rotation });
+            this.addEvent(
+                this.lastX,
+                this.lastY,
+                'wheel',
+                { amount: e.amount, rotation: e.rotation },
+                this.captureNativeEventTime(e.time),
+            );
         });
 
         uIOhook.start();
@@ -210,12 +251,20 @@ class MouseTracker {
         console.log('[MouseTracker] uIOhook stopped');
     }
 
-    addEvent(x: number, y: number, type: EventType, data?: any): void {
+    private captureNativeEventTime(rawEventTime: number): number | undefined {
+        if (!Number.isFinite(rawEventTime) || rawEventTime <= 0) return undefined;
+
+        return this.nativeClock.observe(rawEventTime, Date.now(), process.platform) ?? undefined;
+    }
+
+    addEvent(x: number, y: number, type: EventType, data?: any, nativeTimeMs?: number): void {
         if (!this.isTracking || !this.recordingBounds) {
             return;
         }
 
-        const absoluteTime = Date.now();
+        const absoluteTime = nativeTimeMs !== undefined
+            ? (this.nativeClock.toEpoch(nativeTimeMs) ?? Date.now())
+            : Date.now();
         const timestamp = absoluteTime - this.startTime;
 
         // Normalize coordinates
@@ -225,6 +274,7 @@ class MouseTracker {
         const event: MouseClickEvent = {
             timestamp,
             absoluteTime,
+            nativeTimeMs,
             x,
             y,
             cx,

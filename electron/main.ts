@@ -1,9 +1,25 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, session, protocol } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  nativeImage,
+  session,
+  protocol,
+  type MenuItemConstructorOptions,
+} from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fsSync from 'node:fs'
 import fs from 'node:fs/promises'
-import { createHudOverlayWindow, createEditorWindow, createSourceSelectorWindow } from './windows'
+import {
+  createHudOverlayWindow,
+  createEditorWindow,
+  createSettingsWindow,
+  createSourceSelectorWindow,
+} from './windows'
 import { registerIpcHandlers } from './ipc/handlers'
+import { registerPreferenceIpcHandlers } from './preferences'
 
 // Electron 30 + macOS Metal/ANGLE can intermittently lose the GPU context after
 // ScreenCaptureKit recording. Prefer the GL ANGLE backend in development so the
@@ -11,6 +27,14 @@ import { registerIpcHandlers } from './ipc/handlers'
 if (process.platform === 'darwin') {
   app.commandLine.appendSwitch('use-angle', 'gl')
 }
+
+// Keep Electron's internal product label aligned with the packaged ToScreen
+// name. Preserve the existing user-data location so the name change cannot move
+// or orphan recordings, projects, or preferences.
+const existingUserDataPath = path.join(app.getPath('appData'), 'toscreen')
+fsSync.mkdirSync(existingUserDataPath, { recursive: true })
+app.setName('ToScreen')
+app.setPath('userData', existingUserDataPath)
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -61,19 +85,53 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 // Window references
 let mainWindow: BrowserWindow | null = null
 let sourceSelectorWindow: BrowserWindow | null = null
+let settingsWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let selectedSourceName = ''
+let mainWindowMode: 'hud' | 'editor' | null = null
+let isQuitting = false
 
 // Tray Icons
 const defaultTrayIcon = getTrayIcon('openscreen.png');
 const recordingTrayIcon = getTrayIcon('rec-button.png');
 
-function createWindow() {
+function registerMainWindow(win: BrowserWindow, mode: 'hud' | 'editor') {
+  mainWindow = win
+  mainWindowMode = mode
+
+  win.on('closed', () => {
+    if (mainWindow !== win) return
+
+    mainWindow = null
+    mainWindowMode = null
+
+    if (mode === 'editor' && !isQuitting) {
+      setTimeout(() => {
+        if (!mainWindow && !isQuitting) {
+          registerMainWindow(createHudOverlayWindow(), 'hud')
+        }
+      }, 0)
+    }
+  })
+}
+
+function createInitialWindow() {
   if (VITE_DEV_SERVER_URL && process.env.TOSCREEN_DEV_WINDOW_TYPE === 'editor') {
-    mainWindow = createEditorWindow()
+    registerMainWindow(createEditorWindow(), 'editor')
     return
   }
-  mainWindow = createHudOverlayWindow()
+  registerMainWindow(createHudOverlayWindow(), 'hud')
+}
+
+function showOrCreateMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+    return
+  }
+
+  registerMainWindow(createHudOverlayWindow(), 'hud')
 }
 
 function createTray() {
@@ -108,11 +166,7 @@ function updateTrayMenu(recording: boolean = false) {
       {
         label: "Open",
         click: () => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.isMinimized() && mainWindow.restore();
-          } else {
-            createWindow();
-          }
+          showOrCreateMainWindow()
         },
       },
       {
@@ -128,11 +182,14 @@ function updateTrayMenu(recording: boolean = false) {
 }
 
 function createEditorWindowWrapper() {
-  if (mainWindow) {
-    mainWindow.close()
-    mainWindow = null
+  if (mainWindowMode === 'editor' && mainWindow && !mainWindow.isDestroyed()) {
+    showOrCreateMainWindow()
+    return
   }
-  mainWindow = createEditorWindow()
+
+  const previousWindow = mainWindow
+  registerMainWindow(createEditorWindow(), 'editor')
+  if (previousWindow && !previousWindow.isDestroyed()) previousWindow.close()
 }
 
 function createSourceSelectorWindowWrapper() {
@@ -143,18 +200,84 @@ function createSourceSelectorWindowWrapper() {
   return sourceSelectorWindow
 }
 
+function showSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    if (settingsWindow.isMinimized()) settingsWindow.restore()
+    settingsWindow.show()
+    settingsWindow.focus()
+    return
+  }
+
+  settingsWindow = createSettingsWindow()
+  settingsWindow.on('closed', () => {
+    settingsWindow = null
+  })
+}
+
+function installApplicationMenu() {
+  const isMac = process.platform === 'darwin'
+  const template: MenuItemConstructorOptions[] = [
+    ...(isMac ? [{
+      label: 'ToScreen',
+      submenu: [
+        { label: 'About ToScreen', role: 'about' as const },
+        { type: 'separator' as const },
+        {
+          label: 'Settings…',
+          accelerator: 'CommandOrControl+,',
+          click: showSettingsWindow,
+        },
+        { type: 'separator' as const },
+        { role: 'services' as const },
+        { type: 'separator' as const },
+        { label: 'Hide ToScreen', role: 'hide' as const },
+        { role: 'hideOthers' as const },
+        { role: 'unhide' as const },
+        { type: 'separator' as const },
+        { label: 'Quit ToScreen', role: 'quit' as const },
+      ],
+    }] : []),
+    {
+      label: 'File',
+      submenu: [
+        ...(!isMac ? [{
+          label: 'Settings…',
+          accelerator: 'CommandOrControl+,',
+          click: showSettingsWindow,
+        }, { type: 'separator' as const }] : []),
+        { role: 'close' },
+      ],
+    },
+    { role: 'editMenu' },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'togglefullscreen' },
+        ...(VITE_DEV_SERVER_URL ? [
+          { type: 'separator' as const },
+          { role: 'reload' as const },
+          { role: 'toggleDevTools' as const },
+        ] : []),
+      ],
+    },
+    { role: 'windowMenu' },
+  ]
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
 // On macOS, applications and their menu bar stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   // Keep app running (macOS behavior)
 })
 
+app.on('before-quit', () => {
+  isQuitting = true
+})
+
 app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
-  }
+  showOrCreateMainWindow()
 })
 
 
@@ -169,6 +292,9 @@ app.whenReady().then(async () => {
   ipcMain.on('hud-overlay-close', () => {
     app.quit();
   });
+
+  registerPreferenceIpcHandlers()
+  installApplicationMenu()
 
   // Register custom protocol to bypass fetch API file:// restrictions
   protocol.registerFileProtocol('toscreen', (request, callback) => {
@@ -238,5 +364,5 @@ app.whenReady().then(async () => {
       }
     }
   )
-  createWindow()
+  createInitialWindow()
 })

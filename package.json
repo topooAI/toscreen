@@ -1,7 +1,8 @@
 {
   "name": "toscreen",
+  "productName": "ToScreen",
   "private": true,
-  "version": "0.0.0.31",
+  "version": "0.0.0.34",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,6 +25,9 @@
     "audit:timeline-lane-wrapping": "tsx scripts/verify-timeline-lane-wrapping.ts",
     "audit:timeline-drag-safety": "tsx scripts/verify-timeline-drag-safety.ts",
     "audit:timeline-magnetic-snap": "tsx scripts/verify-timeline-magnetic-snap.ts",
+    "audit:interaction-engine-standard": "tsx scripts/verify-interaction-engine-standard.ts",
+    "audit:cursor-clock": "tsx scripts/verify-cursor-clock-contract.ts",
+    "audit:cursor-variants": "tsx scripts/verify-cursor-variant-contract.ts",
     "audit:timeline-range-zoom": "tsx scripts/verify-timeline-range-zoom.ts",
     "audit:timeline-seek-mapping": "tsx scripts/verify-timeline-seek-mapping.ts",
     "audit:timeline-playhead-time": "tsx scripts/verify-timeline-playhead-time.ts",
@@ -38,6 +42,7 @@
     "audit:screenstudio-core-contract": "tsx scripts/verify-screenstudio-core-contract.ts",
     "audit:screenstudio-control-wiring": "tsx scripts/verify-screenstudio-control-wiring.ts",
     "audit:electron-editor-runtime": "tsx scripts/verify-electron-editor-runtime-contract.ts",
+    "audit:electron-window-lifecycle": "tsx scripts/verify-electron-window-lifecycle.ts",
     "audit:project-model-smoke": "tsx scripts/audit-project-model-smoke.ts",
     "audit:project-model-restore": "tsx scripts/verify-project-model-restore.ts",
     "audit:project-model-roundtrip": "tsx scripts/verify-project-model-roundtrip.ts",

@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -58,6 +67,162 @@
   }
 }
 
+.toscreen-theme {
+  --ui-bg: transparent;
+  --ui-shell: transparent;
+  --ui-surface: rgba(15, 16, 20, 0.36);
+  --ui-inspector-surface: rgba(17, 18, 22, 0.68);
+  --ui-popover-surface: rgba(32, 33, 38, 0.98);
+  --ui-panel: rgba(20, 21, 26, 0.24);
+  --ui-timeline-surface: rgba(18, 19, 23, 0.64);
+  --ui-timeline-card-surface: rgba(28, 29, 34, 0.76);
+  --ui-titlebar: rgba(10, 11, 15, 0.1);
+  --ui-preview-shell: rgba(5, 6, 9, 0.12);
+  --ui-control: rgba(255, 255, 255, 0.05);
+  --ui-control-hover: rgba(255, 255, 255, 0.09);
+  --ui-track-hover: rgba(255, 255, 255, 0.025);
+  --ui-border: rgba(255, 255, 255, 0.07);
+  --ui-border-strong: rgba(255, 255, 255, 0.14);
+  --ui-text-primary: rgba(255, 255, 255, 0.92);
+  --ui-text-secondary: rgba(255, 255, 255, 0.56);
+  --ui-text-tertiary: rgba(255, 255, 255, 0.38);
+  --ui-segment-selected: #f5f5f7;
+  --ui-segment-selected-text: #111113;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color-scheme: dark;
+}
+
+.toscreen-theme[data-theme="light"] {
+  --ui-bg: transparent;
+  --ui-shell: transparent;
+  --ui-surface: rgba(255, 255, 255, 0.3);
+  --ui-inspector-surface: rgba(255, 255, 255, 0.76);
+  --ui-popover-surface: rgba(255, 255, 255, 0.98);
+  --ui-panel: rgba(243, 248, 251, 0.2);
+  --ui-timeline-surface: rgba(255, 255, 255, 0.68);
+  --ui-timeline-card-surface: rgba(255, 255, 255, 0.84);
+  --ui-titlebar: rgba(248, 251, 253, 0.08);
+  --ui-preview-shell: rgba(255, 255, 255, 0.34);
+  --ui-control: rgba(17, 24, 39, 0.055);
+  --ui-control-hover: rgba(17, 24, 39, 0.095);
+  --ui-track-hover: rgba(17, 24, 39, 0.025);
+  --ui-border: rgba(17, 24, 39, 0.1);
+  --ui-border-strong: rgba(17, 24, 39, 0.18);
+  --ui-text-primary: rgba(17, 24, 39, 0.94);
+  --ui-text-secondary: rgba(17, 24, 39, 0.62);
+  --ui-text-tertiary: rgba(17, 24, 39, 0.44);
+  --ui-segment-selected: #ffffff;
+  --ui-segment-selected-text: #111827;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.46);
+  color-scheme: light;
+}
+
+html:has(.toscreen-theme),
+body:has(.toscreen-theme),
+#root:has(.toscreen-theme) {
+  background: transparent !important;
+}
+
+.toscreen-dropdown-menu {
+  --ui-popover-surface: rgb(32, 33, 38);
+  --ui-control-hover: rgba(255, 255, 255, 0.09);
+  --ui-text-primary: rgba(255, 255, 255, 0.92);
+  --ui-text-secondary: rgba(255, 255, 255, 0.64);
+  background-color: var(--ui-popover-surface) !important;
+  color: var(--ui-text-primary);
+  isolation: isolate;
+}
+
+html:has(.toscreen-theme[data-theme="light"]) .toscreen-dropdown-menu {
+  --ui-popover-surface: rgb(255, 255, 255);
+  --ui-control-hover: rgba(17, 24, 39, 0.075);
+  --ui-text-primary: rgba(17, 24, 39, 0.94);
+  --ui-text-secondary: rgba(17, 24, 39, 0.72);
+}
+
+.ui-glass-surface {
+  box-shadow:
+    0 16px 42px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.toscreen-theme[data-theme="dark"] .ui-glass-surface {
+  box-shadow:
+    0 18px 52px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Large backdrop filters and multi-pass preview shadows are expensive while
+   their bounds change every frame. Keep the panels transparent during live
+   window/panel resizing, then restore the full glass treatment on release. */
+.is-layout-resizing .ui-glass-surface {
+  box-shadow: none !important;
+}
+
+.is-layout-resizing .video-player-render-layer {
+  filter: none !important;
+}
+
+/* Existing editor controls still use a small set of dark Tailwind tokens.
+   Remap those tokens inside light mode while the component system migrates to
+   semantic variables. Video content, wallpapers, and colored timeline clips
+   deliberately remain untouched. */
+.toscreen-theme[data-theme="light"] [class~="bg-[#09090b]"],
+.toscreen-theme[data-theme="light"] [class~="bg-[#0c0c0e]"],
+.toscreen-theme[data-theme="light"] [class~="bg-[#1a1a1a]"],
+.toscreen-theme[data-theme="light"] [class~="bg-[#23232a]"] {
+  background-color: var(--ui-surface) !important;
+}
+
+.toscreen-theme[data-theme="light"] [class~="bg-[#09090b]/80"] {
+  background-color: var(--ui-titlebar) !important;
+}
+
+.toscreen-theme[data-theme="light"] [class~="bg-white/5"],
+.toscreen-theme[data-theme="light"] [class~="bg-white/[0.01]"],
+.toscreen-theme[data-theme="light"] [class~="bg-white/[0.025]"],
+.toscreen-theme[data-theme="light"] [class~="bg-white/[0.03]"],
+.toscreen-theme[data-theme="light"] [class~="bg-white/[0.04]"],
+.toscreen-theme[data-theme="light"] [class~="bg-white/[0.05]"],
+.toscreen-theme[data-theme="light"] [class~="bg-white/10"] {
+  background-color: var(--ui-control) !important;
+}
+
+.toscreen-theme[data-theme="light"] [class~="hover:bg-white/[0.03]"]:hover,
+.toscreen-theme[data-theme="light"] [class~="hover:bg-white/[0.05]"]:hover,
+.toscreen-theme[data-theme="light"] [class~="hover:bg-white/10"]:hover {
+  background-color: var(--ui-control-hover) !important;
+}
+
+.toscreen-theme[data-theme="light"] [class~="border-white/5"],
+.toscreen-theme[data-theme="light"] [class~="border-white/[0.05]"],
+.toscreen-theme[data-theme="light"] [class~="border-white/[0.06]"],
+.toscreen-theme[data-theme="light"] [class~="border-white/[0.07]"],
+.toscreen-theme[data-theme="light"] [class~="border-white/[0.08]"],
+.toscreen-theme[data-theme="light"] [class~="border-white/10"] {
+  border-color: var(--ui-border) !important;
+}
+
+.toscreen-theme[data-theme="light"] [class~="border-white/20"] {
+  border-color: var(--ui-border-strong) !important;
+}
+
+.toscreen-theme[data-theme="light"] [class~="text-slate-200"],
+.toscreen-theme[data-theme="light"] [class~="text-slate-300"] {
+  color: var(--ui-text-primary) !important;
+}
+
+.toscreen-theme[data-theme="light"] [class~="text-slate-400"] {
+  color: var(--ui-text-secondary) !important;
+}
+
+.toscreen-theme[data-theme="light"] [class~="text-slate-500"],
+.toscreen-theme[data-theme="light"] [class~="text-slate-600"] {
+  color: var(--ui-text-tertiary) !important;
+}
+
 
 @layer base {
   * {
@@ -65,10 +230,20 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Geist', 'Geist Sans', sans-serif;
     -webkit-user-select: none;
     user-select: none;
   }
+}
+
+/* Keep this rule outside Tailwind layers so legacy font weight utilities and
+   CSS modules cannot override the application's Geist Medium typography.
+   Inline content styles still win for editable annotations. */
+html,
+body,
+#root,
+#root * {
+  font-family: 'Geist Sans', sans-serif;
+  font-weight: 500;
 }
 
 /* Smooth timeline cursor animations */

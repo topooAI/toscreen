@@ -5,9 +5,12 @@ import type {
   AudioRegion,
   CropRegion,
   CursorDataPoint,
+  CursorCustomImageMap,
+  CursorStylePreset,
   TrimRegion,
   ZoomRegion,
 } from "../types";
+import { resolveCursorStyle } from "../types";
 import { restoreLegacyEditorStateFromProjectModel } from "./legacyAdapter";
 import type { VideoEditorProject } from "./types";
 
@@ -33,6 +36,9 @@ export interface ProjectRenderSettings {
     size: number;
     smoothing: boolean;
     showVectorCursor: boolean;
+    style: CursorStylePreset;
+    customImage: string | null;
+    customImages: CursorCustomImageMap;
     offsetMs: number;
   };
   effects: {
@@ -62,6 +68,9 @@ export interface ProjectAutosaveSnapshot {
   cursorSize: number;
   cursorSmoothing: boolean;
   showVectorCursor: boolean;
+  cursorStyle: CursorStylePreset;
+  cursorCustomImage: string | null;
+  cursorCustomImages: CursorCustomImageMap;
   cursorOffset: number;
 }
 
@@ -90,7 +99,11 @@ export function getProjectRenderSettings(project: VideoEditorProject): ProjectRe
       size: restored.cursorSize ?? 1.5,
       smoothing: restored.cursorSmoothing ?? true,
       showVectorCursor: restored.showVectorCursor ?? true,
-      offsetMs: restored.cursorOffset ?? -150,
+      style: resolveCursorStyle(restored.cursorStyle, restored.showVectorCursor ?? true),
+      customImage: restored.cursorCustomImage ?? null,
+      customImages: restored.cursorCustomImages
+        ?? (restored.cursorCustomImage ? { default: restored.cursorCustomImage } : {}),
+      offsetMs: restored.cursorOffset ?? 0,
     },
     effects: {
       motionBlurEnabled: restored.motionBlurEnabled ?? true,
@@ -130,6 +143,9 @@ export function createProjectAutosaveSnapshot(
     cursorSize: renderSettings.cursor.size,
     cursorSmoothing: renderSettings.cursor.smoothing,
     showVectorCursor: renderSettings.cursor.showVectorCursor,
+    cursorStyle: renderSettings.cursor.style,
+    cursorCustomImage: renderSettings.cursor.customImage,
+    cursorCustomImages: renderSettings.cursor.customImages,
     cursorOffset: renderSettings.cursor.offsetMs,
   };
 }

@@ -27,7 +27,7 @@ assertIncludes(
 );
 assertIncludes(
   videoPlayback,
-  "findInterpolatedTarget(zoomRegionsRef.current, projectTimeMs)",
+  "zoomRegionsRef.current,\n        projectTimeMs,",
   "Zoom interpolation must use project time, not the HTML video element time.",
 );
 assertNotIncludes(

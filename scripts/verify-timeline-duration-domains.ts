@@ -65,14 +65,24 @@ assertIncludes(
   "Source-backed main clips must retain source duration as their source end.",
 );
 assertIncludes(
-  timelineEditorContent,
-  "const clampedEnd = Math.min(projectTotalMs, Math.max(minEnd, region.endMs));",
-  "Camera/Zoom regions must clamp against project duration.",
+  videoEditorContent,
+  "persistedSourceDurationMs",
+  "Restored Camera/Zoom regions must use the persisted screen-recording duration.",
+);
+assertIncludes(
+  videoEditorContent,
+  "clampZoomRegionsToRecordingDuration(",
+  "Restored and generated Camera/Zoom regions must share the recording-duration boundary helper.",
 );
 assertIncludes(
   timelineEditorContent,
-  "const clampedEnd = Math.min(sourceTotalMs, Math.max(minEnd, region.endMs));",
-  "Trim regions must clamp against source duration.",
+  "constrainFocusDragSpan(activeItemId, snappedSpan, zoomRegions, sourceTotalMs)",
+  "Camera/Zoom drag commits must clamp against source recording duration.",
+);
+assertIncludes(
+  timelineEditorContent,
+  "constrainFocusResizeSpan(",
+  "Camera/Zoom resize commits must clamp against source recording duration.",
 );
 assertIncludes(
   videoEditorContent,
@@ -110,6 +120,16 @@ assertNotIncludes(
   "duration={sourceVideoDuration",
   "Timeline playback controls must not display sourceVideoDuration.",
 );
+assertNotIncludes(
+  timelineEditorContent,
+  "zoomRegionsRef.current.forEach",
+  "Timeline mount and media metadata changes must not rewrite restored Camera/Zoom data.",
+);
+assertNotIncludes(
+  videoEditorContent,
+  "[recordingDurationMs, zoomRegions]",
+  "Transient media duration changes must not destructively rewrite Camera/Zoom data.",
+);
 
 console.log(JSON.stringify({
   status: "ok",
@@ -120,8 +140,9 @@ console.log(JSON.stringify({
     "useTimeMap stays source-bound",
     "main video rendering stays source-bound",
     "main clip segmentation helper stays source-bound",
-    "Camera/Zoom clamps to project duration",
-    "Trim clamps to source duration",
+    "restored Camera/Zoom uses persisted source duration",
+    "Camera/Zoom drag and resize clamp to source duration",
+    "transient media duration cannot rewrite restored Camera/Zoom data",
     "VideoEditor passes projectDuration into TimelineEditor",
     "Timeline playback controls display project duration, not source duration",
     "PlaybackControls clamps forward seek and total label against duration prop",

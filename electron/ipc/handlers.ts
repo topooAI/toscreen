@@ -13,6 +13,12 @@ import {
 
 import { generateProxyVideo } from './proxyGenerator'
 import {
+  mergeCursorShapeTelemetry,
+  normalizeNativeCursorEvents,
+  rebaseCursorEventsToTimeline,
+  resolveCursorTimelineStart,
+} from '../cursorTelemetry'
+import {
   companionAudioPathCandidatesForMediaPath,
   normalizeMediaPath,
   projectPathCandidatesForMediaPath,
@@ -20,6 +26,16 @@ import {
 } from './projectFiles'
 
 let selectedSource: any = null
+
+function nativeCursorPathForMediaPath(mediaPath: string): string | null {
+  const parsed = path.parse(mediaPath)
+  const timestamp = parsed.name.match(/(?:^|[-_])(\d{13})$/)?.[1]
+  return timestamp ? path.join(parsed.dir, `temp_cursor_${timestamp}.json`) : null
+}
+
+function hasPreciseEventClock(events: any[]): boolean {
+  return events.some(event => Number.isFinite(Number(event?.nativeTimeMs)))
+}
 
 export async function getSelectedSourceForMediaRequest() {
   if (!selectedSource) return null;
@@ -155,15 +171,13 @@ export function registerIpcHandlers(
 
       const latestVideo = videoFiles.sort().reverse()[0]
       const videoPath = path.join(RECORDINGS_DIR, latestVideo)
-      const parsed = path.parse(videoPath)
-      const proxyPath = path.join(parsed.dir, `${parsed.name}-proxy.mp4`)
-      const hasProxy = await fs.access(proxyPath).then(() => true).catch(() => false)
+      const proxyResult = await generateProxyVideo(videoPath)
       const audioPath = await findFirstExistingPath(companionAudioPathCandidatesForMediaPath(videoPath))
 
       return {
         success: true,
         path: videoPath,
-        proxyPath: hasProxy ? proxyPath : undefined,
+        proxyPath: proxyResult.success ? proxyResult.proxyPath : undefined,
         audioPath,
       }
     } catch (error) {
@@ -202,10 +216,11 @@ export function registerIpcHandlers(
       }
     }
 
+    // Start input monitoring first. MouseTracker stores absolute event times;
+    // export rebases them to ScreenCaptureKit's actual first encoded frame.
+    mouseTracker.start(recordingBounds)
     const result = await startNativeRecording({ showCursor: false, displayId })
     if (result.success) {
-      mouseTracker.start(recordingBounds)
-      
       const mainWin = getMainWindow()
       if (mainWin) {
         mainWin.minimize()
@@ -215,21 +230,26 @@ export function registerIpcHandlers(
         const sourceName = selectedSource?.name || 'Screen'
         onRecordingStateChange(true, sourceName)
       }
+    } else {
+      mouseTracker.stop()
     }
 
     return result
   })
 
   ipcMain.handle('stop-native-recording', async () => {
-    const result = await stopNativeRecording()
-    
-    // Stop mouse tracking and export clicks
+    // Stop input capture at the same user action that stops the video stream.
+    // Native finalization can take close to a second and must not extend the
+    // cursor timeline beyond the last encoded frame.
     const { events, bounds } = mouseTracker.stop()
+    const result = await stopNativeRecording()
+
+    // Export clicks after the recorder returns its final output path.
     if (result.success && result.outputPath) {
       if (events.length > 0) {
         try {
           const clicksPath = result.outputPath + '.clicks.json'
-          await mouseTracker.exportToFile(clicksPath, events, bounds, undefined)
+          await mouseTracker.exportToFile(clicksPath, events, bounds, result.videoStartTime)
           console.log('[IPC] Exported clicks to native recording path:', clicksPath)
         } catch (error) {
           console.error('[IPC] Failed to export clicks for native recording:', error)
@@ -448,21 +468,57 @@ export function registerIpcHandlers(
 
   // Read clicks.json for a given video path
   ipcMain.handle('read-clicks-json', async (_, videoPath: string) => {
-    try {
-      const normalizedPath = normalizeMediaPath(videoPath);
-      const clicksPath = normalizedPath + '.clicks.json';
+    const normalizedPath = normalizeMediaPath(videoPath);
+    let eventDrivenClicks: any[] = []
+    let eventTimelineStartTime: number | undefined
 
+    try {
+      const clicksPath = normalizedPath + '.clicks.json';
       const content = await fs.readFile(clicksPath, 'utf-8');
       const data = JSON.parse(content);
-      
-      // Handle both old array-only format and new wrapped format
-      const clicks = Array.isArray(data) ? data : (data.events || []);
-      
-      return { success: true, clicks };
-    } catch (error) {
-      // It's normal for some videos to not have clicks
-      return { success: false, message: 'No clicks file found' };
+      eventDrivenClicks = Array.isArray(data) ? data : (data.events || []);
+      const parsedTimelineStart = Number(Array.isArray(data) ? undefined : data.videoStartTime)
+      eventTimelineStartTime = Number.isFinite(parsedTimelineStart) ? parsedTimelineStart : undefined
+    } catch {
+      // Native cursor polling remains available for old recordings below.
     }
+
+    const nativeCursorPath = nativeCursorPathForMediaPath(normalizedPath)
+    let nativeEvents: any[] = []
+    if (nativeCursorPath) {
+      try {
+        const nativeContent = await fs.readFile(nativeCursorPath, 'utf-8')
+        const rawNativeEvents = JSON.parse(nativeContent)
+        const resolvedTimelineStart = resolveCursorTimelineStart(rawNativeEvents, eventTimelineStartTime)
+        nativeEvents = normalizeNativeCursorEvents(rawNativeEvents, resolvedTimelineStart)
+        eventDrivenClicks = rebaseCursorEventsToTimeline(eventDrivenClicks, resolvedTimelineStart)
+      } catch {
+        // Older and WebRTC recordings only have the clicks sidecar below.
+      }
+    }
+
+    // The event sidecar owns the media clock and precise position. The AppKit
+    // sidecar only contributes cursor shape transitions. Both streams are
+    // normalized to the event sidecar's first-video-frame timestamp above.
+    if (eventDrivenClicks.length > 0 && hasPreciseEventClock(eventDrivenClicks)) {
+      const mergedEvents = mergeCursorShapeTelemetry(eventDrivenClicks, nativeEvents)
+      return {
+        success: true,
+        clicks: mergedEvents,
+        source: nativeEvents.length > 0 ? 'event-cursor-with-native-shapes' : 'event-cursor',
+      };
+    }
+
+    if (nativeEvents.length > 0) {
+      return { success: true, clicks: nativeEvents, source: 'native-cursor' }
+    }
+
+    if (eventDrivenClicks.length > 0) {
+      return { success: true, clicks: eventDrivenClicks, source: 'legacy-clicks' };
+    }
+
+    // It's normal for some videos to not have cursor telemetry.
+    return { success: false, message: 'No clicks file found' };
   });
 
   // Project Auto-Save API

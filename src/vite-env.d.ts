@@ -44,6 +44,10 @@ interface Window {
     setCurrentVideoPath: (path: string, proxyPath?: string, audioPath?: string) => Promise<{ success: boolean }>
     getCurrentVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string }>
     clearCurrentVideoPath: () => Promise<{ success: boolean }>
+    getEditorPreferencesSync: () => unknown
+    saveEditorPreferences: (preferences: unknown) => Promise<{ success: boolean; preferences?: unknown; error?: string }>
+    resetEditorPreferences: () => Promise<{ success: boolean; preferences?: unknown; error?: string }>
+    onEditorPreferencesUpdated: (callback: (preferences: unknown) => void) => () => void
     generateProxyVideo: (inputPath: string) => Promise<{ success: boolean, proxyPath?: string, error?: string }>;
     onProxyGenerationProgress: (callback: (percent: number) => void) => () => void;
     saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean, error?: string, message?: string }>;

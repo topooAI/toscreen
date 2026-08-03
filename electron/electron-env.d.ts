@@ -40,6 +40,10 @@ interface Window {
     getCurrentVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string }>
     clearCurrentVideoPath: () => Promise<{ success: boolean }>
     getPlatform: () => Promise<string>
+    getEditorPreferencesSync: () => unknown
+    saveEditorPreferences: (preferences: unknown) => Promise<{ success: boolean; preferences?: unknown; error?: string }>
+    resetEditorPreferences: () => Promise<{ success: boolean; preferences?: unknown; error?: string }>
+    onEditorPreferencesUpdated: (callback: (preferences: unknown) => void) => () => void
     // Mouse Tracker APIs
     recordMouseClick: (x: number, y: number) => Promise<{ success: boolean }>
     getMouseTrackingStatus: () => Promise<{ isTracking: boolean; eventCount: number }>

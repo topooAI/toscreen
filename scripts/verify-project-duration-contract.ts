@@ -95,8 +95,8 @@ const input: LegacyEditorProjectInput = {
 };
 
 const durationSeconds = calculateLegacyProjectDurationSeconds(input);
-if (durationSeconds !== 16) {
-  fail("Project duration must be determined by the latest clip end, including original audio and Camera/Zoom clips.", {
+if (durationSeconds !== 15) {
+  fail("Attached original audio must end with the screen clip; independent clips may extend the project.", {
     durationSeconds,
   });
 }
@@ -121,7 +121,7 @@ if (!validation.valid) {
 }
 
 const renderSettings = getProjectRenderSettings(project);
-if (project.durationMs !== 16000 || renderSettings.durationMs !== 16000) {
+if (project.durationMs !== 15000 || renderSettings.durationMs !== 15000) {
   fail("ProjectModel and render settings must share the same project duration.", {
     projectDurationMs: project.durationMs,
     renderSettingsDurationMs: renderSettings.durationMs,

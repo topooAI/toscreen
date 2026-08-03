@@ -1,6 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Application, Container, Ticker } from "pixi.js";
 import { CursorDataPoint } from "../types";
+import type { CursorCustomImageMap, CursorStylePreset } from "../types";
+import { prepareCursorTrack, sampleCursorTrack } from "../videoPlayback/cursorTrack";
+import { cursorElementMarkup, normalizeCursorVisualType } from "../videoPlayback/cursorVisuals";
 
 interface UseCursorRendererProps {
   pixiReady: boolean;
@@ -12,7 +15,10 @@ interface UseCursorRendererProps {
   cursorSize?: number;
   cursorSmoothing?: boolean;
   showVectorCursor?: boolean;
+  cursorStyle?: CursorStylePreset;
+  cursorCustomImages?: CursorCustomImageMap;
   cursorOffset?: number;
+  mediaDurationMs?: number;
 }
 
 export function useCursorRenderer({
@@ -25,65 +31,79 @@ export function useCursorRenderer({
   cursorSize = 1.5,
   cursorSmoothing = true,
   showVectorCursor = true,
-  cursorOffset = -180,
+  cursorStyle = 'toscreen',
+  cursorCustomImages = {},
+  cursorOffset = 0,
+  mediaDurationMs,
 }: UseCursorRendererProps) {
   const clickAnimationStateRef = useRef({ timeSinceClick: 999, isAnimating: false });
+  const preparedCursorData = useMemo(
+    () => prepareCursorTrack(cursorData, cursorSmoothing, mediaDurationMs),
+    [cursorData, cursorSmoothing, mediaDurationMs],
+  );
 
   // Sync settings parameters into high-performance references (avoid ticker rebuilds)
   const cursorSizeRef = useRef(cursorSize);
-  const cursorSmoothingRef = useRef(cursorSmoothing);
   const showVectorCursorRef = useRef(showVectorCursor);
+  const cursorStyleRef = useRef(cursorStyle);
+  const cursorCustomImagesRef = useRef(cursorCustomImages);
   const cursorOffsetRef = useRef(cursorOffset);
 
   useEffect(() => { cursorSizeRef.current = cursorSize; }, [cursorSize]);
-  useEffect(() => { cursorSmoothingRef.current = cursorSmoothing; }, [cursorSmoothing]);
   useEffect(() => { showVectorCursorRef.current = showVectorCursor; }, [showVectorCursor]);
+  useEffect(() => { cursorStyleRef.current = cursorStyle; }, [cursorStyle]);
+  useEffect(() => { cursorCustomImagesRef.current = cursorCustomImages; }, [cursorCustomImages]);
   useEffect(() => { cursorOffsetRef.current = cursorOffset; }, [cursorOffset]);
 
   useEffect(() => {
-    if (!pixiReady || !appRef.current || !videoRef.current || cursorData.length === 0) return;
+    if (!pixiReady || !appRef.current || !videoRef.current || preparedCursorData.length === 0) return;
 
     const app = appRef.current;
     const parent = app.canvas?.parentElement || videoRef.current.parentElement;
     if (!parent) return;
+
+    const cursorLayer = document.createElement("div");
+    cursorLayer.style.position = "absolute";
+    cursorLayer.style.inset = "0";
+    cursorLayer.style.overflow = "hidden";
+    cursorLayer.style.pointerEvents = "none";
+    cursorLayer.style.zIndex = "9999";
 
     // Create standard, high-performance HTML/CSS element for distortion-free rendering
     const cursor = document.createElement("div");
     cursor.style.position = "absolute";
     cursor.style.left = "0";
     cursor.style.top = "0";
-    cursor.style.width = "28px";
-    cursor.style.height = "28px";
+    cursor.style.width = "56px";
+    cursor.style.height = "56px";
     cursor.style.margin = "0";
     cursor.style.padding = "0";
     cursor.style.border = "none";
     cursor.style.overflow = "visible";
     cursor.style.transformOrigin = "0px 0px"; // Tip of the arrow
     cursor.style.pointerEvents = "none";
-    cursor.style.zIndex = "9999";
+    cursor.style.zIndex = "1";
     cursor.style.willChange = "transform";
     
-    // High-DPI vector cursor: 56x56 base for Retina-crisp rendering at all scale levels
-    cursor.style.width = "56px";
-    cursor.style.height = "56px";
-    cursor.innerHTML = `
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.35)); display: block; overflow: visible;">
-        <path d="M0 0V40L11.4 28.6L21.4 48.6L28.6 44.2L18.6 24.2L36 24.2L0 0Z" fill="black" stroke="white" stroke-width="3" stroke-linejoin="round"/>
-      </svg>
-    `;
+    const fitCursorVisualToBox = () => {
+      const visual = cursor.querySelector('svg, img') as SVGElement | HTMLImageElement | null;
+      if (!visual) return;
+      visual.style.width = '100%';
+      visual.style.height = '100%';
+    };
 
-    const svgEl = cursor.querySelector('svg') as SVGSVGElement | null;
+    cursor.innerHTML = cursorElementMarkup('default', cursorStyleRef.current, cursorCustomImagesRef.current);
+    fitCursorVisualToBox();
 
-    parent.appendChild(cursor);
+    cursorLayer.appendChild(cursor);
+    parent.appendChild(cursorLayer);
 
     let lastClickIndex = -1;
     let rVFCId: number | null = null;
     let currentFrameMediaTimeMs = -1;
-    let lastRVFCTime = -1;
 
     const updateFrameTime = (_now: number, metadata: any) => {
       currentFrameMediaTimeMs = metadata.mediaTime * 1000;
-      lastRVFCTime = performance.now();
       
       const video = videoRef.current;
       if (video && 'requestVideoFrameCallback' in video) {
@@ -96,17 +116,12 @@ export function useCursorRenderer({
       rVFCId = (video as any).requestVideoFrameCallback(updateFrameTime);
     }
 
-    // Catmull-Rom Cubic Spline interpolation formula for C1 smooth curves
-    const catmullRom = (p0: number, p1: number, p2: number, p3: number, t: number): number => {
-      return 0.5 * (
-        (2 * p1) +
-        (-p0 + p2) * t +
-        (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t +
-        (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t
-      );
-    };
-
     let lastAppliedFilter = '';
+    let lastClipPath = '';
+    let lastCursorType = 'default';
+    let lastCursorStyle = cursorStyleRef.current;
+    let lastCustomImages = cursorCustomImagesRef.current;
+    let lastCursorBoxSize = 56;
 
     const ticker = (time: Ticker) => {
       const video = videoRef.current;
@@ -119,11 +134,15 @@ export function useCursorRenderer({
       if (video.paused) {
         currentTimeMs = rawTimeMs;
         currentFrameMediaTimeMs = -1;
-        lastRVFCTime = -1;
       } else {
-        if (currentFrameMediaTimeMs !== -1 && lastRVFCTime !== -1) {
-          const elapsed = performance.now() - lastRVFCTime;
-          currentTimeMs = currentFrameMediaTimeMs + elapsed * video.playbackRate;
+        if (
+          currentFrameMediaTimeMs !== -1
+          && !video.seeking
+          && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+        ) {
+          // mediaTime is the PTS of the frame the user is actually seeing.
+          // Extrapolating between callbacks makes the cursor run ahead of video.
+          currentTimeMs = currentFrameMediaTimeMs;
         } else {
           currentTimeMs = video.currentTime * 1000;
         }
@@ -133,78 +152,51 @@ export function useCursorRenderer({
       currentTimeMs = currentTimeMs + cursorOffsetRef.current;
 
       // Determine if we are running mock or real recording data
-      const isMock = cursorData.length > 0 && cursorData[0].timestamp === 0 && cursorData[cursorData.length - 1].timestamp === 10000;
+      const isMock = preparedCursorData.length > 0
+        && preparedCursorData[0].timestamp === 0
+        && preparedCursorData[preparedCursorData.length - 1].timestamp === 10000;
       
-      const minTimeMs = cursorData[0].timestamp;
-      const maxTimeMs = cursorData[cursorData.length - 1].timestamp;
+      const minTimeMs = preparedCursorData[0].timestamp;
+      const maxTimeMs = preparedCursorData[preparedCursorData.length - 1].timestamp;
       
       if (isMock) {
-        // Loop the mock data every 10 seconds so it never disappears on long videos
-        const mockDurationMs = cursorData[cursorData.length - 1].timestamp;
+        const mockDurationMs = preparedCursorData[preparedCursorData.length - 1].timestamp;
         currentTimeMs = currentTimeMs % Math.max(1, mockDurationMs);
       } else {
-        // For real recorded videos, clamp to the range of available mouse events
         currentTimeMs = Math.max(minTimeMs, Math.min(maxTimeMs, currentTimeMs));
       }
 
-      // O(log N) Binary Search to instantly find the correct time anchor.
-      // This is the absolute key to fixing "end-of-video extreme lag"!
-      // Previously, an O(N) linear scan caused up to 100,000 iterations per frame (60fps) 
-      // towards the end of long videos, completely choking the CPU.
-      let left = 0;
-      let right = cursorData.length - 2;
-      let currentIndex = 0;
-      
-      while (left <= right) {
-        const mid = Math.floor((left + right) / 2);
-        if (cursorData[mid].timestamp <= currentTimeMs && cursorData[mid + 1].timestamp > currentTimeMs) {
-          currentIndex = mid;
-          break;
-        } else if (cursorData[mid].timestamp > currentTimeMs) {
-          right = mid - 1;
-        } else {
-          left = mid + 1;
-        }
-      }
-
-      // If we've reached the very end of our mouse recording timeline, anchor to the final state
-      if (currentTimeMs >= maxTimeMs) {
-        currentIndex = cursorData.length - 2;
-      }
-
-      // Fetch 4 spline points for Catmull-Rom smooth boundary interpolation
-      const p0 = cursorData[Math.max(0, currentIndex - 1)];
-      const p1 = cursorData[currentIndex];
-      const p2 = cursorData[Math.min(cursorData.length - 1, currentIndex + 1)];
-      const p3 = cursorData[Math.min(cursorData.length - 1, currentIndex + 2)];
-
-      // Calculate time progress between p1 and p2 (safely clamped to [0, 1] to prevent extrapolation glitches)
-      const timeDiff = p2.timestamp - p1.timestamp;
-      const progress = timeDiff === 0 ? 0 : Math.max(0, Math.min(1, (currentTimeMs - p1.timestamp) / timeDiff));
-
-      let currentX = 0;
-      let currentY = 0;
-
-      if (cursorSmoothingRef.current) {
-        // Apply Catmull-Rom interpolation to smooth out jerky angles/shakiness
-        currentX = catmullRom(p0.cx, p1.cx, p2.cx, p3.cx, progress);
-        currentY = catmullRom(p0.cy, p1.cy, p2.cy, p3.cy, progress);
-      } else {
-        // Linear interpolation (keeps native raw jerky points)
-        currentX = p1.cx + (p2.cx - p1.cx) * progress;
-        currentY = p1.cy + (p2.cy - p1.cy) * progress;
+      const sample = sampleCursorTrack(preparedCursorData, currentTimeMs);
+      if (!sample) return;
+      const currentIndex = sample.index;
+      const currentPoint = preparedCursorData[currentIndex];
+      const currentX = sample.x;
+      const currentY = sample.y;
+      const currentCursorType = normalizeCursorVisualType(sample.cursorType);
+      const currentCursorStyle = cursorStyleRef.current;
+      const currentCustomImages = cursorCustomImagesRef.current;
+      if (
+        currentCursorType !== lastCursorType
+        || currentCursorStyle !== lastCursorStyle
+        || currentCustomImages !== lastCustomImages
+      ) {
+        cursor.innerHTML = cursorElementMarkup(currentCursorType, currentCursorStyle, currentCustomImages);
+        fitCursorVisualToBox();
+        lastCursorType = currentCursorType;
+        lastCursorStyle = currentCursorStyle;
+        lastCustomImages = currentCustomImages;
+        lastAppliedFilter = '';
       }
 
       // PERFORMANCE KILLER FIX: Forced Synchronous Layout (Layout Thrashing)
       // NEVER read parent.clientWidth/clientHeight inside a 60fps ticker loop!
       // This causes the browser to recalculate the entire page layout on EVERY FRAME, causing massive stutters!
       // We assume it's visible by default, or you can rely on CSS for hiding.
-      const isVisible = true;
-      cursor.style.display = isVisible ? 'block' : 'none';
+      let isVisible = false;
 
       // Detect clicks to trigger Jiggle animation (only for Premium Vector Cursor)
       const isVectorStyle = showVectorCursorRef.current;
-      if (isVectorStyle && p1.isClick && currentIndex !== lastClickIndex) {
+      if (isVectorStyle && currentPoint.isClick && currentIndex !== lastClickIndex) {
         lastClickIndex = currentIndex;
         clickAnimationStateRef.current = { timeSinceClick: 0, isAnimating: true };
       }
@@ -214,6 +206,12 @@ export function useCursorRenderer({
       // When showVectorCursor is false, force small size to match macOS native cursor size
       // Note: SVG base is 56px (2x), so divide by 2 to get equivalent visual size
       const displayScale = isVectorStyle ? currentSize * 0.8 : 0.31; 
+      const targetSizePx = 56 * displayScale;
+      if (Math.abs(targetSizePx - lastCursorBoxSize) > 0.01) {
+        cursor.style.width = `${targetSizePx}px`;
+        cursor.style.height = `${targetSizePx}px`;
+        lastCursorBoxSize = targetSizePx;
+      }
 
       let jiggleScale = 1.0;
       if (isVectorStyle && clickAnimationStateRef.current.isAnimating) {
@@ -230,49 +228,61 @@ export function useCursorRenderer({
       }
 
       // Dynamically toggle drop shadow filter based on style selection
-      if (svgEl) {
+      const visualElement = cursor.querySelector('svg, img') as SVGElement | HTMLImageElement | null;
+      if (visualElement) {
         const targetFilter = isVectorStyle
           ? 'drop-shadow(0px 3px 5px rgba(0,0,0,0.35))' // Premium large style
           : 'drop-shadow(0px 1px 2px rgba(0,0,0,0.45))'; // Native style
         
         if (lastAppliedFilter !== targetFilter) {
-          svgEl.style.filter = targetFilter;
+          visualElement.style.filter = targetFilter;
           lastAppliedFilter = targetFilter;
         }
       }
 
-      if (isVisible) {
-        // Fallback initialized to 0. 
-        // We rely entirely on PIXI's mathematical affine transform below, eliminating DOM read thrashing!
-        let finalX = 0;
-        let finalY = 0;
+      let finalX = 0;
+      let finalY = 0;
 
-        // Perfect coordinate transformation via PIXI to account for camera zoom/pan!
-        const container = videoContainerRef.current;
-        if (container) {
-          const videoSprite = container.children?.[0] as any;
-          if (videoSprite && videoSprite.texture && videoSprite.texture.width > 0) {
-            const videoWidth = videoSprite.texture.width;
-            const videoHeight = videoSprite.texture.height;
+      // Transform the recorded video coordinate through the current PIXI camera.
+      const container = videoContainerRef.current;
+      if (container) {
+        const videoSprite = container.children?.[0] as any;
+        if (videoSprite && videoSprite.texture && videoSprite.texture.width > 0) {
+          const videoWidth = videoSprite.texture.width;
+          const videoHeight = videoSprite.texture.height;
+          const globalPos = videoSprite.toGlobal({
+            x: currentX * videoWidth,
+            y: currentY * videoHeight
+          });
 
-            // Directly invoke videoSprite.toGlobal using PIXI affine matrix conversion!
-            // This is 100% mathematically correct and eliminates manual layout offsets.
-            const globalPos = videoSprite.toGlobal({
-              x: currentX * videoWidth,
-              y: currentY * videoHeight
-            });
-            
-            finalX = globalPos.x;
-            finalY = globalPos.y;
+          finalX = globalPos.x;
+          finalY = globalPos.y;
+          isVisible = true;
+
+          const visibleVideoBounds = videoSprite.getBounds?.();
+          if (visibleVideoBounds?.width > 0 && visibleVideoBounds?.height > 0) {
+            const stageWidth = app.screen.width;
+            const stageHeight = app.screen.height;
+            const left = Math.max(0, Math.min(stageWidth, visibleVideoBounds.x));
+            const top = Math.max(0, Math.min(stageHeight, visibleVideoBounds.y));
+            const right = Math.max(0, Math.min(stageWidth, stageWidth - (visibleVideoBounds.x + visibleVideoBounds.width)));
+            const bottom = Math.max(0, Math.min(stageHeight, stageHeight - (visibleVideoBounds.y + visibleVideoBounds.height)));
+            const clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px)`;
+            if (clipPath !== lastClipPath) {
+              cursorLayer.style.clipPath = clipPath;
+              lastClipPath = clipPath;
+            }
           }
         }
-
-        // Apply transformation GPU-accelerated and distortion-free!
-        // No tipOffsetX/tipOffsetY subtracted because the SVG path tip is exactly at (0, 0)
-        const totalScale = jiggleScale * displayScale;
-        // Removed performance-killing log
-        cursor.style.transform = `translate3d(${finalX}px, ${finalY}px, 0) scale(${totalScale})`;
       }
+
+      cursor.style.display = isVisible ? 'block' : 'none';
+      if (!isVisible) return;
+
+      // The SVG path tip is exactly at (0, 0).
+      const pressedScale = sample.isPointerDown ? 0.86 : 1;
+      const animationScale = jiggleScale * pressedScale;
+      cursor.style.transform = `translate3d(${finalX}px, ${finalY}px, 0) scale(${animationScale})`;
     };
 
     app.ticker.add(ticker);
@@ -284,11 +294,11 @@ export function useCursorRenderer({
       if (app && app.ticker) {
         app.ticker.remove(ticker);
       }
-      if (cursor && cursor.parentElement) {
-        cursor.parentElement.removeChild(cursor);
+      if (cursorLayer.parentElement) {
+        cursorLayer.parentElement.removeChild(cursorLayer);
       }
     };
-  }, [pixiReady, cursorData]);
+  }, [pixiReady, preparedCursorData]);
 
   return null;
 }

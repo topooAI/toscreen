@@ -1,12 +1,14 @@
 import React from 'react';
 import { useItem, useTimelineContext } from "dnd-timeline";
 import type { Span } from "dnd-timeline";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 // lucide-react icons removed per user requirement: pure text only
 import glassStyles from "./ItemGlass.module.css";
 import VolumeEnvelope from './VolumeEnvelope';
 import { VolumeKeyframe, AudioRegion, ZoomRegion } from '../types';
 import { useAudioWaveform } from "../hooks/useAudioWaveform";
+import { useTimelineVisualSnap } from "./TimelineVisualSnapContext";
 
 import { VideoThumbnails } from "./VideoThumbnails";
 import { getAudioWaveformLeftPx, resolveAudioResizeBounds } from "./timelineAudioResizeBounds";
@@ -117,8 +119,10 @@ interface ItemProps {
   onVolumeChange?: (vol: number) => void;
   onVolumeKeyframesChange?: (keyframes: VolumeKeyframe[]) => void;
   onDirectSpanChange?: (id: string, span: Span) => void;
+  onDirectDragSpanChange?: (id: string, span: Span) => void;
   onDirectSpanPreview?: (id: string, span: Span | null) => void;
-  getDirectSnapSpan?: (id: string, span: Span) => Span;
+  getVisualSnapSpan?: (id: string, span: Span, snapThresholdMs: number) => Span;
+  getVisualResizeSnapSpan?: (id: string, span: Span, snapThresholdMs: number) => Span;
   onDirectResizeStart?: () => void;
   onDirectResizeEnd?: () => void;
   zoomRegions?: ZoomRegion[];
@@ -137,6 +141,8 @@ const ZOOM_LABELS: Record<number, string> = {
   5: "3.5×",
   6: "5×",
 };
+
+const TIMELINE_RESIZE_HIT_AREA_PX = 18;
 
 function ItemComponent({ 
   id, 
@@ -158,8 +164,10 @@ function ItemComponent({
   volumeKeyframes,
   onVolumeKeyframesChange,
   onDirectSpanChange,
+  onDirectDragSpanChange,
   onDirectSpanPreview,
-  getDirectSnapSpan,
+  getVisualSnapSpan,
+  getVisualResizeSnapSpan,
   onDirectResizeStart,
   onDirectResizeEnd,
   zoomRegions = [],
@@ -170,19 +178,27 @@ function ItemComponent({
 }: ItemProps) {
   const { valueToPixels } = useTimelineContext();
   const pxPerMs = valueToPixels(1);
+  const snapThresholdMs = 8 / Math.max(pxPerMs, 0.0001);
   const baseWidthPx = (span.end - span.start) * pxPerMs;
+  const visualSnap = useTimelineVisualSnap();
   const isZoom = variant === 'zoom';
   const isTrim = variant === 'trim';
   const isVideo = variant === 'video';
   const isAudio = variant === 'audio';
+  const isAnnotation = variant === 'annotation';
+  const canTimelineDirectDrag = isAudio || isAnnotation;
+  const canTimelineDirectResize = isTrim || isAudio || isAnnotation;
   const dynamicResizeHandleWidth = isZoom || isTrim
-    ? Math.max(4, Math.min(10, baseWidthPx / 3))
-    : Math.max(4, Math.min(12, baseWidthPx / 4));
+    ? 5
+    : 5;
 
   const { setNodeRef, attributes, listeners, itemStyle, itemContentStyle, transform } = useItem({
     id,
     span,
-    resizeHandleWidth: 2 * dynamicResizeHandleWidth,
+    // dnd-timeline checks half of this value against the outer item edge.
+    // 18px gives each side a 9px hit radius, covering the 5px handle plus
+    // the 3px visual inset from `width: calc(100% - 3px)`.
+    resizeHandleWidth: TIMELINE_RESIZE_HIT_AREA_PX,
     data: { rowId, variant },
   });
 
@@ -196,6 +212,7 @@ function ItemComponent({
   const isResizingLeft = React.useRef(false);
   const isResizingRight = React.useRef(false);
   const directResizeSpanRef = React.useRef<Span | null>(null);
+  const directDragSpanRef = React.useRef<Span | null>(null);
 
   // 精确计算拖拽时容器左边缘的物理位移量
   const baseLeftPx = span.start * pxPerMs;
@@ -212,14 +229,35 @@ function ItemComponent({
   const activePeaks = (audioPeaks && audioPeaks.length > 0) ? audioPeaks : hookPeaks;
   const trueTotalDurMs = (activePeaks === hookPeaks && hookDurationMs > 0) ? hookDurationMs : effTotalDuration;
 
+  const snappedItemStyle = React.useMemo(() => {
+    if (
+      !transform ||
+      visualSnap.activeItemId !== id ||
+      Math.abs(visualSnap.offsetPx) <= 0.5 ||
+      isResizingLeft.current ||
+      isResizingRight.current
+    ) {
+      return itemStyle;
+    }
+
+    return {
+      ...itemStyle,
+      transform: CSS.Translate.toString({
+        ...transform,
+        x: transform.x + visualSnap.offsetPx,
+      }),
+    };
+  }, [id, itemStyle, transform, visualSnap.activeItemId, visualSnap.offsetPx]);
+
   const handleDirectResizePointerDown = React.useCallback((direction: 'start' | 'end') => (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!onDirectSpanChange || (!isZoom && !isTrim)) return;
+    if (!onDirectSpanChange || !canTimelineDirectResize) return;
     const node = nodeRef.current;
     const parentNode = node?.parentElement;
     if (!node || !parentNode) return;
 
     event.preventDefault();
     event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation?.();
     onSelect?.();
     onDirectResizeStart?.();
 
@@ -233,35 +271,48 @@ function ItemComponent({
     const minDurationMs = 1;
     const minWidthPx = Math.max(1, minDurationMs * pxPerMs);
     const previousOpacity = node.style.opacity;
-
-    const ghost = node.cloneNode(true) as HTMLElement;
-    ghost.removeAttribute('id');
-    ghost.style.position = 'absolute';
-    ghost.style.top = node.style.top || '0px';
-    ghost.style.left = `${initialLeftPx}px`;
-    ghost.style.right = 'auto';
-    ghost.style.width = `${initialWidthPx}px`;
-    ghost.style.height = `${nodeRect.height}px`;
-    ghost.style.zIndex = '999';
-    ghost.style.pointerEvents = 'none';
-    ghost.style.transition = 'none';
-    ghost.style.transform = 'none';
-    ghost.setAttribute('data-direct-resize-ghost', 'true');
-
-    parentNode.appendChild(ghost);
-    node.style.opacity = '0';
+    const resizeCommitThresholdPx = 8;
+    let hasMeaningfulResize = false;
+    let ghost: HTMLElement | null = null;
     directResizeSpanRef.current = initialSpan;
 
+    const ensureGhost = () => {
+      if (ghost) return ghost;
+
+      ghost = node.cloneNode(true) as HTMLElement;
+      ghost.removeAttribute('id');
+      ghost.style.position = 'absolute';
+      ghost.style.top = node.style.top || '0px';
+      ghost.style.left = `${initialLeftPx}px`;
+      ghost.style.right = 'auto';
+      ghost.style.width = `${initialWidthPx}px`;
+      ghost.style.height = `${nodeRect.height}px`;
+      ghost.style.zIndex = '999';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.transition = 'none';
+      ghost.style.transform = 'none';
+      ghost.setAttribute('data-direct-resize-ghost', 'true');
+
+      parentNode.appendChild(ghost);
+      node.style.opacity = '0';
+      return ghost;
+    };
+
     const applyPreview = (leftPx: number, widthPx: number) => {
-      ghost.style.left = `${leftPx}px`;
-      ghost.style.width = `${widthPx}px`;
+      const activeGhost = ensureGhost();
+      activeGhost.style.left = `${leftPx}px`;
+      activeGhost.style.width = `${widthPx}px`;
     };
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       moveEvent.preventDefault();
       const deltaPx = moveEvent.clientX - startClientX;
+      if (!hasMeaningfulResize && Math.abs(deltaPx) < resizeCommitThresholdPx) {
+        return;
+      }
+      hasMeaningfulResize = true;
       const deltaMs = deltaPx / Math.max(pxPerMs, 0.0001);
-      const rawNextSpan = direction === 'start'
+      const rawSpan = direction === 'start'
         ? {
             start: Math.max(0, Math.min(initialSpan.start + deltaMs, initialSpan.end - minDurationMs)),
             end: initialSpan.end,
@@ -270,7 +321,7 @@ function ItemComponent({
             start: initialSpan.start,
             end: Math.max(initialSpan.start + minDurationMs, initialSpan.end + deltaMs),
           };
-      const nextSpan = getDirectSnapSpan?.(id, rawNextSpan) ?? rawNextSpan;
+      const nextSpan = getVisualResizeSnapSpan?.(id, rawSpan, snapThresholdMs) ?? rawSpan;
 
       directResizeSpanRef.current = nextSpan;
       onDirectSpanPreview?.(id, nextSpan);
@@ -295,12 +346,12 @@ function ItemComponent({
 
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
-      if (directResizeSpanRef.current) {
+      if (hasMeaningfulResize && directResizeSpanRef.current) {
         onDirectSpanChange(id, directResizeSpanRef.current);
       }
       onDirectSpanPreview?.(id, null);
       node.style.opacity = previousOpacity;
-      ghost.remove();
+      ghost?.remove();
       directResizeSpanRef.current = null;
       isResizingLeft.current = false;
       isResizingRight.current = false;
@@ -317,7 +368,82 @@ function ItemComponent({
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp, { once: true });
-  }, [baseLeftPx, baseWidthPx, getDirectSnapSpan, id, isTrim, isZoom, onDirectResizeEnd, onDirectResizeStart, onDirectSpanChange, onDirectSpanPreview, onSelect, pxPerMs, span]);
+  }, [canTimelineDirectResize, getVisualResizeSnapSpan, id, onDirectResizeEnd, onDirectResizeStart, onDirectSpanChange, onDirectSpanPreview, onSelect, pxPerMs, snapThresholdMs, span]);
+
+  const handleDirectDragPointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!canTimelineDirectDrag || !onDirectSpanChange || isResizingLeft.current || isResizingRight.current) {
+      return;
+    }
+
+    const node = nodeRef.current;
+    if (!node) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation?.();
+    node.setPointerCapture?.(event.pointerId);
+    onSelect?.();
+
+    const startClientX = event.clientX;
+    const pointerId = event.pointerId;
+    const initialSpan = { ...span };
+    const durationMs = initialSpan.end - initialSpan.start;
+    const previousTransform = node.style.transform;
+    const previousTransition = node.style.transition;
+    const previousZIndex = node.style.zIndex;
+
+    directDragSpanRef.current = initialSpan;
+    node.style.transition = "none";
+    node.style.zIndex = "999";
+
+    const applyPreview = (nextSpan: Span) => {
+      directDragSpanRef.current = nextSpan;
+      const offsetPx = (nextSpan.start - initialSpan.start) * pxPerMs;
+      node.style.transform = `translate3d(${offsetPx}px, 0, 0)`;
+      onDirectSpanPreview?.(id, nextSpan);
+    };
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      const deltaMs = (moveEvent.clientX - startClientX) / Math.max(pxPerMs, 0.0001);
+      const rawStart = Math.max(0, initialSpan.start + deltaMs);
+      const rawSpan = { start: rawStart, end: rawStart + durationMs };
+      applyPreview(getVisualSnapSpan?.(id, rawSpan, snapThresholdMs) ?? rawSpan);
+    };
+
+    const finish = (commit: boolean) => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
+      node.releasePointerCapture?.(pointerId);
+
+      const finalSpan = directDragSpanRef.current;
+      if (commit && finalSpan) {
+        (onDirectDragSpanChange ?? onDirectSpanChange)(id, finalSpan);
+      }
+      onDirectSpanPreview?.(id, null);
+      directDragSpanRef.current = null;
+      requestAnimationFrame(() => {
+        node.style.transform = previousTransform;
+        node.style.transition = previousTransition;
+        node.style.zIndex = previousZIndex;
+      });
+    };
+
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      upEvent.preventDefault();
+      upEvent.stopPropagation();
+      finish(true);
+    };
+
+    const handlePointerCancel = () => {
+      finish(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+    window.addEventListener("pointercancel", handlePointerCancel, { once: true });
+  }, [canTimelineDirectDrag, getVisualSnapSpan, id, onDirectDragSpanChange, onDirectSpanChange, onDirectSpanPreview, onSelect, pxPerMs, snapThresholdMs, span]);
 
   // 使用 MutationObserver 在 dnd-timeline 内部不触发 React 渲染的拖拽过程中，实时修正波形的物理偏移并设置拖拽物理墙
   React.useEffect(() => {
@@ -381,8 +507,9 @@ function ItemComponent({
     
     return (
       <div
-        ref={handleNodeRef}
-        style={{ 
+      ref={handleNodeRef}
+      data-timeline-item-id={id}
+      style={{
           ...itemStyle, 
           height: isAudioSelected ? 110 : 92,
           marginTop: 3,
@@ -472,7 +599,7 @@ function ItemComponent({
             <div
               className={cn(
                 glassStyles.glassVideo,
-                "w-full overflow-hidden flex items-center justify-between cursor-grab active:cursor-grabbing relative transition-all duration-300 ease-in-out flex-shrink-0",
+                "w-full overflow-hidden flex items-center justify-between cursor-grab active:cursor-grabbing relative transition-colors duration-150 flex-shrink-0",
                 isSelected && "selected"
               )}
               style={{ color: '#fff', margin: 0, height: 56, width: 'calc(100% - 3px)' }}
@@ -541,8 +668,9 @@ function ItemComponent({
   return (
     <div
       ref={handleNodeRef}
+      data-timeline-item-id={id}
       style={{
-        ...itemStyle,
+        ...snappedItemStyle,
         minWidth: 24,
         ...(isNestedTrim ? {
           top: 'auto',
@@ -553,14 +681,21 @@ function ItemComponent({
           marginBottom: 0
         } : {})
       }}
-      {...listeners}
+      {...(canTimelineDirectDrag ? {} : listeners)}
       {...attributes}
-      onPointerDownCapture={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        isResizingLeft.current = e.clientX - rect.left <= dynamicResizeHandleWidth;
-        isResizingRight.current = rect.right - e.clientX <= dynamicResizeHandleWidth;
-        onSelect?.();
-      }}
+        onPointerDownCapture={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (target?.closest('[data-timeline-resize-handle="true"]')) {
+            return;
+          }
+          isResizingLeft.current = false;
+          isResizingRight.current = false;
+          if (canTimelineDirectDrag) {
+            handleDirectDragPointerDown(e);
+            return;
+          }
+          onSelect?.();
+        }}
       className="group"
       onPointerUp={() => {
         isResizingLeft.current = false;
@@ -588,9 +723,10 @@ function ItemComponent({
         >
           {/* Left Resize Handle */}
           <div
+            data-timeline-resize-handle="true"
             className={cn(glassStyles.zoomEndCap, glassStyles.left, "flex items-center justify-center")}
             style={{ cursor: 'col-resize', pointerEvents: 'auto', width: `${dynamicResizeHandleWidth}px` }}
-            onPointerDown={handleDirectResizePointerDown('start')}
+            onPointerDown={canTimelineDirectResize ? handleDirectResizePointerDown('start') : undefined}
             title="Resize left"
           >
             <div className="w-1 h-3 bg-white/60 rounded-full" />
@@ -598,9 +734,10 @@ function ItemComponent({
 
           {/* Right Resize Handle */}
           <div
+            data-timeline-resize-handle="true"
             className={cn(glassStyles.zoomEndCap, glassStyles.right, "flex items-center justify-center")}
             style={{ cursor: 'col-resize', pointerEvents: 'auto', width: `${dynamicResizeHandleWidth}px` }}
-            onPointerDown={handleDirectResizePointerDown('end')}
+            onPointerDown={canTimelineDirectResize ? handleDirectResizePointerDown('end') : undefined}
             title="Resize right"
           >
             <div className="w-1 h-3 bg-white/60 rounded-full" />
@@ -682,8 +819,10 @@ export default React.memo(ItemComponent, (prev, next) => {
     prev.zoomRegions === next.zoomRegions &&
     prev.zoomBoundaryRegions === next.zoomBoundaryRegions &&
     prev.onDirectSpanChange === next.onDirectSpanChange &&
+    prev.onDirectDragSpanChange === next.onDirectDragSpanChange &&
     prev.onDirectSpanPreview === next.onDirectSpanPreview &&
-    prev.getDirectSnapSpan === next.getDirectSnapSpan &&
+    prev.getVisualSnapSpan === next.getVisualSnapSpan &&
+    prev.getVisualResizeSnapSpan === next.getVisualResizeSnapSpan &&
     prev.onDirectResizeStart === next.onDirectResizeStart &&
     prev.onDirectResizeEnd === next.onDirectResizeEnd
   );

@@ -20,13 +20,18 @@ export function usePixiApp(containerRef: React.RefObject<HTMLDivElement>) {
       try {
         app = new Application();
         
+        const previewResolution = Math.min(window.devicePixelRatio || 1, 1.5);
+
         await app.init({
           preference: 'webgl',
           width: container.clientWidth,
           height: container.clientHeight,
           backgroundAlpha: 0,
           antialias: true,
-          resolution: window.devicePixelRatio || 1,
+          // The editor preview is resized continuously. Capping its backing
+          // buffer keeps live panel/window resizing responsive on Retina
+          // displays; export rendering uses a separate full-resolution path.
+          resolution: previewResolution,
           autoDensity: true,
         });
       } catch (error) {

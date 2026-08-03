@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
@@ -28,11 +28,18 @@ import {
   type FigureData,
   type AudioRegion,
   type VolumeKeyframe,
+  type CursorStylePreset,
+  type CursorCustomImageMap,
+  resolveCursorStyle,
 } from "./types";
-import { generateAutoZooms } from "@/lib/autoZoom/generator";
+import {
+  clampZoomRegionsToRecordingDuration,
+  generateAutoZooms,
+} from "@/lib/autoZoom/generator";
 import { VideoExporter, type ExportProgress, type ExportQuality } from "@/lib/exporter";
 import { type AspectRatio, getAspectRatioValue } from "@/utils/aspectRatioUtils";
 import { getAssetPath } from "@/lib/assetPath";
+import { loadEditorPreferences, type AppTheme } from "@/lib/editorPreferences";
 import {
   createProjectFromLegacyEditorState,
   createProjectAutosaveSnapshot,
@@ -43,11 +50,15 @@ import {
   restoreLegacyEditorStateFromProjectModel,
   validateVideoEditorProject,
 } from "./project";
+import { createProductCameraRegion } from './videoPlayback/cameraMotion';
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
+const EDITOR_SPLIT_HANDLE_HEIGHT_PX = 8;
 
-export default function VideoEditor() {
+export default function VideoEditor({ theme }: { theme: AppTheme }) {
+  const [editorDefaults] = useState(loadEditorPreferences);
+  const [isLayoutResizing, setIsLayoutResizing] = useState(false);
   const [videoPath, setVideoPath] = useState<string | null>(null);
   const [originalVideoPath, setOriginalVideoPath] = useState<string | null>(null);
   const [companionAudioPath, setCompanionAudioPath] = useState<string | null>(null);
@@ -57,11 +68,11 @@ export default function VideoEditor() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [wallpaper, setWallpaper] = useState<string>(WALLPAPER_PATHS[0]);
-  const [shadowIntensity, setShadowIntensity] = useState(0.6);
+  const [shadowIntensity, setShadowIntensity] = useState(editorDefaults.shadowIntensity);
   const [showBlur, setShowBlur] = useState(false);
-  const [motionBlurEnabled, setMotionBlurEnabled] = useState(true);
-  const [borderRadius, setBorderRadius] = useState(20);
-  const [padding, setPadding] = useState(60);
+  const [motionBlurEnabled, setMotionBlurEnabled] = useState(editorDefaults.motionBlurEnabled);
+  const [borderRadius, setBorderRadius] = useState(editorDefaults.borderRadius);
+  const [padding, setPadding] = useState(editorDefaults.padding);
   const [cropRegion, setCropRegion] = useState<CropRegion>(DEFAULT_CROP_REGION);
   const [zoomRegions, setZoomRegions] = useState<ZoomRegion[]>([]);
   const [selectedZoomId, setSelectedZoomId] = useState<string | null>(null);
@@ -202,15 +213,31 @@ export default function VideoEditor() {
   }, [audioRegions, duration, trimRegions]);
 
   // Premium Cursor Customization Settings (Screen Studio parity)
-  const [cursorSize, setCursorSize] = useState(1.5);
-  const [cursorSmoothing, setCursorSmoothing] = useState(true);
-  const [showVectorCursor, setShowVectorCursor] = useState(true);
-  const [cursorOffset, setCursorOffset] = useState(-180);
+  const [cursorSize, setCursorSize] = useState(editorDefaults.cursorSize);
+  const [cursorSmoothing, setCursorSmoothing] = useState(editorDefaults.cursorSmoothing);
+  const [showVectorCursor, setShowVectorCursor] = useState(editorDefaults.showVectorCursor);
+  const [cursorStyle, setCursorStyle] = useState<CursorStylePreset>(editorDefaults.cursorStyle);
+  const [cursorCustomImages, setCursorCustomImages] = useState<CursorCustomImageMap>({});
+  const [cursorOffset, setCursorOffset] = useState(0);
   const [cursorData, setCursorData] = useState<any[]>([]);
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
-  const [exportQuality, setExportQuality] = useState<ExportQuality>('good');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(editorDefaults.aspectRatio);
+  const [exportQuality, setExportQuality] = useState<ExportQuality>(editorDefaults.exportQuality);
   const [isFullScreenBinding, setIsFullScreenBinding] = useState(true);
+  const handleCursorStyleChange = useCallback((style: CursorStylePreset) => {
+    setCursorStyle(style);
+    setShowVectorCursor(style !== 'system');
+  }, []);
+  const handleCursorCustomImagesChange = useCallback((images: CursorCustomImageMap) => {
+    setCursorCustomImages(images);
+    if (Object.keys(images).length === 0) {
+      setCursorStyle((style) => style === 'custom' ? 'toscreen' : style);
+    }
+  }, []);
+  const recordingDurationMs = useMemo(
+    () => Math.max(0, Math.round(duration * 1000)),
+    [duration],
+  );
 
   const projectDuration = useMemo(() => calculateLegacyProjectDurationSeconds({
     durationSeconds: duration,
@@ -234,6 +261,8 @@ export default function VideoEditor() {
     cursorSize,
     cursorSmoothing,
     showVectorCursor,
+    cursorStyle,
+    cursorCustomImages,
     cursorOffset,
     cropRegion,
     wallpaper,
@@ -258,6 +287,8 @@ export default function VideoEditor() {
     cursorSize,
     cursorSmoothing,
     showVectorCursor,
+    cursorStyle,
+    cursorCustomImages,
     cursorOffset,
     cropRegion,
     wallpaper,
@@ -282,6 +313,11 @@ export default function VideoEditor() {
 
   const currentTimeStateRef = useRef(currentTime);
   const timelineResizeLockRef = useRef(0);
+  const verticalEditorSplitRef = useRef<HTMLDivElement | null>(null);
+  const verticalSplitCleanupRef = useRef<(() => void) | null>(null);
+  const panelLayoutResizeRef = useRef(false);
+  const windowLayoutResizeRef = useRef(false);
+  const windowResizeTimerRef = useRef<number | null>(null);
   const projectClockRef = useRef<number | null>(null);
   const projectClockBaseRef = useRef({ startedAt: 0, startTime: 0 });
 
@@ -297,6 +333,86 @@ export default function VideoEditor() {
     timelineResizeLockRef.current = Math.max(0, timelineResizeLockRef.current - 1);
   }, []);
 
+  const handlePanelLayoutResize = useCallback((isDragging: boolean) => {
+    panelLayoutResizeRef.current = isDragging;
+    setIsLayoutResizing(isDragging || windowLayoutResizeRef.current);
+  }, []);
+
+  const handleVerticalSplitPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const container = verticalEditorSplitRef.current;
+    if (!container) return;
+
+    event.preventDefault();
+    verticalSplitCleanupRef.current?.();
+    handlePanelLayoutResize(true);
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+
+    const updateSplit = (clientY: number) => {
+      const bounds = container.getBoundingClientRect();
+      const handleHeight = EDITOR_SPLIT_HANDLE_HEIGHT_PX;
+      const usableHeight = Math.max(1, bounds.height);
+      const previewHeight = clientY - bounds.top - handleHeight / 2;
+      const ratio = Math.max(0.35, Math.min(0.65, previewHeight / usableHeight));
+
+      container.style.setProperty('--preview-panel-fr', `${ratio * 100}fr`);
+      container.style.setProperty('--timeline-panel-fr', `${(1 - ratio) * 100}fr`);
+    };
+
+    const handlePointerMove = (pointerEvent: PointerEvent) => {
+      updateSplit(pointerEvent.clientY);
+    };
+
+    const finishDragging = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', finishDragging);
+      window.removeEventListener('pointercancel', finishDragging);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      verticalSplitCleanupRef.current = null;
+      handlePanelLayoutResize(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', finishDragging);
+    window.addEventListener('pointercancel', finishDragging);
+    verticalSplitCleanupRef.current = finishDragging;
+    updateSplit(event.clientY);
+  }, [handlePanelLayoutResize]);
+
+  useEffect(() => {
+    return () => verticalSplitCleanupRef.current?.();
+  }, []);
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      windowLayoutResizeRef.current = true;
+      setIsLayoutResizing(true);
+
+      if (windowResizeTimerRef.current !== null) {
+        window.clearTimeout(windowResizeTimerRef.current);
+      }
+
+      windowResizeTimerRef.current = window.setTimeout(() => {
+        windowResizeTimerRef.current = null;
+        windowLayoutResizeRef.current = false;
+        setIsLayoutResizing(panelLayoutResizeRef.current);
+      }, 120);
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    return () => {
+      window.removeEventListener('resize', handleWindowResize);
+      if (windowResizeTimerRef.current !== null) {
+        window.clearTimeout(windowResizeTimerRef.current);
+        windowResizeTimerRef.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!isPlaying) {
       if (projectClockRef.current !== null) {
@@ -306,20 +422,46 @@ export default function VideoEditor() {
       return;
     }
 
-    const startTime = Math.min(Math.max(currentTimeStateRef.current, 0), Math.max(projectDuration, 0));
-    projectClockBaseRef.current = {
-      startedAt: performance.now(),
-      startTime,
-    };
+    let projectTailStarted = false;
 
     const tick = () => {
+      const video = videoPlaybackRef.current?.video;
+      const sourceVideoIsPlaying = Boolean(
+        video
+        && duration > 0
+        && !video.paused
+        && video.currentTime < duration - 0.05
+      );
+
+      // The media clock is authoritative while recorded video is active.
+      // The project clock only takes over for independent content after it.
+      if (sourceVideoIsPlaying) {
+        projectTailStarted = false;
+        projectClockRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      if (!projectTailStarted) {
+        const sourceTime = video && Number.isFinite(video.currentTime)
+          ? video.currentTime
+          : currentTimeStateRef.current;
+        const startTime = Math.min(
+          Math.max(currentTimeStateRef.current, sourceTime, 0),
+          Math.max(projectDuration, 0),
+        );
+        projectClockBaseRef.current = {
+          startedAt: performance.now(),
+          startTime,
+        };
+        projectTailStarted = true;
+      }
+
       const { startedAt, startTime } = projectClockBaseRef.current;
       const nextTime = startTime + (performance.now() - startedAt) / 1000;
       const clampedTime = Math.min(nextTime, projectDuration);
 
       setCurrentTime(clampedTime);
 
-      const video = videoPlaybackRef.current?.video;
       if (video && duration > 0 && clampedTime < duration && video.paused) {
         videoPlaybackRef.current?.play().catch(() => {});
       }
@@ -375,7 +517,18 @@ export default function VideoEditor() {
       const validation = validateVideoEditorProject(project.projectModel);
       if (validation.valid) {
         const restored = restoreLegacyEditorStateFromProjectModel(project.projectModel);
-        setZoomRegions(restored.zoomRegions);
+        const screenClip = project.projectModel.clips.find(
+          (clip: { type?: string }) => clip.type === "screen-recording",
+        );
+        const persistedSourceDurationMs = screenClip
+          ? Math.max(0, Number(screenClip.sourceEndMs) - Number(screenClip.sourceStartMs))
+          : 0;
+        setZoomRegions(
+          clampZoomRegionsToRecordingDuration(
+            restored.zoomRegions,
+            persistedSourceDurationMs,
+          ),
+        );
         setTrimRegions(restored.trimRegions);
         setAnnotationRegions(restored.annotationRegions);
         setAudioRegions(restored.audioRegions);
@@ -395,6 +548,12 @@ export default function VideoEditor() {
         if (restored.cursorSize !== undefined) setCursorSize(restored.cursorSize);
         if (restored.cursorSmoothing !== undefined) setCursorSmoothing(restored.cursorSmoothing);
         if (restored.showVectorCursor !== undefined) setShowVectorCursor(restored.showVectorCursor);
+        if (restored.cursorStyle !== undefined) setCursorStyle(restored.cursorStyle);
+        if (restored.cursorCustomImages !== undefined) {
+          setCursorCustomImages(restored.cursorCustomImages);
+        } else if (restored.cursorCustomImage) {
+          setCursorCustomImages({ default: restored.cursorCustomImage });
+        }
         if (restored.cursorOffset !== undefined) setCursorOffset(restored.cursorOffset);
         return "projectModel";
       }
@@ -428,6 +587,14 @@ export default function VideoEditor() {
     if (project.cursorSize !== undefined) setCursorSize(project.cursorSize);
     if (project.cursorSmoothing !== undefined) setCursorSmoothing(project.cursorSmoothing);
     if (project.showVectorCursor !== undefined) setShowVectorCursor(project.showVectorCursor);
+    setCursorStyle(resolveCursorStyle(project.cursorStyle, project.showVectorCursor ?? true));
+    setCursorCustomImages(
+      project.cursorCustomImages && typeof project.cursorCustomImages === 'object'
+        ? project.cursorCustomImages
+        : typeof project.cursorCustomImage === 'string'
+          ? { default: project.cursorCustomImage }
+          : {},
+    );
     if (project.cursorOffset !== undefined) setCursorOffset(project.cursorOffset);
     return "legacy";
   }, []);
@@ -576,8 +743,27 @@ export default function VideoEditor() {
       playback?.pause();
       setIsPlaying(false);
     } else {
-      if (currentTime >= projectDuration) {
+      if (currentTime >= Math.max(0, projectDuration - 0.05)) {
         handleSeek(0);
+        if (playback && video && duration > 0) {
+          let replayStarted = false;
+          const startReplay = () => {
+            if (replayStarted) return;
+            replayStarted = true;
+            video.removeEventListener('seeked', startReplay);
+            playback.play().catch(err => {
+              console.error('Video replay failed:', err);
+              setIsPlaying(false);
+            });
+          };
+          video.addEventListener('seeked', startReplay, { once: true });
+          requestAnimationFrame(() => {
+            if (!video.seeking) startReplay();
+          });
+        } else {
+          setIsPlaying(true);
+        }
+        return;
       }
 
       if (playback && video && currentTime < duration - 0.05) {
@@ -653,12 +839,29 @@ export default function VideoEditor() {
       endMs: Math.round(span.end),
       depth: DEFAULT_ZOOM_DEPTH,
       focus: { cx: 0.5, cy: 0.5 },
+      focusMode: 'manual',
+      source: 'manual',
     };
     setZoomRegions((prev) => [...prev, newRegion]);
     setSelectedZoomId(id);
     setSelectedTrimId(null);
     setSelectedAnnotationId(null);
   }, []);
+
+  const handleCameraAdded = useCallback((span: Span) => {
+    const region = createProductCameraRegion(Math.round(span.start), Math.round(span.end));
+    setZoomRegions((prev) => [...prev, region]);
+    setSelectedZoomId(region.id);
+    setSelectedTrimId(null);
+    setSelectedAnnotationId(null);
+  }, []);
+
+  const handleCameraMotionChange = useCallback((cameraMotion: NonNullable<ZoomRegion['cameraMotion']>) => {
+    if (!selectedZoomId) return;
+    setZoomRegions((prev) => prev.map((region) => (
+      region.id === selectedZoomId ? { ...region, cameraMotion } : region
+    )));
+  }, [selectedZoomId]);
 
   const handleTrimAdded = useCallback((span: Span) => {
     const id = `trim-${nextTrimIdRef.current++}`;
@@ -1028,7 +1231,9 @@ export default function VideoEditor() {
       }
 
       // Generate zoom regions
-      const newRegions = generateAutoZooms(result.clicks);
+      const newRegions = generateAutoZooms(result.clicks, {
+        totalDurationMs: recordingDurationMs,
+      });
 
       if (newRegions.length === 0) {
         toast.info("No zoom regions generated.", {
@@ -1048,7 +1253,7 @@ export default function VideoEditor() {
     } finally {
       setLoading(false);
     }
-  }, [originalVideoPath]);
+  }, [originalVideoPath, recordingDurationMs]);
 
   // Check for available auto-zoom data when video loads
   useEffect(() => {
@@ -1061,18 +1266,8 @@ export default function VideoEditor() {
         if (mounted && result.success && result.clicks && result.clicks.length > 0) {
           console.log(`[AutoZoom] Found ${result.clicks.length} clicks, applying automatically.`);
           setCursorData(result.clicks); // Save actual cursor coordinates array
-
-          // Generate regions immediately
-          const newRegions = generateAutoZooms(result.clicks);
-          console.log(`[AutoZoom] Generated ${newRegions.length} regions:`, newRegions);
-
-          if (newRegions.length > 0) {
-            setZoomRegions(newRegions);
-            toast.success("✨ Auto-Zoom Applied", {
-              description: `Automatically created ${newRegions.length} zoom regions based on your clicks.`,
-              duration: 4000,
-            });
-          }
+          // Loading telemetry must never overwrite a restored or manually edited timeline.
+          // Auto-zoom generation is an explicit command through the sidebar button.
         } else {
           if (mounted) {
             setCursorData([]);
@@ -1193,6 +1388,8 @@ export default function VideoEditor() {
         cursorSize: renderSettings.cursor.size,
         cursorSmoothing: renderSettings.cursor.smoothing,
         showVectorCursor: renderSettings.cursor.showVectorCursor,
+        cursorStyle: renderSettings.cursor.style,
+        cursorCustomImages: renderSettings.cursor.customImages,
         cursorOffset: renderSettings.cursor.offsetMs,
         onProgress: (progress: ExportProgress) => {
           setExportProgress(progress);
@@ -1254,6 +1451,8 @@ export default function VideoEditor() {
             selectedZoomDepth={selectedZoomId ? zoomRegions.find(z => z.id === selectedZoomId)?.depth : null}
             onZoomDepthChange={(depth) => selectedZoomId && handleZoomDepthChange(depth)}
             selectedZoomId={selectedZoomId}
+            selectedCameraMotion={selectedZoomId ? zoomRegions.find((region) => region.id === selectedZoomId)?.cameraMotion : null}
+            onCameraMotionChange={handleCameraMotionChange}
             onZoomDelete={handleZoomDelete}
             selectedTrimId={selectedTrimId}
             onTrimDelete={handleTrimDelete}
@@ -1270,10 +1469,13 @@ export default function VideoEditor() {
             cropRegion={cropRegion}
             onCropChange={setCropRegion}
             aspectRatio={aspectRatio}
+            onAspectRatioChange={setAspectRatio}
             videoElement={videoPlaybackRef.current?.video || null}
-            exportQuality={exportQuality}
-            onExportQualityChange={setExportQuality}
-            onExport={handleExport}
+            onExport={() => {
+              setExportError(null);
+              setExportProgress(null);
+              setShowExportDialog(true);
+            }}
             selectedAnnotationId={selectedAnnotationId}
             annotationRegions={annotationRegions}
             onAnnotationContentChange={handleAnnotationContentChange}
@@ -1281,13 +1483,16 @@ export default function VideoEditor() {
             onAnnotationStyleChange={handleAnnotationStyleChange}
             onAnnotationFigureDataChange={handleAnnotationFigureDataChange}
             onAnnotationDelete={handleAnnotationDelete}
-            onAutoZoom={handleAutoZoom}
             cursorSize={cursorSize}
             onCursorSizeChange={setCursorSize}
             cursorSmoothing={cursorSmoothing}
             onCursorSmoothingChange={setCursorSmoothing}
             showVectorCursor={showVectorCursor}
             onShowVectorCursorChange={setShowVectorCursor}
+            cursorStyle={cursorStyle}
+            onCursorStyleChange={handleCursorStyleChange}
+            cursorCustomImages={cursorCustomImages}
+            onCursorCustomImagesChange={handleCursorCustomImagesChange}
             cursorOffset={cursorOffset}
             onCursorOffsetChange={setCursorOffset}
             selectedVideoId={selectedVideoId}
@@ -1301,17 +1506,17 @@ export default function VideoEditor() {
           wallpaper, zoomRegions, selectedZoomId, selectedTrimId, shadowIntensity,
           showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, aspectRatio,
           exportQuality, selectedAnnotationId, annotationRegions, cursorSize,
-          cursorSmoothing, showVectorCursor, cursorOffset, selectedVideoId, selectedAudioId, audioRegions,
-          handleZoomDepthChange, handleZoomDelete, handleTrimDelete,
-          handleExport, handleAnnotationContentChange, handleAnnotationTypeChange,
+          cursorSmoothing, showVectorCursor, cursorStyle, cursorCustomImages, cursorOffset, selectedVideoId, selectedAudioId, audioRegions,
+          handleZoomDepthChange, handleZoomDelete, handleCameraMotionChange, handleTrimDelete,
+          handleAnnotationContentChange, handleAnnotationTypeChange,
           handleAnnotationStyleChange, handleAnnotationFigureDataChange, handleAnnotationDelete,
-          handleAutoZoom, videoPlaybackRef.current?.video, handleSeparateAudio, handleSelectAudio
+          videoPlaybackRef.current?.video, handleSeparateAudio, handleSelectAudio, handleCursorStyleChange, handleCursorCustomImagesChange
         ]);
 
   if (loading) {
     return (
       <div 
-        className="flex flex-col h-screen w-screen bg-[#111111] overflow-hidden"
+        className="flex h-full w-full flex-col bg-[var(--ui-shell)] text-[var(--ui-text-primary)] overflow-hidden"
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
@@ -1340,7 +1545,7 @@ export default function VideoEditor() {
 
   return (
     <div 
-      className="flex flex-col h-screen bg-[#09090b] text-slate-200 overflow-hidden selection:bg-[#34B27B]/30"
+      className={`flex h-full w-full flex-col bg-[var(--ui-bg)] text-[var(--ui-text-primary)] overflow-hidden selection:bg-[#34B27B]/30${isLayoutResizing ? ' is-layout-resizing' : ''}`}
       onDragEnter={(e) => e.preventDefault()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={async (e) => {
@@ -1449,22 +1654,45 @@ export default function VideoEditor() {
         </div>
       )}
       <div
-        className="h-10 flex-shrink-0 bg-[#09090b]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-6 z-50"
+        className="h-10 flex-shrink-0 z-50"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      >
-        <div className="flex-1" />
-      </div>
+        aria-hidden="true"
+      />
 
-      <div className="flex-1 p-5 gap-4 flex min-h-0 relative">
-        {/* Left Column - Video & Timeline */}
-        <div className="flex-[7] flex flex-col gap-3 min-w-0 h-full">
-          <PanelGroup direction="vertical" className="gap-3">
+      <div className="flex-1 p-1 min-h-0 relative">
+        <PanelGroup
+          key="editor-horizontal-layout-v1"
+          direction="horizontal"
+          autoSaveId="toscreen-editor-sidebar-layout"
+        >
+          <Panel defaultSize={78} minSize={60}>
+            {/* Left Column - Video & Timeline */}
+            <div className="flex flex-col min-w-0 h-full">
+              <div
+                ref={verticalEditorSplitRef}
+                className="ui-glass-surface grid h-full min-h-0 overflow-hidden rounded-lg border border-[var(--ui-border)] bg-[var(--ui-timeline-surface)]"
+                style={{
+                  gridTemplateRows: 'minmax(0, var(--preview-panel-fr, 55fr)) minmax(0, var(--timeline-panel-fr, 45fr))',
+                }}
+              >
             {/* Top section: video preview and controls */}
-            <Panel defaultSize={70} minSize={40}>
-              <div className="w-full h-full flex flex-col items-center justify-center bg-black/40 rounded-2xl border border-white/5 shadow-2xl overflow-hidden">
+            <div className="min-h-0 overflow-hidden bg-[var(--ui-preview-shell)]">
+              <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden">
                 {/* Video preview */}
-                <div className="w-full flex justify-center items-center" style={{ flex: '1 1 auto', margin: '6px 0 0' }}>
-                  <div className="relative" style={{ width: 'auto', height: '100%', aspectRatio: getAspectRatioValue(currentRenderSettings.canvas.aspectRatio), maxWidth: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+                <div
+                  className="w-full h-full p-1.5 flex items-center justify-center overflow-hidden"
+                  style={{ containerType: 'size' }}
+                >
+                  <div
+                    className="relative shrink-0"
+                    style={{
+                      width: `min(100cqw, calc(100cqh * ${getAspectRatioValue(currentRenderSettings.canvas.aspectRatio)}))`,
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      aspectRatio: getAspectRatioValue(currentRenderSettings.canvas.aspectRatio),
+                      boxSizing: 'border-box',
+                    }}
+                  >
                     <VideoPlayback
                       aspectRatio={currentRenderSettings.canvas.aspectRatio}
                       ref={videoPlaybackRef}
@@ -1527,21 +1755,27 @@ export default function VideoEditor() {
                       cursorSize={currentRenderSettings.cursor.size}
                       cursorSmoothing={currentRenderSettings.cursor.smoothing}
                       showVectorCursor={currentRenderSettings.cursor.showVectorCursor}
+                      cursorStyle={currentRenderSettings.cursor.style}
+                      cursorCustomImages={currentRenderSettings.cursor.customImages}
                       cursorData={currentRenderSettings.cursor.data}
                       cursorOffset={currentRenderSettings.cursor.offsetMs}
+                      isLayoutResizing={isLayoutResizing}
                     />
                   </div>
                 </div>
               </div>
-            </Panel>
-
-            <PanelResizeHandle className="h-3 bg-[#09090b]/80 hover:bg-[#09090b] transition-colors rounded-full mx-4 flex items-center justify-center">
-              <div className="w-8 h-1 bg-white/20 rounded-full"></div>
-            </PanelResizeHandle>
+            </div>
 
             {/* Timeline section */}
-            <Panel defaultSize={30} minSize={20}>
-              <div className="h-full bg-[#09090b] rounded-2xl border border-white/5 shadow-lg overflow-hidden flex flex-col">
+            <div className="relative z-10 -mx-px -mb-px h-[calc(100%+1px)] w-[calc(100%+2px)] min-h-0 overflow-hidden rounded-lg border border-[var(--ui-border)] bg-[var(--ui-timeline-card-surface)] flex flex-col">
+                <div
+                  className="group h-2 shrink-0 bg-transparent flex items-start justify-center pt-[5px] cursor-row-resize"
+                  onPointerDown={handleVerticalSplitPointerDown}
+                  role="separator"
+                  aria-orientation="horizontal"
+                >
+                  <div className="w-8 h-[3px] rounded-full bg-[var(--ui-border-strong)] transition-colors group-hover:bg-[var(--ui-text-tertiary)]"></div>
+                </div>
                 <TimelineEditor
                   videoDuration={projectDuration}
                   sourceVideoDuration={duration}
@@ -1550,6 +1784,7 @@ export default function VideoEditor() {
                   videoRef={videoElementRef}
                   zoomRegions={zoomRegions}
                   onZoomAdded={handleZoomAdded}
+                  onCameraAdded={handleCameraAdded}
                   onZoomSpanChange={handleZoomSpanChange}
                   onZoomSplit={handleZoomSplit}
                   onZoomDelete={handleZoomDelete}
@@ -1578,8 +1813,7 @@ export default function VideoEditor() {
                   selectedAudioId={selectedAudioId}
                   onSelectAudio={handleSelectAudio}
                   audioRegions={audioRegions}
-                  aspectRatio={aspectRatio}
-                  onAspectRatioChange={setAspectRatio}
+                  onAutoZoom={handleAutoZoom}
                   isFullScreenBinding={isFullScreenBinding}
                   onFullScreenBindingChange={setIsFullScreenBinding}
                   isPlaying={isPlaying}
@@ -1588,16 +1822,26 @@ export default function VideoEditor() {
                   onSelectVideo={setSelectedVideoId}
                   videoPath={videoPath ? toFileUrl(videoPath) : undefined}
                 />
+            </div>
               </div>
-            </Panel>
-          </PanelGroup>
-        </div>
+            </div>
+          </Panel>
 
-        {/* Right section: Sidebar */}
-        {memoizedSidebar}
+          <PanelResizeHandle
+            className="w-1 shrink-0 bg-transparent cursor-col-resize"
+            onDragging={handlePanelLayoutResize}
+          />
+
+          <Panel defaultSize={22} minSize={18} maxSize={36}>
+            {/* Right section: Sidebar */}
+            <div className="h-full min-w-0">
+              {memoizedSidebar}
+            </div>
+          </Panel>
+        </PanelGroup>
       </div>
 
-      <Toaster theme="dark" className="pointer-events-auto" />
+      <Toaster theme={theme} className="pointer-events-auto" />
 
       <ExportDialog
         isOpen={showExportDialog}
@@ -1605,6 +1849,9 @@ export default function VideoEditor() {
         progress={exportProgress}
         isExporting={isExporting}
         error={exportError}
+        quality={exportQuality}
+        onQualityChange={setExportQuality}
+        onStart={handleExport}
         onCancel={handleCancelExport}
       />
     </div>

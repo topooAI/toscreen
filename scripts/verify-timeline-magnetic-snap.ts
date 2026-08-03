@@ -2,201 +2,193 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   collectTimelineSnapTargets,
-  getTimelineMagneticSnapResult,
   getTimelineMagneticSnapSpan,
-  getTimelineSnapThresholdMs,
   type TimelineSnapItem,
 } from "../src/components/video-editor/timeline/timelineMagneticSnap";
+import {
+  constrainFocusDragSpan,
+  constrainFocusResizeSpan,
+} from "../src/components/video-editor/timeline/timelineFocusSpan";
 
 const VIDEO_ROW_ID = "row-video";
 const ZOOM_ROW_ID = "row-zoom-0";
 
-function assertSpan(label: string, actual: { start: number; end: number }, expected: { start: number; end: number }) {
+function assertSpan(
+  label: string,
+  actual: { start: number; end: number },
+  expected: { start: number; end: number },
+) {
   if (actual.start !== expected.start || actual.end !== expected.end) {
     throw new Error(`${label} expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
   }
 }
 
 function assertArray(label: string, actual: number[], expected: number[]) {
-  const actualJson = JSON.stringify(actual);
-  const expectedJson = JSON.stringify(expected);
-  if (actualJson !== expectedJson) {
-    throw new Error(`${label} expected ${expectedJson}, got ${actualJson}`);
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`${label} expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
   }
 }
 
 const items: TimelineSnapItem[] = [
-  { id: "zoom-a", rowId: ZOOM_ROW_ID, span: { start: 1000, end: 2000 } },
-  { id: "zoom-a-part-1", rowId: ZOOM_ROW_ID, span: { start: 2100, end: 2300 } },
-  { id: "zoom-peer", rowId: ZOOM_ROW_ID, span: { start: 3000, end: 4000 } },
-  { id: "video-track", rowId: VIDEO_ROW_ID, span: { start: 0, end: 8000 } },
-  { id: "annotation-peer", rowId: "row-annotation-0", span: { start: 1200, end: 1800 } },
+  { id: "focus-a", rowId: ZOOM_ROW_ID, span: { start: 1000, end: 2000 } },
+  { id: "focus-b", rowId: ZOOM_ROW_ID, span: { start: 3000, end: 4000 } },
 ];
 
-const snapTargets = collectTimelineSnapTargets({
-  activeItemId: "zoom-a",
-  items,
-  currentTimeMs: 2500,
-  videoRowId: VIDEO_ROW_ID,
-});
-
-assertArray("snap targets exclude self, same base part, and other rows", snapTargets, [
-  2500,
-  3000,
-  4000,
-  0,
-  8000,
-]);
-
-if (getTimelineSnapThresholdMs(2000) !== 300) {
-  throw new Error("Expected snap threshold to cap at 300ms.");
-}
-
-if (getTimelineSnapThresholdMs(100) !== 50) {
-  throw new Error("Expected snap threshold to floor at 50ms.");
-}
+assertArray(
+  "snap targets contain peer edges but never the playhead",
+  collectTimelineSnapTargets({
+    activeItemId: "focus-a",
+    items,
+    currentTimeMs: 2500,
+  }),
+  [3000, 4000],
+);
 
 assertSpan(
-  "drag start snaps to peer edge inside threshold",
+  "drag snaps to a peer edge and preserves duration",
   getTimelineMagneticSnapSpan({
-    activeItemId: "zoom-a",
-    targetSpan: { start: 2920, end: 3920 },
+    activeItemId: "focus-a",
+    targetSpan: { start: 2025, end: 3025 },
     items,
     currentTimeMs: 2500,
     intervalMs: 1000,
     videoRowId: VIDEO_ROW_ID,
+    interaction: "drag",
+    snapThresholdMs: 80,
   }),
-  { start: 3000, end: 4000 },
+  { start: 2000, end: 3000 },
 );
 
 assertSpan(
-  "drag end snaps to playhead inside threshold",
+  "drag outside the pixel-derived threshold remains pointer-accurate",
   getTimelineMagneticSnapSpan({
-    activeItemId: "zoom-a",
-    targetSpan: { start: 1420, end: 2420 },
+    activeItemId: "focus-a",
+    targetSpan: { start: 2150, end: 3150 },
     items,
     currentTimeMs: 2500,
     intervalMs: 1000,
     videoRowId: VIDEO_ROW_ID,
+    interaction: "drag",
+    snapThresholdMs: 80,
   }),
-  { start: 1500, end: 2500 },
+  { start: 2150, end: 3150 },
 );
 
 assertSpan(
-  "target outside threshold does not snap",
+  "deep overlap does not cause a long-distance magnetic jump",
   getTimelineMagneticSnapSpan({
-    activeItemId: "zoom-a",
-    targetSpan: { start: 2700, end: 3700 },
+    activeItemId: "focus-a",
+    targetSpan: { start: 3250, end: 4250 },
     items,
-    currentTimeMs: 6000,
+    currentTimeMs: 2500,
     intervalMs: 1000,
     videoRowId: VIDEO_ROW_ID,
+    interaction: "drag",
+    snapThresholdMs: 80,
   }),
-  { start: 2700, end: 3700 },
+  { start: 3250, end: 4250 },
 );
 
 assertSpan(
-  "self original edge is not a sticky snap target",
+  "right resize snaps from either side of the target",
   getTimelineMagneticSnapSpan({
-    activeItemId: "zoom-a",
-    targetSpan: { start: 1050, end: 2050 },
+    activeItemId: "focus-a",
+    targetSpan: { start: 1000, end: 3040 },
     items,
-    currentTimeMs: 6000,
+    currentTimeMs: 2500,
     intervalMs: 1000,
     videoRowId: VIDEO_ROW_ID,
+    interaction: "resize",
+    snapThresholdMs: 80,
   }),
-  { start: 1050, end: 2050 },
+  { start: 1000, end: 3000 },
+);
+
+const focusItems = [
+  { id: "focus-prev", startMs: 0, endMs: 1000 },
+  { id: "focus-active", startMs: 1500, endMs: 2500 },
+  { id: "focus-next", startMs: 3000, endMs: 4000 },
+];
+
+assertSpan(
+  "focus drag is physically blocked before the next focus clip",
+  constrainFocusDragSpan("focus-active", { start: 2600, end: 3600 }, focusItems, 5000),
+  { start: 2000, end: 3000 },
 );
 
 assertSpan(
-  "resize-left snaps only the left edge",
-  getTimelineMagneticSnapSpan({
-    activeItemId: "zoom-a",
-    targetSpan: { start: 40, end: 2000 },
-    items,
-    currentTimeMs: 6000,
-    intervalMs: 1000,
-    videoRowId: VIDEO_ROW_ID,
-  }),
-  { start: 0, end: 2000 },
-);
-
-assertSpan(
-  "resize-right snaps only the right edge",
-  getTimelineMagneticSnapSpan({
-    activeItemId: "zoom-a",
-    targetSpan: { start: 1000, end: 3940 },
-    items,
-    currentTimeMs: 6000,
-    intervalMs: 1000,
-    videoRowId: VIDEO_ROW_ID,
-  }),
-  { start: 1000, end: 4000 },
+  "focus right resize is physically blocked at the next focus clip",
+  constrainFocusResizeSpan("focus-active", { start: 1500, end: 3600 }, focusItems, 5000, 100),
+  { start: 1500, end: 3000 },
 );
 
 const repoRoot = process.cwd();
-const timelineEditorPath = path.join(
-  repoRoot,
-  "src",
-  "components",
-  "video-editor",
-  "timeline",
-  "TimelineEditor.tsx",
+const timelineEditor = fs.readFileSync(
+  path.join(repoRoot, "src", "components", "video-editor", "timeline", "TimelineEditor.tsx"),
+  "utf8",
 );
-const timelineEditor = fs.readFileSync(timelineEditorPath, "utf8");
+const timelineItem = fs.readFileSync(
+  path.join(repoRoot, "src", "components", "video-editor", "timeline", "Item.tsx"),
+  "utf8",
+);
+const timelineWrapper = fs.readFileSync(
+  path.join(repoRoot, "src", "components", "video-editor", "timeline", "TimelineWrapper.tsx"),
+  "utf8",
+);
 
-const requiredNeedles = [
-  'Magnet } from "lucide-react"',
-  'getTimelineMagneticSnapResult',
-  'getTimelineMagneticSnapSpan',
-  "isMagneticSnapEnabled",
-  "setIsMagneticSnapEnabled",
-  "snapGuideMs",
-  "return getTimelineMagneticSnapSpan({",
-  "return getTimelineMagneticSnapResult({",
-  "activeItemId",
-  "targetSpan",
-  "items: timelineItems",
-  "currentTimeMs: activeCurrentTimeMs",
-  "intervalMs: timelineScale.intervalMs",
-  "videoRowId: VIDEO_ROW_ID",
-  "isMagneticSnapEnabled={isMagneticSnapEnabled}",
-  "getMagneticSnapResult={getMagneticSnapResultForSpan}",
-  "onSnapGuideChange={setSnapGuideMs}",
-  "getDirectSnapSpan={getDirectSnapSpan}",
+const requiredWiring = [
+  "snapThresholdMs: number",
+  "interaction: \"drag\"",
+  "interaction: \"resize\"",
+  "constrainFocusDragSpan",
+  "constrainFocusResizeSpan",
+  "const canTimelineDirectDrag = isAudio || isAnnotation",
+  "return variant === \"trim\"",
+  "getDragSnapThresholdMs",
+  "getResizeSnapThresholdMs",
+  "getMagneticResizeSnapSpan",
+  "(onItemDragSpanChange ?? onItemSpanChange)",
 ];
 
-const missing = requiredNeedles.filter((needle) => !timelineEditor.includes(needle));
+const combinedSource = `${timelineEditor}\n${timelineItem}\n${timelineWrapper}`;
+const missing = requiredWiring.filter((needle) => !combinedSource.includes(needle));
+const forbidden = [
+  "fitTimelineSnapSpanToNearbyEdges({",
+  "getSourceZoomMagneticSnapSpan",
+  "getSourceZoomResizeMagneticSnapSpan",
+  "variant === \"zoom\" || variant === \"trim\"",
+  "zoomRegionsRef.current.forEach",
+  "trimRegionsRef.current.forEach",
+].filter((needle) => timelineEditor.includes(needle));
 
-if (missing.length > 0) {
-  console.error(JSON.stringify({
-    status: "failed",
-    message: "TimelineEditor is not wired through the magnetic snap helper.",
+const focusItemStart = timelineEditor.indexOf('variant="zoom"');
+const focusItemEnd = timelineEditor.indexOf("</Item>", focusItemStart);
+const focusItemSource = timelineEditor.slice(focusItemStart, focusItemEnd);
+const forbiddenFocusProps = [
+  "onDirectSpanChange",
+  "onDirectDragSpanChange",
+  "onDirectSpanPreview",
+  "getVisualSnapSpan",
+  "getVisualResizeSnapSpan",
+].filter((needle) => focusItemSource.includes(needle));
+
+if (missing.length > 0 || forbidden.length > 0 || forbiddenFocusProps.length > 0) {
+  throw new Error(JSON.stringify({
+    message: "Timeline magnetic snap wiring is inconsistent.",
     missing,
+    forbidden,
+    forbiddenFocusProps,
   }, null, 2));
-  process.exit(1);
-}
-
-const snapResult = getTimelineMagneticSnapResult({
-  activeItemId: "zoom-a",
-  targetSpan: { start: 2920, end: 3920 },
-  items,
-  currentTimeMs: 2500,
-  intervalMs: 1000,
-  videoRowId: VIDEO_ROW_ID,
-});
-
-assertSpan("snap result exposes snapped span", snapResult.span, { start: 3000, end: 4000 });
-if (snapResult.targetMs !== 3000 || snapResult.edge !== "start") {
-  throw new Error(`Expected snap result target 3000/start, got ${JSON.stringify(snapResult)}`);
 }
 
 console.log(JSON.stringify({
   status: "ok",
-  helper: "getTimelineMagneticSnapSpan",
-  snapTargets,
-  threshold: {
-    min: getTimelineSnapThresholdMs(100),
-    cap: getTimelineSnapThresholdMs(2000),
-  },
+  behavior: [
+    "single dnd-timeline gesture engine for Focus",
+    "8px pixel-derived live threshold",
+    "no playhead snap",
+    "drag preserves duration",
+    "resize changes one edge",
+    "focus clips cannot overlap",
+  ],
 }, null, 2));

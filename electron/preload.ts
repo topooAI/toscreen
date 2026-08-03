@@ -63,6 +63,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPlatform: () => {
     return ipcRenderer.invoke('get-platform')
   },
+  getEditorPreferencesSync: () => {
+    return ipcRenderer.sendSync('get-editor-preferences-sync')
+  },
+  saveEditorPreferences: (preferences: unknown) => {
+    return ipcRenderer.invoke('save-editor-preferences', preferences)
+  },
+  resetEditorPreferences: () => {
+    return ipcRenderer.invoke('reset-editor-preferences')
+  },
+  onEditorPreferencesUpdated: (callback: (preferences: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, preferences: unknown) => callback(preferences)
+    ipcRenderer.on('editor-preferences-updated', listener)
+    return () => ipcRenderer.removeListener('editor-preferences-updated', listener)
+  },
   // Mouse Tracker APIs
   recordMouseClick: (x: number, y: number) => {
     return ipcRenderer.invoke('record-mouse-click', x, y)

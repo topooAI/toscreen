@@ -3,6 +3,7 @@ import type {
   AudioRegion,
   CropRegion,
   CursorDataPoint,
+  CursorStylePreset,
   TrimRegion,
   ZoomDepth,
   ZoomFocus,
@@ -146,6 +147,9 @@ export interface CursorClipProps {
   size: number;
   smoothing: boolean;
   vectorCursor: boolean;
+  style?: CursorStylePreset;
+  customImage?: string;
+  customImages?: import("../types").CursorCustomImageMap;
   offsetMs: number;
 }
 

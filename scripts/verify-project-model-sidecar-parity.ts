@@ -69,10 +69,17 @@ const legacyInput: LegacyEditorProjectInput = {
     cx: 0.45,
     cy: 0.44,
     isClick: true,
+    cursorType: "pointer",
   }],
   cursorSize: 1.9,
   cursorSmoothing: false,
-  showVectorCursor: false,
+  showVectorCursor: true,
+  cursorStyle: "custom",
+  cursorCustomImages: {
+    default: "data:image/png;base64,ZGVmYXVsdA==",
+    pointer: "data:image/png;base64,cG9pbnRlcg==",
+    text: "data:image/png;base64,dGV4dA==",
+  },
   cursorOffset: -120,
   cropRegion: { x: 0.02, y: 0.04, width: 0.92, height: 0.88 },
   wallpaper: "/wallpapers/wallpaper9.jpg",
@@ -138,6 +145,9 @@ function legacySnapshot(value: Record<string, unknown>) {
     cursorSize: value.cursorSize,
     cursorSmoothing: value.cursorSmoothing,
     showVectorCursor: value.showVectorCursor,
+    cursorStyle: value.cursorStyle,
+    cursorCustomImage: value.cursorCustomImage,
+    cursorCustomImages: value.cursorCustomImages,
     cursorOffset: value.cursorOffset,
   };
 }

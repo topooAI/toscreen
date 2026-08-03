@@ -7,7 +7,7 @@ import {
   type ZoomFocus,
   type ZoomDepth
 } from "../types";
-import { DEFAULT_FOCUS, SMOOTHING_FACTOR, MIN_DELTA } from "../videoPlayback/constants";
+import { DEFAULT_FOCUS } from "../videoPlayback/constants";
 import { findInterpolatedTarget, interpolateZoomScale } from "../videoPlayback/zoomRegionUtils";
 import { videoFocusToStage } from "../videoPlayback/focusUtils";
 import { applyZoomTransform } from "../videoPlayback/zoomTransform";
@@ -121,20 +121,18 @@ export function useZoomEngine({
         }
 
         const state = animationStateRef.current;
-        const scaleDelta = targetScaleFactor - state.scale;
-        const focusXDelta = targetFocus.cx - state.focusX;
-        const focusYDelta = targetFocus.cy - state.focusY;
+        const previousScale = state.scale;
+        const previousFocusX = state.focusX;
+        const previousFocusY = state.focusY;
+        state.scale = targetScaleFactor;
+        state.focusX = targetFocus.cx;
+        state.focusY = targetFocus.cy;
 
-        if (Math.abs(scaleDelta) > MIN_DELTA) state.scale += scaleDelta * SMOOTHING_FACTOR;
-        else state.scale = targetScaleFactor;
-
-        if (Math.abs(focusXDelta) > MIN_DELTA) state.focusX += focusXDelta * SMOOTHING_FACTOR;
-        else state.focusX = targetFocus.cx;
-
-        if (Math.abs(focusYDelta) > MIN_DELTA) state.focusY += focusYDelta * SMOOTHING_FACTOR;
-        else state.focusY = targetFocus.cy;
-
-        const motionIntensity = Math.max(Math.abs(state.scale - targetScaleFactor), Math.abs(state.focusX - targetFocus.cx));
+        const motionIntensity = Math.max(
+          Math.abs(state.scale - previousScale),
+          Math.abs(state.focusX - previousFocusX),
+          Math.abs(state.focusY - previousFocusY),
+        );
         applyTransform(motionIntensity);
       } catch (err) {
         console.error("ZoomEngine ticker error:", err);

@@ -18,13 +18,6 @@ export function clampTimelineRange(
     end = start + maxSpan;
   }
 
-  const absoluteMaxEnd = Math.max(totalMs + 60 * 60 * 1000, maxSpan);
-  if (end > absoluteMaxEnd) {
-    const span = end - start;
-    end = absoluteMaxEnd;
-    start = Math.max(0, end - span);
-  }
-
   end = Math.max(start + minVisibleRangeMs, end);
 
   return { start, end };

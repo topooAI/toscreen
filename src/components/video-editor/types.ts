@@ -1,3 +1,13 @@
+export {
+  CURSOR_STYLE_PRESETS,
+  DEFAULT_CURSOR_STYLE,
+  isCursorStylePreset,
+  resolveCursorStyle,
+} from '../../../shared/cursorStyles';
+export type { CursorStylePreset } from '../../../shared/cursorStyles';
+export type { CursorCustomImageMap, CursorCustomState } from '../../../shared/cursorStyles';
+export { CURSOR_CUSTOMIZABLE_STATES } from '../../../shared/cursorStyles';
+
 export type ZoomDepth = 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface ZoomFocus {
@@ -11,7 +21,31 @@ export interface ZoomRegion {
   endMs: number;
   depth: ZoomDepth;
   focus: ZoomFocus;
+  focusMode?: 'manual' | 'auto';
+  source?: 'manual' | 'auto';
   clicks?: any[]; // Raw mouse path data for dynamic tracking
+  /** Camera Motion clips share the legacy timed-region persistence path while
+   * rendering on their own Camera lane. Focus sampling ignores these clips. */
+  kind?: 'focus' | 'camera';
+  cameraMotion?: CameraMotionPreset;
+}
+
+export interface CameraMotionTransform {
+  scale: number;
+  translateX: number; // normalized stage width
+  translateY: number; // normalized stage height
+  rotateZ: number; // degrees
+  skewX: number; // degrees; lightweight perspective approximation
+  skewY: number; // degrees; lightweight perspective approximation
+  blur: number;
+}
+
+export interface CameraMotionPreset {
+  id: 'product-oblique-push' | 'custom';
+  name: string;
+  from: CameraMotionTransform;
+  to: CameraMotionTransform;
+  easing: 'smooth' | 'linear';
 }
 
 export interface CursorDataPoint {
@@ -22,6 +56,9 @@ export interface CursorDataPoint {
   cx: number;
   cy: number;
   isClick?: boolean;
+  isPointerDown?: boolean;
+  type?: 'click' | 'mousedown' | 'mouseup' | 'drag' | 'move' | 'keydown' | 'wheel';
+  cursorType?: string;
 }
 
 export interface TrimRegion {

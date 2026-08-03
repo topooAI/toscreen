@@ -1,8 +1,17 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTimelineContext } from "dnd-timeline";
 import { useWaveformCache } from "../hooks/useWaveformCache";
 import { Button } from "../../ui/button";
-import { Plus, Scissors, ZoomIn, MessageSquare, ChevronDown, Check, Target, Scan, Magnet } from "lucide-react";
+import { Orbit, Plus } from "lucide-react";
+import {
+  PiCornersOutBold,
+  PiCrosshairBold,
+  PiMagicWandBold,
+  PiMagnetBold,
+  PiMagnifyingGlassPlusBold,
+  PiScissorsBold,
+  PiTextTBold,
+} from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "../../../lib/utils";
 import { useTimeMap } from "../hooks/useTimeMap";
@@ -14,6 +23,7 @@ import { partitionIntoTimelineLanes } from "./lanePartition";
 import { clampAudioResizeSpanToSource, resolveAudioResizeBounds } from "./timelineAudioResizeBounds";
 import { getTimelineMagneticSnapResult, getTimelineMagneticSnapSpan } from "./timelineMagneticSnap";
 import type { TimelineMagneticSnapResult } from "./timelineMagneticSnap";
+import { constrainFocusDragSpan, constrainFocusResizeSpan } from "./timelineFocusSpan";
 import { buildMainClipSegments } from "./timelineMainClipSegments";
 import {
   buildAssociatedOriginalAudioForSourceRange,
@@ -26,19 +36,26 @@ import { FALLBACK_TRACK_START_PX, resolveTrackStartPx } from "./timelineTrackOri
 import type { Range, Span } from "dnd-timeline";
 import type { ZoomRegion, TrimRegion, AnnotationRegion, AudioRegion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../../ui/dropdown-menu";
-import { type AspectRatio, getAspectRatioLabel } from "../../../utils/aspectRatioUtils";
-import { formatShortcut } from "../../../utils/platformUtils";
 
 import PlaybackControls from "../PlaybackControls";
 
 const ZOOM_ROW_ID = "row-zoom-0";
+const CAMERA_ROW_ID = "row-camera-0";
 const TRIM_ROW_ID = "row-trim";
+
+function TimelineToolTooltip({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="group relative flex">
+      {children}
+      <span
+        role="tooltip"
+        className="pointer-events-none invisible absolute left-0 top-full z-[70] mt-1.5 whitespace-nowrap rounded-[4px] bg-[var(--ui-text-primary)] px-2 py-1 text-[10px] font-medium text-[var(--ui-inspector-surface)] opacity-0 shadow-md transition-opacity delay-300 duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
 const VIDEO_ROW_ID = "row-video";
 const FALLBACK_RANGE_MS = 1000;
 const TARGET_MARKER_COUNT = 12;
@@ -64,6 +81,7 @@ interface TimelineEditorProps {
   videoRef?: React.RefObject<HTMLVideoElement | null>;
   zoomRegions: ZoomRegion[];
   onZoomAdded: (span: Span) => void;
+  onCameraAdded?: (span: Span) => void;
   onZoomSpanChange: (id: string, span: Span) => void;
   onZoomSplit?: (id: string, splitAtMs: number) => void;
   onZoomDelete: (id: string) => void;
@@ -91,8 +109,7 @@ interface TimelineEditorProps {
   waveformCache?: any;
   onAudioVolumeKeyframesChange?: (id: string, keyframes: any[]) => void;
   onAudioVolumeChange?: (id: string, volume: number) => void;
-  aspectRatio: AspectRatio;
-  onAspectRatioChange: (aspectRatio: AspectRatio) => void;
+  onAutoZoom?: () => void;
   isFullScreenBinding: boolean;
   onFullScreenBindingChange: (enabled: boolean) => void;
   isPlaying: boolean;
@@ -246,6 +263,7 @@ function PlaybackCursor({
   const cursorContainerRef = useRef<HTMLDivElement>(null);
 
   const isDraggingRef = useRef(isDragging);
+
   useEffect(() => {
     isDraggingRef.current = isDragging;
   }, [isDragging]);
@@ -356,18 +374,20 @@ function PlaybackCursor({
     >
       <div
         ref={cursorLineRef}
-        className="absolute top-0 bottom-0 w-[16px] -ml-[8px] cursor-ew-resize pointer-events-auto flex justify-center group/line"
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          setIsDragging(true);
-        }}
+        className="pointer-events-none absolute top-0 bottom-0 -ml-[8px] flex w-[16px] justify-center group/line"
       >
-        <div className="w-[1px] h-full bg-[#FF00B7] shadow-[0_0_10px_rgba(255,0,183,0.5)] group-hover/line:shadow-[0_0_15px_rgba(255,0,183,0.7)]" />
+        <div className="w-[1px] h-full bg-[#FF00B7]" />
         <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing drop-shadow-md"
+          className="pointer-events-auto absolute left-1/2 top-0 flex h-[16px] w-[18px] -translate-x-1/2 cursor-grab flex-col items-center transition-transform hover:scale-110 active:cursor-grabbing"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(true);
+          }}
+          onClick={(e) => e.stopPropagation()}
         >
           {/* 上半部方块 */}
-          <div className="w-2.5 h-2 bg-[#FF00B7] rounded-t-[1px] shadow-sm" />
+          <div className="w-2.5 h-2 bg-[#FF00B7] rounded-t-[1px]" />
           {/* 下半部尖角 */}
           <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-[#FF00B7]" />
         </div>
@@ -419,9 +439,10 @@ const TimelineAxis = memo(({
       .sort((a, b) => a - b);
 
     const minorTicks = [];
-    const minorInterval = intervalMs / 5;
+    const minorInterval = intervalMs / 20;
+    const firstMinorTick = Math.ceil(visibleStart / minorInterval) * minorInterval;
     
-    for (let time = firstMarker; time <= maxTime; time += minorInterval) {
+    for (let time = firstMinorTick; time <= maxTime; time += minorInterval) {
       if (time >= visibleStart && time <= visibleEnd) {
         const isMajor = Math.abs(time % intervalMs) < 1;
         if (!isMajor) {
@@ -441,14 +462,14 @@ const TimelineAxis = memo(({
 
   return (
     <div
-      className="h-8 bg-[#09090b] border-b border-white/5 relative overflow-hidden select-none w-full"
+      className="h-8 bg-transparent border-b border-[var(--ui-border)] relative overflow-hidden select-none w-full"
     >
       {markers.minorTicks.map((time) => {
         const offset = valueToPixels(time - range.start);
         return (
           <div
             key={`minor-${time}`}
-            className="absolute bottom-0 h-1 w-[1px] bg-white/5"
+            className="absolute top-0 h-1 w-px bg-[var(--ui-border)]"
             style={{ [sideProperty]: `${trackStartPx + offset}px` }}
           />
         );
@@ -466,8 +487,8 @@ const TimelineAxis = memo(({
             }}
           >
             <div className="flex flex-col items-center pb-1">
-              <div className="h-2 w-[1px] bg-white/20 mb-1" />
-              <span className="text-[10px] font-medium tabular-nums tracking-tight text-slate-500">
+              <div className="h-2 w-px bg-[var(--ui-border-strong)] mb-1" />
+              <span className="text-[10px] font-medium tabular-nums tracking-tight text-[var(--ui-text-tertiary)]">
                 {marker.label}
               </span>
             </div>
@@ -500,6 +521,7 @@ function Timeline({
   selectedTrimId,
   selectedAnnotationId,
   onAddZoom,
+  onAddCamera,
   onAddAnnotation,
   selectedAudioId,
   onSelectAudio,
@@ -517,7 +539,8 @@ function Timeline({
   onSelectVideo,
   isTimelineResizing,
   snapGuideMs,
-  getDirectSnapSpan,
+  getVisualSnapSpan,
+  getVisualResizeSnapSpan,
 }: {
   items: TimelineRenderItem[];
   zoomRegions: ZoomRegion[];
@@ -533,6 +556,7 @@ function Timeline({
   selectedTrimId?: string | null;
   selectedAnnotationId?: string | null;
   onAddZoom?: () => void;
+  onAddCamera?: () => void;
   onAddAnnotation?: () => void;
   selectedAudioId?: string | null;
   onSelectAudio?: (id: string | null) => void;
@@ -550,7 +574,8 @@ function Timeline({
   onSelectVideo: (id: string | null) => void;
   isTimelineResizing?: boolean;
   snapGuideMs?: number | null;
-  getDirectSnapSpan?: (id: string, span: Span) => Span;
+  getVisualSnapSpan?: (id: string, span: Span, snapThresholdMs: number) => Span;
+  getVisualResizeSnapSpan?: (id: string, span: Span, snapThresholdMs: number) => Span;
 }) {
   
   const trackRenderer = useMemo(() => {
@@ -617,6 +642,23 @@ function Timeline({
           </Item>
         ))}
       </Row>
+
+      <Row id={CAMERA_ROW_ID} onAddClick={onAddCamera}>
+        {items.filter(item => item.rowId === CAMERA_ROW_ID).map((item) => (
+          <Item
+            id={item.id}
+            key={item.id}
+            rowId={item.rowId}
+            span={item.span}
+            isSelected={item.id === selectedZoomId}
+            onSelect={() => onSelectZoom?.(item.id)}
+            variant="zoom"
+            zoomDepth={item.zoomDepth}
+          >
+            {item.label}
+          </Item>
+        ))}
+      </Row>
       
       {(() => {
         const zoomRowIds = Array.from(new Set(
@@ -636,11 +678,6 @@ function Timeline({
                 onSelect={() => onSelectZoom?.(item.id)}
                 variant="zoom"
                 zoomDepth={item.zoomDepth}
-                onDirectSpanChange={onItemSpanChange}
-                onDirectSpanPreview={onItemResizePreview}
-                getDirectSnapSpan={getDirectSnapSpan}
-                onDirectResizeStart={onTimelineResizeStart}
-                onDirectResizeEnd={onTimelineResizeEnd}
               >
                 {item.label}
               </Item>
@@ -666,6 +703,12 @@ function Timeline({
                 isSelected={item.id === selectedAnnotationId}
                 onSelect={() => onSelectAnnotation?.(item.id)}
                 variant="annotation"
+                onDirectSpanChange={onItemSpanChange}
+                onDirectSpanPreview={onItemResizePreview}
+                onDirectResizeStart={onTimelineResizeStart}
+                onDirectResizeEnd={onTimelineResizeEnd}
+                getVisualSnapSpan={getVisualSnapSpan}
+                getVisualResizeSnapSpan={getVisualResizeSnapSpan}
               >
                 {item.label}
               </Item>
@@ -700,6 +743,12 @@ function Timeline({
                 volume={item.volume}
                 volumeKeyframes={item.volumeKeyframes}
                 onVolumeKeyframesChange={(keyframes) => onAudioVolumeKeyframesChange?.(item.id, keyframes)}
+                onDirectSpanChange={onItemSpanChange}
+                onDirectSpanPreview={onItemResizePreview}
+                onDirectResizeStart={onTimelineResizeStart}
+                onDirectResizeEnd={onTimelineResizeEnd}
+                getVisualSnapSpan={getVisualSnapSpan}
+                getVisualResizeSnapSpan={getVisualResizeSnapSpan}
               >
                 {item.label}
               </Item>
@@ -709,7 +758,7 @@ function Timeline({
       })()}
     </>
   );
-}, [items, zoomRegions, zoomBoundaryRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange, onItemSpanChange, onItemResizePreview, getDirectSnapSpan, onTimelineResizeStart, onTimelineResizeEnd]);
+}, [items, zoomRegions, zoomBoundaryRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange, onItemSpanChange, onItemResizePreview, getVisualSnapSpan, getVisualResizeSnapSpan, onTimelineResizeStart, onTimelineResizeEnd]);
 
 const { setTimelineRef, style, range, pixelsToValue, valueToPixels, direction, setSidebarRef } = useTimelineContext();
   const localTimelineRef = useRef<HTMLDivElement | null>(null);
@@ -741,6 +790,13 @@ const { setTimelineRef, style, range, pixelsToValue, valueToPixels, direction, s
   }, [items.length]);
 
   const handleTimelineClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('[data-timeline-item-id]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
     if (isTimelineResizing) {
       e.preventDefault();
       e.stopPropagation();
@@ -776,7 +832,7 @@ const { setTimelineRef, style, range, pixelsToValue, valueToPixels, direction, s
     <div
       ref={setRefs}
       style={style}
-      className="select-none bg-[#09090b] min-h-[140px] h-full relative cursor-pointer group"
+      className="select-none bg-transparent min-h-[140px] h-full relative cursor-pointer group"
       onClick={handleTimelineClick}
     >
       {/* 虚拟的 Sidebar 测量节点：真实宽度 + 呼吸留白 = 轨道起点 fallback */}
@@ -818,6 +874,7 @@ export default function TimelineEditor({
   onSeek,
   zoomRegions,
   onZoomAdded,
+  onCameraAdded,
   onZoomSpanChange,
   onZoomSplit,
   onZoomDelete,
@@ -841,8 +898,7 @@ export default function TimelineEditor({
   selectedAudioId,
   onSelectAudio,
   onAudioVolumeKeyframesChange,
-  aspectRatio,
-  onAspectRatioChange,
+  onAutoZoom,
   isFullScreenBinding,
   onFullScreenBindingChange,
   isPlaying,
@@ -877,21 +933,8 @@ export default function TimelineEditor({
   const [selectedKeyframeId, setSelectedKeyframeId] = useState<string | null>(null);
   const [resizePreview, setResizePreview] = useState<{ id: string; span: Span } | null>(null);
   const [isTimelineResizing, setIsTimelineResizing] = useState(false);
-  const [isMagneticSnapEnabled, setIsMagneticSnapEnabled] = useState(false);
+  const [isMagneticSnapEnabled, setIsMagneticSnapEnabled] = useState(true);
   const [snapGuideMs, setSnapGuideMs] = useState<number | null>(null);
-  const [shortcuts, setShortcuts] = useState({
-    pan: 'Shift + Ctrl + Scroll',
-    zoom: 'Ctrl + Scroll'
-  });
-
-  useEffect(() => {
-    formatShortcut(['shift', 'mod', 'Scroll']).then(pan => {
-      formatShortcut(['mod', 'Scroll']).then(zoom => {
-        setShortcuts({ pan, zoom });
-      });
-    });
-  }, []);
-
   useEffect(() => {
     if (!isMagneticSnapEnabled) {
       setSnapGuideMs(null);
@@ -939,40 +982,15 @@ export default function TimelineEditor({
     onSelectAudio(null);
   }, [selectedAudioId, onAudioDelete, onSelectAudio]);
 
+  const hasInitializedRangeRef = useRef(activeDurationMs > 0);
   useEffect(() => {
-    setRange(createInitialRange(activeDurationMs));
-  }, [activeDurationMs]);
-
-  useEffect(() => {
-    // Only clamp if we have a valid duration and regions to clamp
-    if (totalMs <= 0 || safeMinDurationMs <= 0) {
+    if (hasInitializedRangeRef.current || activeDurationMs <= 0) {
       return;
     }
 
-    zoomRegions.forEach((region) => {
-      const clampedStart = Math.max(0, Math.min(region.startMs, projectTotalMs));
-      const minEnd = clampedStart + safeMinDurationMs;
-      const clampedEnd = Math.min(projectTotalMs, Math.max(minEnd, region.endMs));
-      const normalizedStart = Math.max(0, Math.min(clampedStart, projectTotalMs - safeMinDurationMs));
-      const normalizedEnd = Math.max(minEnd, Math.min(clampedEnd, projectTotalMs));
-
-      if (normalizedStart !== region.startMs || normalizedEnd !== region.endMs) {
-        onZoomSpanChange(region.id, { start: normalizedStart, end: normalizedEnd });
-      }
-    });
-
-    trimRegions.forEach((region) => {
-      const clampedStart = Math.max(0, Math.min(region.startMs, sourceTotalMs));
-      const minEnd = clampedStart + safeMinDurationMs;
-      const clampedEnd = Math.min(sourceTotalMs, Math.max(minEnd, region.endMs));
-      const normalizedStart = Math.max(0, Math.min(clampedStart, sourceTotalMs - safeMinDurationMs));
-      const normalizedEnd = Math.max(minEnd, Math.min(clampedEnd, sourceTotalMs));
-
-      if (normalizedStart !== region.startMs || normalizedEnd !== region.endMs) {
-        onTrimSpanChange?.(region.id, { start: normalizedStart, end: normalizedEnd });
-      }
-    });
-  }, [zoomRegions, trimRegions, projectTotalMs, sourceTotalMs, safeMinDurationMs, onZoomSpanChange, onTrimSpanChange]);
+    hasInitializedRangeRef.current = true;
+    setRange(createInitialRange(activeDurationMs));
+  }, [activeDurationMs]);
 
   const hasOverlap = useCallback((newSpan: Span, excludeId?: string, targetRowId?: string): boolean => {
     const mapTime = (time: number) => (isTrimTrackVisible || !mapSourceToEffective) ? time : mapSourceToEffective(time);
@@ -982,8 +1000,7 @@ export default function TimelineEditor({
     const isAnnotationItem = (annotationRegions || []).some(r => r.id === excludeId);
     const isAudioItem = (audioRegions || []).some(r => r.id === baseExcludeId);
 
-    if (isZoomItem || isAnnotationItem) {
-      // Zoom/Annotation overlap is resolved by visual lane wrapping instead of collision rejection.
+    if (isAnnotationItem) {
       return false;
     }
 
@@ -1041,8 +1058,7 @@ export default function TimelineEditor({
     const isAnnotationItem = (annotationRegions || []).some(r => r.id === excludeId);
     const isAudioItem = (audioRegions || []).some(r => r.id === baseExcludeId);
 
-    if (isZoomItem || isAnnotationItem) {
-      // Zoom/Annotation overlap is resolved by visual lane wrapping instead of collision rejection.
+    if (isAnnotationItem) {
       return newSpan;
     }
 
@@ -1173,17 +1189,17 @@ export default function TimelineEditor({
       return;
     }
 
-    const defaultDuration = Math.min(1000, totalMs);
+    const defaultDuration = Math.min(1000, sourceTotalMs);
     if (defaultDuration <= 0) {
       return;
     }
 
     // Always place zoom at playhead
-    const startPos = Math.max(0, Math.min(currentTimeMs, totalMs));
+    const startPos = Math.max(0, Math.min(currentTimeMs, sourceTotalMs));
     // Find the next zoom region after the playhead
     const sorted = [...zoomRegions].sort((a, b) => a.startMs - b.startMs);
     const nextRegion = sorted.find(region => region.startMs > startPos);
-    const gapToNext = nextRegion ? nextRegion.startMs - startPos : totalMs - startPos;
+    const gapToNext = nextRegion ? nextRegion.startMs - startPos : sourceTotalMs - startPos;
 
     // Check if playhead is inside any zoom region
     const isOverlapping = sorted.some(region => startPos >= region.startMs && startPos < region.endMs);
@@ -1196,7 +1212,24 @@ export default function TimelineEditor({
 
     const actualDuration = Math.min(1000, gapToNext);
     onZoomAdded({ start: startPos, end: startPos + actualDuration });
-  }, [videoDuration, totalMs, currentTimeMs, zoomRegions, onZoomAdded]);
+  }, [videoDuration, activeDurationMs, sourceTotalMs, currentTimeMs, zoomRegions, onZoomAdded]);
+
+  const handleAddCamera = useCallback(() => {
+    if (!onCameraAdded || sourceTotalMs <= 0) return;
+    const startPos = Math.max(0, Math.min(currentTimeMs, sourceTotalMs));
+    const cameraRegions = zoomRegions.filter((region) => region.kind === 'camera');
+    const nextRegion = [...cameraRegions]
+      .sort((a, b) => a.startMs - b.startMs)
+      .find((region) => region.startMs > startPos);
+    const gapToNext = nextRegion ? nextRegion.startMs - startPos : sourceTotalMs - startPos;
+    const overlaps = cameraRegions.some((region) => startPos >= region.startMs && startPos < region.endMs);
+    if (overlaps || gapToNext <= 0) {
+      toast.error('Cannot place camera motion here');
+      return;
+    }
+    const durationMs = Math.min(3000, gapToNext);
+    onCameraAdded({ start: startPos, end: startPos + durationMs });
+  }, [currentTimeMs, onCameraAdded, sourceTotalMs, zoomRegions]);
 
   const handleAddTrim = useCallback(() => {
     if (!videoDuration || videoDuration === 0 || activeDurationMs === 0 || !onTrimAdded) {
@@ -1233,17 +1266,14 @@ export default function TimelineEditor({
       return;
     }
 
-    const defaultDuration = Math.min(1000, totalMs);
-    if (defaultDuration <= 0) {
-      return;
-    }
+    const defaultDuration = 1000;
 
     // Multiple annotations can exist at the same timestamp
-    const startPos = Math.max(0, Math.min(currentTimeMs, totalMs));
-    const endPos = Math.min(startPos + defaultDuration, totalMs);
+    const startPos = Math.max(0, currentTimeMs);
+    const endPos = startPos + defaultDuration;
     
     onAnnotationAdded({ start: startPos, end: endPos });
-  }, [videoDuration, totalMs, currentTimeMs, onAnnotationAdded]);
+  }, [videoDuration, activeDurationMs, currentTimeMs, onAnnotationAdded]);
 
   const handleSplitZoom = useCallback(() => {
     if (!selectedZoomId || !onZoomSplit) return;
@@ -1349,15 +1379,16 @@ export default function TimelineEditor({
       associatedAudio: buildAssociatedOriginalAudioForSourceRange(originalAudio, 0, sourceTotalMs),
     }];
     
-    const partitionedZooms = partitionIntoTimelineLanes(zoomRegions);
-    const zooms: TimelineRenderItem[] = partitionedZooms.map(({ item: region, trackIndex }, index) => ({
+    const zooms: TimelineRenderItem[] = [...zoomRegions]
+      .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)
+      .map((region, index) => ({
       id: region.id,
-      rowId: `row-zoom-${trackIndex}`,
+      rowId: region.kind === 'camera' ? CAMERA_ROW_ID : ZOOM_ROW_ID,
       span: { start: mapTime(region.startMs), end: mapTime(region.endMs) },
-      label: `Zoom ${index + 1}`,
+      label: region.kind === 'camera' ? (region.cameraMotion?.name || 'Camera Motion') : `Focus ${index + 1}`,
       zoomDepth: region.depth,
       variant: 'zoom',
-    }));
+      }));
 
     const trims: TimelineRenderItem[] = isTrimTrackVisible ? trimRegions.map((region, index) => ({
       id: region.id,
@@ -1439,7 +1470,8 @@ export default function TimelineEditor({
 
   const getMagneticSnapResultForSpan = useCallback((
     activeItemId: string,
-    targetSpan: Span
+    targetSpan: Span,
+    snapThresholdMs: number,
   ): TimelineMagneticSnapResult => {
     return getTimelineMagneticSnapResult({
       activeItemId,
@@ -1448,12 +1480,15 @@ export default function TimelineEditor({
       currentTimeMs: activeCurrentTimeMs,
       intervalMs: timelineScale.intervalMs,
       videoRowId: VIDEO_ROW_ID,
+      interaction: "drag",
+      snapThresholdMs,
     });
   }, [timelineItems, activeCurrentTimeMs, timelineScale.intervalMs]);
 
   const getMagneticSnapSpan = useCallback((
     activeItemId: string,
-    targetSpan: Span
+    targetSpan: Span,
+    snapThresholdMs: number,
   ): Span => {
     return getTimelineMagneticSnapSpan({
       activeItemId,
@@ -1462,19 +1497,62 @@ export default function TimelineEditor({
       currentTimeMs: activeCurrentTimeMs,
       intervalMs: timelineScale.intervalMs,
       videoRowId: VIDEO_ROW_ID,
+      interaction: "drag",
+      snapThresholdMs,
     });
   }, [timelineItems, activeCurrentTimeMs, timelineScale.intervalMs]);
 
-  const getDirectSnapSpan = useCallback((id: string, span: Span): Span => {
-    if (!isMagneticSnapEnabled) {
-      setSnapGuideMs(null);
-      return span;
+  const getVisualMagneticSnapSpan = useCallback((
+    activeItemId: string,
+    targetSpan: Span,
+    snapThresholdMs: number,
+  ): Span => {
+    const snappedSpan = getTimelineMagneticSnapSpan({
+      activeItemId,
+      targetSpan,
+      items: timelineItems,
+      currentTimeMs: activeCurrentTimeMs,
+      intervalMs: timelineScale.intervalMs,
+      videoRowId: VIDEO_ROW_ID,
+      interaction: "drag",
+      snapThresholdMs,
+    });
+
+    if (!zoomRegions.some((region) => region.id === activeItemId)) {
+      return snappedSpan;
     }
 
-    const snap = getMagneticSnapResultForSpan(id, span);
-    setSnapGuideMs(snap.targetMs);
-    return snap.span;
-  }, [getMagneticSnapResultForSpan, isMagneticSnapEnabled]);
+    return constrainFocusDragSpan(activeItemId, snappedSpan, zoomRegions, sourceTotalMs);
+  }, [timelineItems, activeCurrentTimeMs, timelineScale.intervalMs, zoomRegions, sourceTotalMs]);
+
+  const getVisualResizeMagneticSnapSpan = useCallback((
+    activeItemId: string,
+    targetSpan: Span,
+    snapThresholdMs: number,
+  ): Span => {
+    const snappedSpan = getTimelineMagneticSnapSpan({
+      activeItemId,
+      targetSpan,
+      items: timelineItems,
+      currentTimeMs: activeCurrentTimeMs,
+      intervalMs: timelineScale.intervalMs,
+      videoRowId: VIDEO_ROW_ID,
+      interaction: "resize",
+      snapThresholdMs,
+    });
+
+    if (!zoomRegions.some((region) => region.id === activeItemId)) {
+      return snappedSpan;
+    }
+
+    return constrainFocusResizeSpan(
+      activeItemId,
+      snappedSpan,
+      zoomRegions,
+      sourceTotalMs,
+      safeMinDurationMs,
+    );
+  }, [timelineItems, activeCurrentTimeMs, timelineScale.intervalMs, zoomRegions, sourceTotalMs, safeMinDurationMs]);
 
   const previewZoomRegions = useMemo(() => {
     if (!resizePreview || !zoomRegions.some(region => region.id === resizePreview.id)) {
@@ -1532,7 +1610,7 @@ export default function TimelineEditor({
       
     // Check if it's a zoom or trim item
     if (zoomRegions.some(r => r.id === id)) {
-      onZoomSpanChange(id, targetSpan);
+      onZoomSpanChange(id, constrainFocusResizeSpan(id, targetSpan, zoomRegions, sourceTotalMs, safeMinDurationMs));
     } else if (trimRegions.some(r => r.id === id)) {
       onTrimSpanChange?.(id, targetSpan);
     } else if ((annotationRegions || []).some(r => r.id === id)) {
@@ -1570,11 +1648,23 @@ export default function TimelineEditor({
       }
       onAudioSpanChange?.(id, targetSpan);
     }
-  }, [zoomRegions, trimRegions, annotationRegions, audioRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, onAudioSpanChange, isTrimTrackVisible, mapEffectiveToSource]);
+  }, [zoomRegions, trimRegions, annotationRegions, audioRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, onAudioSpanChange, isTrimTrackVisible, mapEffectiveToSource, sourceTotalMs, safeMinDurationMs]);
+
+  const handleItemDragSpanChange = useCallback((id: string, span: Span) => {
+    const targetSpan = isTrimTrackVisible
+      ? { ...span }
+      : { start: mapEffectiveToSource(span.start), end: mapEffectiveToSource(span.end) };
+
+    if (zoomRegions.some(r => r.id === id)) {
+      onZoomSpanChange(id, constrainFocusDragSpan(id, targetSpan, zoomRegions, sourceTotalMs));
+    } else {
+      handleItemSpanChange(id, span);
+    }
+  }, [handleItemSpanChange, isTrimTrackVisible, mapEffectiveToSource, onZoomSpanChange, sourceTotalMs, zoomRegions]);
 
   if (!videoDuration || videoDuration === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center rounded-lg bg-[#09090b] gap-3">
+      <div className="flex-1 flex flex-col items-center justify-center rounded-lg bg-transparent gap-3">
         <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
           <Plus className="w-6 h-6 text-slate-600" />
         </div>
@@ -1587,93 +1677,102 @@ export default function TimelineEditor({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#09090b] overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-[#09090b] relative">
+    <div className="flex-1 flex flex-col bg-transparent overflow-hidden">
+      <div className="flex items-center gap-2 p-2 border-b border-[var(--ui-border)] bg-transparent relative">
         <div className="flex items-center gap-1">
-          <Button
-            onClick={handleAddZoom}
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-slate-400 hover:text-[#34B27B] hover:bg-[#34B27B]/10 transition-all"
-            title="Add Zoom (Z)"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </Button>
-          <Button
-            onClick={handleAddTrim}
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-slate-400 hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-all"
-            title="Add Trim (T)"
-          >
-            <Scissors className="w-4 h-4" />
-          </Button>
-          <div className="w-px h-4 bg-white/10 mx-1" />
-          <Button
-            onClick={handleAddAnnotation}
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-slate-400 hover:text-[#B4A046] hover:bg-[#B4A046]/10 transition-all"
-            title="Add Annotation (A)"
-          >
-            <MessageSquare className="w-4 h-4" />
-          </Button>
-          <Button
-            onClick={() => setIsMagneticSnapEnabled((enabled) => !enabled)}
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-7 w-7 transition-all",
-              isMagneticSnapEnabled
-                ? "text-[#34B27B] bg-[#34B27B]/10 hover:bg-[#34B27B]/20"
-                : "text-slate-400 hover:text-[#34B27B] hover:bg-[#34B27B]/10"
-            )}
-            title={isMagneticSnapEnabled ? "Magnetic Snap On" : "Magnetic Snap Off"}
-            aria-pressed={isMagneticSnapEnabled}
-          >
-            <Magnet className="w-4 h-4" />
-          </Button>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onFullScreenBindingChange(!isFullScreenBinding)}
-            className={cn(
-              "h-7 w-7 transition-all",
-              isFullScreenBinding 
-                ? "text-[#34B27B] bg-[#34B27B]/10 hover:bg-[#34B27B]/20" 
-                : "text-slate-400 hover:text-[#34B27B] hover:bg-[#34B27B]/10"
-            )}
-            title={isFullScreenBinding ? "Full Screen Priority (Hides Background)" : "Center Priority (Prioritizes Mouse Position)"}
-          >
-            {isFullScreenBinding ? <Scan className="w-4 h-4" /> : <Target className="w-4 h-4" />}
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <TimelineToolTooltip label="Add Focus (Z)">
+            <Button
+              onClick={handleAddZoom}
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 bg-transparent text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)] transition-colors"
+              aria-label="Add Focus"
+            >
+              <PiMagnifyingGlassPlusBold className="h-3 w-3" />
+            </Button>
+          </TimelineToolTooltip>
+          <TimelineToolTooltip label="Add Camera Motion">
+            <Button
+              onClick={handleAddCamera}
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 bg-transparent text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)] transition-colors"
+              aria-label="Add Camera Motion"
+            >
+              <Orbit className="h-3 w-3" strokeWidth={1.8} />
+            </Button>
+          </TimelineToolTooltip>
+          {onAutoZoom && (
+            <TimelineToolTooltip label="Generate Auto Focus">
               <Button
+                onClick={onAutoZoom}
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-all gap-1"
+                size="icon"
+                className="h-7 w-7 bg-transparent text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)] transition-colors"
+                aria-label="Generate Auto Focus"
               >
-                <span className="font-medium">{getAspectRatioLabel(aspectRatio)}</span>
-                <ChevronDown className="w-3 h-3" />
+                <PiMagicWandBold className="h-3 w-3" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-[#1a1a1a] border-white/10">
-              {(['16:9', '9:16', '1:1', '4:3', '4:5'] as AspectRatio[]).map((ratio) => (
-                <DropdownMenuItem
-                  key={ratio}
-                  onClick={() => onAspectRatioChange(ratio)}
-                  className="text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer flex items-center justify-between gap-3"
-                >
-                  <span>{getAspectRatioLabel(ratio)}</span>
-                  {aspectRatio === ratio && <Check className="w-3 h-3 text-[#34B27B]" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </TimelineToolTooltip>
+          )}
+          <TimelineToolTooltip label="Remove Segment (T)">
+            <Button
+              onClick={handleAddTrim}
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 bg-transparent text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)] transition-colors"
+              aria-label="Remove Segment"
+            >
+              <PiScissorsBold className="h-3 w-3" />
+            </Button>
+          </TimelineToolTooltip>
+          <TimelineToolTooltip label="Add Text (A)">
+            <Button
+              onClick={handleAddAnnotation}
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 bg-transparent text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)] transition-colors"
+              aria-label="Add Text"
+            >
+              <PiTextTBold className="h-3 w-3" />
+            </Button>
+          </TimelineToolTooltip>
+          <TimelineToolTooltip label={`Snap to Edges: ${isMagneticSnapEnabled ? "On" : "Off"}`}>
+            <Button
+              onClick={() => setIsMagneticSnapEnabled((enabled) => !enabled)}
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-7 w-7 bg-transparent transition-colors",
+                isMagneticSnapEnabled
+                  ? "text-[var(--ui-text-secondary)] bg-[var(--ui-control)] hover:bg-[var(--ui-control-hover)]"
+                  : "text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)]"
+              )}
+              aria-label="Toggle Magnetic Snap"
+              aria-pressed={isMagneticSnapEnabled}
+            >
+              <PiMagnetBold className="h-3 w-3" />
+            </Button>
+          </TimelineToolTooltip>
+          <TimelineToolTooltip label={isFullScreenBinding ? "Framing: Fill Screen" : "Framing: Follow Cursor"}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onFullScreenBindingChange(!isFullScreenBinding)}
+              className={cn(
+                "h-7 w-7 bg-transparent transition-colors",
+                isFullScreenBinding
+                  ? "text-[var(--ui-text-secondary)] bg-[var(--ui-control)] hover:bg-[var(--ui-control-hover)]"
+                  : "text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)]"
+              )}
+              aria-label="Change Framing Mode"
+              aria-pressed={isFullScreenBinding}
+            >
+              {isFullScreenBinding
+                ? <PiCornersOutBold className="h-3 w-3" />
+                : <PiCrosshairBold className="h-3 w-3" />}
+            </Button>
+          </TimelineToolTooltip>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 z-10">
           <PlaybackControls
@@ -1685,18 +1784,8 @@ export default function TimelineEditor({
           />
         </div>
         <div className="flex-1" />
-        <div className="flex items-center gap-4 text-[10px] text-slate-500 font-medium">
-          <span className="flex items-center gap-1.5">
-            <kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#34B27B] font-sans">{shortcuts.pan}</kbd>
-            <span>Pan</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#34B27B] font-sans">{shortcuts.zoom}</kbd>            
-            <span>Zoom</span>
-          </span>
-        </div>
       </div>
-      <div className="flex-1 overflow-hidden bg-[#09090b] relative"
+      <div className="flex-1 overflow-hidden bg-transparent relative"
         onClick={() => setSelectedKeyframeId(null)}
       >
         <TimelineWrapper
@@ -1705,6 +1794,7 @@ export default function TimelineEditor({
           hasOverlap={hasOverlap}
           getNonOverlappingSpan={getNonOverlappingSpan}
           getMagneticSnapSpan={getMagneticSnapSpan}
+          getMagneticResizeSnapSpan={getVisualResizeMagneticSnapSpan}
           getMagneticSnapResult={getMagneticSnapResultForSpan}
           isMagneticSnapEnabled={isMagneticSnapEnabled}
           onSnapGuideChange={setSnapGuideMs}
@@ -1713,6 +1803,7 @@ export default function TimelineEditor({
           minVisibleRangeMs={timelineScale.minVisibleRangeMs}
           gridSizeMs={timelineScale.gridMs}
           onItemSpanChange={handleItemSpanChange}
+          onItemDragSpanChange={handleItemDragSpanChange}
           onItemResizePreview={handleItemResizePreview}
           onItemRowChange={handleItemRowChange}
           onResizeInteractionStart={handleTimelineResizeStart}
@@ -1745,6 +1836,7 @@ export default function TimelineEditor({
             onTimelineResizeStart={handleTimelineResizeStart}
             onTimelineResizeEnd={handleTimelineResizeEnd}
             onAddZoom={handleAddZoom}
+            onAddCamera={handleAddCamera}
             onAddAnnotation={handleAddAnnotation}
             videoRef={videoRef}
             mapSourceToEffective={mapSourceToEffective}
@@ -1754,7 +1846,8 @@ export default function TimelineEditor({
             onSelectVideo={onSelectVideo}
             isTimelineResizing={isTimelineResizing}
             snapGuideMs={snapGuideMs}
-            getDirectSnapSpan={getDirectSnapSpan}
+            getVisualSnapSpan={isMagneticSnapEnabled ? getVisualMagneticSnapSpan : undefined}
+            getVisualResizeSnapSpan={isMagneticSnapEnabled ? getVisualResizeMagneticSnapSpan : undefined}
           />
         </TimelineWrapper>
       </div>

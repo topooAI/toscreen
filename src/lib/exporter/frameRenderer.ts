@@ -1,9 +1,12 @@
 import { Application, Container, Sprite, Graphics, BlurFilter, Texture } from 'pixi.js';
-import type { ZoomRegion, CropRegion, AnnotationRegion } from '@/components/video-editor/types';
+import type { ZoomRegion, CropRegion, AnnotationRegion, CursorCustomImageMap, CursorCustomState, CursorDataPoint, CursorStylePreset } from '@/components/video-editor/types';
 import { ZOOM_DEPTH_SCALES } from '@/components/video-editor/types';
 import { findInterpolatedTarget, interpolateZoomScale } from '@/components/video-editor/videoPlayback/zoomRegionUtils';
 import { applyZoomTransform } from '@/components/video-editor/videoPlayback/zoomTransform';
-import { DEFAULT_FOCUS, SMOOTHING_FACTOR, MIN_DELTA } from '@/components/video-editor/videoPlayback/constants';
+import { sampleCameraMotion } from '@/components/video-editor/videoPlayback/cameraMotion';
+import { DEFAULT_FOCUS } from '@/components/video-editor/videoPlayback/constants';
+import { prepareCursorTrack, sampleCursorTrack } from '@/components/video-editor/videoPlayback/cursorTrack';
+import { drawCursorVisual } from '@/components/video-editor/videoPlayback/cursorVisuals';
 import { clampFocusToStage as clampFocusToStageUtil, videoFocusToStage } from '@/components/video-editor/videoPlayback/focusUtils';
 import { renderAnnotations } from './annotationRenderer';
 
@@ -28,7 +31,10 @@ interface FrameRenderConfig {
   cursorSize?: number;
   cursorSmoothing?: boolean;
   showVectorCursor?: boolean;
+  cursorStyle?: CursorStylePreset;
+  cursorCustomImages?: CursorCustomImageMap;
   cursorOffset?: number;
+  cursorMediaDurationMs?: number;
 }
 
 interface AnimationState {
@@ -234,6 +240,8 @@ export class FrameRenderer {
   private animationState: AnimationState;
   private layoutCache: any = null;
   private currentVideoTime = 0;
+  private cursorTrack: CursorDataPoint[] = [];
+  private cursorCustomImages: Partial<Record<CursorCustomState, HTMLImageElement>> = {};
 
   constructor(config: FrameRenderConfig) {
     this.config = config;
@@ -242,6 +250,19 @@ export class FrameRenderer {
       focusX: DEFAULT_FOCUS.cx,
       focusY: DEFAULT_FOCUS.cy,
     };
+    this.cursorTrack = prepareCursorTrack(
+      (config.cursorData || []).map((point) => ({
+        ...point,
+        timestamp: point.timestamp ?? point.timestampMs,
+        cx: point.cx ?? (point.x > 1 ? point.x / 1920 : point.x),
+        cy: point.cy ?? (point.y > 1 ? point.y / 1080 : point.y),
+        x: point.cx ?? (point.x > 1 ? point.x / 1920 : point.x),
+        y: point.cy ?? (point.y > 1 ? point.y / 1080 : point.y),
+        isClick: point.isClick ?? (point.type === "click" || point.type === "mousedown"),
+      })),
+      config.cursorSmoothing !== false,
+      config.cursorMediaDurationMs,
+    );
   }
 
   async initialize(): Promise<void> {
@@ -281,6 +302,7 @@ export class FrameRenderer {
 
     // Setup background (render separately, not in PixiJS)
     await this.setupBackground();
+    await this.setupCustomCursor();
 
     // Setup blur filter for video container
     this.blurFilter = new BlurFilter();
@@ -388,6 +410,27 @@ export class FrameRenderer {
     this.backgroundSprite = bgCanvas as any;
   }
 
+  private async setupCustomCursor(): Promise<void> {
+    const sources = this.config.cursorCustomImages || {};
+    if (this.config.cursorStyle !== 'custom' || Object.keys(sources).length === 0) {
+      this.cursorCustomImages = {};
+      return;
+    }
+
+    const loaded: Partial<Record<CursorCustomState, HTMLImageElement>> = {};
+    await Promise.all(Object.entries(sources).map(async ([state, source]) => {
+      if (!source?.startsWith('data:image/')) return;
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error(`Failed to load custom ${state} cursor image`));
+        image.src = source;
+      });
+      loaded[state as CursorCustomState] = image;
+    }));
+    this.cursorCustomImages = loaded;
+  }
+
   async renderFrame(videoSource: HTMLVideoElement | VideoFrame | ImageBitmap, timestamp: number): Promise<void> {
     if (!this.app || !this.videoContainer || !this.cameraContainer) {
       throw new Error('Renderer not initialized');
@@ -441,6 +484,7 @@ export class FrameRenderer {
       motionIntensity: maxMotionIntensity,
       isPlaying: true,
       motionBlurEnabled: this.config.motionBlurEnabled ?? true,
+      cameraMotion: sampleCameraMotion(this.config.zoomRegions, timeMs),
     });
 
     // Render the PixiJS stage to its canvas (video only, transparent background)
@@ -573,7 +617,11 @@ export class FrameRenderer {
   private updateAnimationState(timeMs: number): number {
     if (!this.cameraContainer || !this.layoutCache) return 0;
 
-    const { strength, focus, depth } = findInterpolatedTarget(this.config.zoomRegions, timeMs);
+    const { strength, focus, depth } = findInterpolatedTarget(
+      this.config.zoomRegions,
+      timeMs,
+      this.cursorTrack,
+    );
     
     const defaultFocus = DEFAULT_FOCUS;
     let targetScaleFactor = 1;
@@ -607,31 +655,9 @@ export class FrameRenderer {
     const prevFocusX = state.focusX;
     const prevFocusY = state.focusY;
 
-    const scaleDelta = targetScaleFactor - state.scale;
-    const focusXDelta = targetFocus.cx - state.focusX;
-    const focusYDelta = targetFocus.cy - state.focusY;
-
-    let nextScale = prevScale;
-    let nextFocusX = prevFocusX;
-    let nextFocusY = prevFocusY;
-
-    if (Math.abs(scaleDelta) > MIN_DELTA) {
-      nextScale = prevScale + scaleDelta * SMOOTHING_FACTOR;
-    } else {
-      nextScale = targetScaleFactor;
-    }
-
-    if (Math.abs(focusXDelta) > MIN_DELTA) {
-      nextFocusX = prevFocusX + focusXDelta * SMOOTHING_FACTOR;
-    } else {
-      nextFocusX = targetFocus.cx;
-    }
-
-    if (Math.abs(focusYDelta) > MIN_DELTA) {
-      nextFocusY = prevFocusY + focusYDelta * SMOOTHING_FACTOR;
-    } else {
-      nextFocusY = targetFocus.cy;
-    }
+    const nextScale = targetScaleFactor;
+    const nextFocusX = targetFocus.cx;
+    const nextFocusY = targetFocus.cy;
 
     state.scale = nextScale;
     state.focusX = nextFocusX;
@@ -701,50 +727,8 @@ export class FrameRenderer {
   }
 
 
-  private drawMacCursor(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, isVectorStyle = true) {
-    ctx.save();
-    
-    // The tip of the pointer is mathematically positioned at local (0, 0), so no offset subtraction needed
-    const targetX = x;
-    const targetY = y;
-    
-    // Drop shadow
-    if (isVectorStyle) {
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-      ctx.shadowBlur = 5 * scale;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 3 * scale;
-    } else {
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-      ctx.shadowBlur = 2 * scale;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 1 * scale;
-    }
-    
-    // Draw the crisp macOS vector cursor scaled relative to the tip at (0, 0)
-    ctx.beginPath();
-    ctx.moveTo(targetX, targetY);
-    ctx.lineTo(targetX, targetY + 20 * scale);
-    ctx.lineTo(targetX + 5.7 * scale, targetY + 14.3 * scale);
-    ctx.lineTo(targetX + 10.7 * scale, scale * 24.3 + targetY);
-    ctx.lineTo(targetX + 14.3 * scale, scale * 22.1 + targetY);
-    ctx.lineTo(targetX + 9.3 * scale, targetY + 12.1 * scale);
-    ctx.lineTo(targetX + 18 * scale, targetY + 12.1 * scale);
-    ctx.closePath();
-    
-    ctx.fillStyle = 'black';
-    ctx.fill();
-    
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2.2 * scale;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-    
-    ctx.restore();
-  }
-
   private renderCursor(timeMs: number): void {
-    const cursorData = this.config.cursorData || [];
+    const cursorData = this.cursorTrack;
     if (cursorData.length === 0 || !this.compositeCtx) return;
 
     let currentTimeMs = timeMs + (this.config.cursorOffset || 0);
@@ -752,47 +736,10 @@ export class FrameRenderer {
     const maxTime = cursorData[cursorData.length - 1].timestamp;
     currentTimeMs = Math.max(minTime, Math.min(maxTime, currentTimeMs));
 
-    let currentIndex = 0;
-    for (let i = 0; i < cursorData.length - 1; i++) {
-      if (cursorData[i].timestamp <= currentTimeMs && cursorData[i + 1].timestamp > currentTimeMs) {
-        currentIndex = i;
-        break;
-      }
-    }
-    if (currentTimeMs >= maxTime) {
-      currentIndex = cursorData.length - 2;
-    }
-
-    const p0 = cursorData[Math.max(0, currentIndex - 1)];
-    const p1 = cursorData[currentIndex];
-    const p2 = cursorData[currentIndex + 1];
-    const p3 = cursorData[Math.min(cursorData.length - 1, currentIndex + 2)];
-
-    const timeDiff = p2.timestamp - p1.timestamp;
-    const progress = timeDiff === 0 ? 0 : Math.max(0, Math.min(1, (currentTimeMs - p1.timestamp) / timeDiff));
-
-    const getX = (p: any) => p.cx !== undefined ? p.cx : (p.x > 1 ? p.x / 1920 : p.x);
-    const getY = (p: any) => p.cy !== undefined ? p.cy : (p.y > 1 ? p.y / 1080 : p.y);
-
-    const catmullRom = (v0: number, v1: number, v2: number, v3: number, t: number): number => {
-      return 0.5 * (
-        (2 * v1) +
-        (-v0 + v2) * t +
-        (2 * v0 - 5 * v1 + 4 * v2 - v3) * t * t +
-        (-v0 + 3 * v1 - 3 * v2 + v3) * t * t * t
-      );
-    };
-
-    let currentX = 0;
-    let currentY = 0;
-
-    if (this.config.cursorSmoothing !== false) {
-      currentX = catmullRom(getX(p0), getX(p1), getX(p2), getX(p3), progress);
-      currentY = catmullRom(getY(p0), getY(p1), getY(p2), getY(p3), progress);
-    } else {
-      currentX = getX(p1) + (getX(p2) - getX(p1)) * progress;
-      currentY = getY(p1) + (getY(p2) - getY(p1)) * progress;
-    }
+    const sample = sampleCursorTrack(cursorData, currentTimeMs);
+    if (!sample) return;
+    const currentX = sample.x;
+    const currentY = sample.y;
 
     const videoSprite = this.videoSprite;
     let finalX = 0;
@@ -831,9 +778,20 @@ export class FrameRenderer {
     }
 
     const displayScale = isVectorStyle ? cursorSize * 1.6 : 0.62;
-    const finalScale = jiggleScale * displayScale * scaleFactor;
+    const pressedScale = sample.isPointerDown ? 0.86 : 1;
+    const finalScale = jiggleScale * pressedScale * displayScale * scaleFactor;
 
-    this.drawMacCursor(this.compositeCtx, finalX, finalY, finalScale, isVectorStyle);
+    const maskBounds = this.maskGraphics?.getBounds();
+    if (maskBounds) {
+      this.compositeCtx.save();
+      this.compositeCtx.beginPath();
+      this.compositeCtx.rect(maskBounds.x, maskBounds.y, maskBounds.width, maskBounds.height);
+      this.compositeCtx.clip();
+      drawCursorVisual(this.compositeCtx, finalX, finalY, finalScale, sample.cursorType, isVectorStyle, currentTimeMs, this.config.cursorStyle, this.cursorCustomImages);
+      this.compositeCtx.restore();
+    } else {
+      drawCursorVisual(this.compositeCtx, finalX, finalY, finalScale, sample.cursorType, isVectorStyle, currentTimeMs, this.config.cursorStyle, this.cursorCustomImages);
+    }
   }
 
   destroy(): void {
@@ -854,5 +812,6 @@ export class FrameRenderer {
     this.shadowCtx = null;
     this.compositeCanvas = null;
     this.compositeCtx = null;
+    this.cursorCustomImages = {};
   }
 }

@@ -21,8 +21,12 @@ if (currentState.phaseReleased) {
   fail("Current Phase 1 acceptance record should not be released before user validation.", currentState);
 }
 
-if (currentState.userAcceptedItems !== 0 || currentState.pendingIds.length !== 8) {
-  fail("Current Phase 1 acceptance record should start with all user checkpoints pending.", currentState);
+if (
+  currentState.currentPhaseStatus !== "not-released" ||
+  currentState.unknownCheckedIds.length !== 0 ||
+  currentState.userAcceptedItems + currentState.pendingIds.length !== currentState.requiredItems.length
+) {
+  fail("Current Phase 1 acceptance record must preserve valid user decisions while remaining unreleased until every checkpoint passes.", currentState);
 }
 
 if (!releasedState.phaseReleased || releasedState.userAcceptedItems !== 8 || releasedState.pendingIds.length !== 0) {

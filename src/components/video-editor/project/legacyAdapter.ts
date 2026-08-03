@@ -5,9 +5,12 @@ import type {
   AudioRegion,
   CropRegion,
   CursorDataPoint,
+  CursorCustomImageMap,
+  CursorStylePreset,
   TrimRegion,
   ZoomRegion,
 } from "../types";
+import { resolveCursorStyle } from "../types";
 import type {
   ProjectAsset,
   ProjectClip,
@@ -40,6 +43,9 @@ export interface LegacyEditorProjectInput {
   cursorSize: number;
   cursorSmoothing: boolean;
   showVectorCursor: boolean;
+  cursorStyle?: CursorStylePreset;
+  cursorCustomImage?: string | null;
+  cursorCustomImages?: CursorCustomImageMap;
   cursorOffset: number;
   cropRegion: CropRegion;
   wallpaper: string;
@@ -81,17 +87,25 @@ export interface LegacyEditorRestoredState {
   cursorSize?: number;
   cursorSmoothing?: boolean;
   showVectorCursor?: boolean;
+  cursorStyle?: CursorStylePreset;
+  cursorCustomImage?: string | null;
+  cursorCustomImages?: CursorCustomImageMap;
   cursorOffset?: number;
 }
 
 export function calculateLegacyProjectDurationSeconds(input: LegacyProjectDurationInput): number {
+  const sourceDurationMs = secondsToMs(input.durationSeconds);
   const candidatesMs = [
-    secondsToMs(input.durationSeconds),
+    sourceDurationMs,
     secondsToMs(input.projectDurationSeconds ?? 0),
     ...input.zoomRegions.map((region) => safeEndMs(region.endMs)),
     ...input.trimRegions.map((region) => safeEndMs(region.endMs)),
     ...input.annotationRegions.map((region) => safeEndMs(region.endMs)),
-    ...input.audioRegions.map((region) => safeEndMs(region.endMs)),
+    ...input.audioRegions.map((region) => (
+      region.isOriginal && !region.isDetached && sourceDurationMs > 0
+        ? Math.min(safeEndMs(region.endMs), sourceDurationMs)
+        : safeEndMs(region.endMs)
+    )),
   ];
 
   return Math.max(0, ...candidatesMs) / 1000;
@@ -266,14 +280,25 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
   });
 
   input.audioRegions.forEach((region) => {
-    const { file: _file, ...serializableRegion } = region;
+    const isAttachedOriginal = region.isOriginal && !region.isDetached && sourceDurationMs > 0;
+    const effectiveEndMs = isAttachedOriginal
+      ? Math.min(region.endMs, sourceDurationMs)
+      : region.endMs;
+    const effectiveSourceEndMs = isAttachedOriginal && region.sourceEndMs !== undefined
+      ? Math.min(region.sourceEndMs, (region.sourceStartMs ?? 0) + Math.max(0, effectiveEndMs - region.startMs))
+      : region.sourceEndMs;
+    const { file: _file, ...serializableRegion } = {
+      ...region,
+      endMs: effectiveEndMs,
+      sourceEndMs: effectiveSourceEndMs,
+    };
     const trackId = laneAllocator.assign({
       baseTrackId: TRACK_IDS.audio,
       trackType: "audio",
       baseName: "Audio",
       baseOrder: 3,
       startMs: region.startMs,
-      endMs: region.endMs,
+      endMs: effectiveEndMs,
     });
     clips.push({
       id: stableId("clip-audio", region.id),
@@ -281,9 +306,9 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
       trackId,
       assetId: audioAssetId(region),
       startMs: region.startMs,
-      endMs: region.endMs,
+      endMs: effectiveEndMs,
       sourceStartMs: region.sourceStartMs,
-      sourceEndMs: region.sourceEndMs,
+      sourceEndMs: effectiveSourceEndMs,
       name: region.name || "Audio",
       props: {
         sourceRegion: serializableRegion,
@@ -296,8 +321,11 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
     });
   });
 
+  const cursorKey = input.originalVideoPath || input.videoPath || "cursor";
+  const cursorAssetId = stableId("asset-cursor", cursorKey);
+  const cursorCustomImages: CursorCustomImageMap = input.cursorCustomImages
+    ?? (input.cursorCustomImage ? { default: input.cursorCustomImage } : {});
   if (input.cursorData.length > 0) {
-    const cursorAssetId = stableId("asset-cursor", input.originalVideoPath || input.videoPath || "cursor");
     addAsset({
       id: cursorAssetId,
       type: "cursor-data",
@@ -307,27 +335,32 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
         points: input.cursorData.length,
       },
     });
-    clips.push({
-      id: stableId("clip-cursor", cursorAssetId),
-      type: "cursor",
-      trackId: TRACK_IDS.cursor,
-      assetId: cursorAssetId,
-      startMs: 0,
-      endMs: projectDurationMs,
-      name: "Cursor",
-      props: {
-        points: input.cursorData,
-        size: input.cursorSize,
-        smoothing: input.cursorSmoothing,
-        vectorCursor: input.showVectorCursor,
-        offsetMs: input.cursorOffset,
-      },
-      legacy: {
-        source: "VideoEditor",
-        regionType: "cursor",
-      },
-    });
   }
+
+  // Cursor appearance is a project setting even when telemetry has no points.
+  clips.push({
+    id: stableId("clip-cursor", cursorKey),
+    type: "cursor",
+    trackId: TRACK_IDS.cursor,
+    assetId: input.cursorData.length > 0 ? cursorAssetId : undefined,
+    startMs: 0,
+    endMs: projectDurationMs,
+    name: "Cursor",
+    props: {
+      points: input.cursorData,
+      size: input.cursorSize,
+      smoothing: input.cursorSmoothing,
+      vectorCursor: input.showVectorCursor,
+      style: resolveCursorStyle(input.cursorStyle, input.showVectorCursor),
+      customImage: cursorCustomImages.default,
+      customImages: cursorCustomImages,
+      offsetMs: input.cursorOffset,
+    },
+    legacy: {
+      source: "VideoEditor",
+      regionType: "cursor",
+    },
+  });
 
   const scenes = createDefaultScenes({
     projectId,
@@ -435,6 +468,10 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
       cursorSize: cursorClip.props.size,
       cursorSmoothing: cursorClip.props.smoothing,
       showVectorCursor: cursorClip.props.vectorCursor,
+      cursorStyle: resolveCursorStyle(cursorClip.props.style, cursorClip.props.vectorCursor),
+      cursorCustomImage: cursorClip.props.customImage ?? null,
+      cursorCustomImages: cursorClip.props.customImages
+        ?? (cursorClip.props.customImage ? { default: cursorClip.props.customImage } : {}),
       cursorOffset: cursorClip.props.offsetMs,
     } : {}),
   };

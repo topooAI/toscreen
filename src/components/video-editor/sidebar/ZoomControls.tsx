@@ -2,33 +2,29 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Trash2, Sparkles } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { KeyboardShortcutsHelp } from "../KeyboardShortcutsHelp";
-import type { ZoomDepth } from "../types";
+import { ZOOM_DEPTH_SCALES, type ZoomDepth } from "../types";
 
 interface ZoomControlsProps {
     selectedZoomDepth?: ZoomDepth | null;
     onZoomDepthChange?: (depth: ZoomDepth) => void;
     selectedZoomId?: string | null;
     onZoomDelete?: (id: string) => void;
-    onAutoZoom?: () => void;
 }
 
-const ZOOM_DEPTH_OPTIONS: Array<{ depth: ZoomDepth; label: string }> = [
-    { depth: 1, label: "1.25×" },
-    { depth: 2, label: "1.5×" },
-    { depth: 3, label: "1.8×" },
-    { depth: 4, label: "2.2×" },
-    { depth: 5, label: "3.5×" },
-    { depth: 6, label: "5×" },
-];
+const ZOOM_DEPTH_OPTIONS: Array<{ depth: ZoomDepth; label: string }> = (
+    [1, 2, 3, 4, 5, 6] as ZoomDepth[]
+).map((depth) => ({
+    depth,
+    label: `${ZOOM_DEPTH_SCALES[depth]}×`,
+}));
 
 export function ZoomControls({
     selectedZoomDepth,
     onZoomDepthChange,
     selectedZoomId,
     onZoomDelete,
-    onAutoZoom,
 }: ZoomControlsProps) {
     const zoomEnabled = Boolean(selectedZoomId);
 
@@ -39,33 +35,21 @@ export function ZoomControls({
     };
 
     return (
-        <div className="space-y-4">
-            {onAutoZoom && (
-                <Button
-                    onClick={onAutoZoom}
-                    className="w-full gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/20 border-0 transition-all duration-200"
-                >
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        Generate Auto-Zoom
-                    </div>
-                </Button>
-            )}
-
+        <div className="space-y-2">
             <div>
-                <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-slate-200">Zoom Level</span>
-                    <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[12px] font-medium text-[var(--ui-text-secondary)]">Zoom Level</span>
+                    <div className="flex items-center gap-2">
                         {zoomEnabled && selectedZoomDepth && (
-                            <span className="text-[10px] uppercase tracking-wider font-medium text-violet-400 bg-violet-500/10 px-2 py-1 rounded-full">
-                                {ZOOM_DEPTH_OPTIONS.find(o => o.depth === selectedZoomDepth)?.label} Active
+                            <span className="text-[11px] font-medium text-[#7C5CFC]">
+                                {ZOOM_DEPTH_OPTIONS.find(o => o.depth === selectedZoomDepth)?.label}
                             </span>
                         )}
                         <KeyboardShortcutsHelp />
                     </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                     {ZOOM_DEPTH_OPTIONS.map((option) => {
                         const isActive = selectedZoomDepth === option.depth;
                         return (
@@ -75,22 +59,21 @@ export function ZoomControls({
                                 disabled={!zoomEnabled}
                                 onClick={() => onZoomDepthChange?.(option.depth)}
                                 className={cn(
-                                    "h-auto w-full rounded-xl border px-1 py-3 text-center shadow-sm transition-all flex flex-col items-center justify-center gap-1.5",
-                                    "duration-200 ease-out",
+                                    "h-8 w-full rounded-[5px] border px-1 text-center shadow-none transition-colors",
                                     zoomEnabled ? "opacity-100 cursor-pointer" : "opacity-40 cursor-not-allowed",
                                     isActive
-                                        ? "border-violet-500 bg-violet-600 text-white shadow-violet-500/20 scale-105 ring-2 ring-violet-500/20"
-                                        : "border-white/5 bg-white/5 text-slate-400 hover:bg-white/10 hover:border-white/10 hover:text-slate-200"
+                                        ? "border-[#7C5CFC] bg-[#7C5CFC] text-white"
+                                        : "border-[var(--ui-border)] bg-[var(--ui-control)] text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)] hover:text-[var(--ui-text-primary)]"
                                 )}
                             >
-                                <span className={cn("text-sm font-semibold tracking-tight")}>{option.label}</span>
+                                <span className="text-[12px] font-medium">{option.label}</span>
                             </Button>
                         );
                     })}
                 </div>
 
                 {!zoomEnabled && (
-                    <p className="text-xs text-slate-500 mt-3 text-center">Select a zoom region to adjust depth</p>
+                    <p className="text-[11px] text-[var(--ui-text-tertiary)] mt-2">Select a focus clip to adjust its zoom level.</p>
                 )}
 
                 {zoomEnabled && (
@@ -98,9 +81,9 @@ export function ZoomControls({
                         onClick={handleDeleteClick}
                         variant="destructive"
                         size="sm"
-                        className="mt-4 w-full gap-2 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30 transition-all"
+                        className="mt-3 w-full h-8 justify-start gap-2 rounded-[5px] bg-red-500/8 text-red-500 border border-red-500/15 hover:bg-red-500/12 transition-colors"
                     >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                         Delete Zoom Region
                     </Button>
                 )}

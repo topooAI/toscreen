@@ -13,6 +13,7 @@ interface RowProps extends RowDefinition {
 const ROW_METADATA: Record<string, { label: string }> = {
   "row-video": { label: "Main Track" },
   "row-zoom": { label: "Focus" },
+  "row-camera": { label: "Camera" },
   "row-trim": { label: "Trim" },
   "row-annotation": { label: "Text" },
   "row-audio": { label: "Audio" },
@@ -29,6 +30,9 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
     } else if (id.startsWith("row-zoom-")) {
       const idx = parseInt(id.replace("row-zoom-", ""), 10) + 1;
       meta = { label: idx === 1 ? "Focus" : `Focus ${idx}` };
+    } else if (id.startsWith("row-camera-")) {
+      const idx = parseInt(id.replace("row-camera-", ""), 10) + 1;
+      meta = { label: idx === 1 ? "Camera" : `Camera ${idx}` };
     } else if (id.startsWith("row-annotation-")) {
       const idx = parseInt(id.replace("row-annotation-", ""), 10) + 1;
       meta = { label: idx === 1 ? "Text" : `Text ${idx}` };
@@ -39,12 +43,12 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
 
   return (
     <div
-      className="border-b border-white/5 bg-[#09090b] group/row hover:bg-white/[0.01] transition-all duration-300 ease-in-out w-full flex items-stretch relative"
-      style={{ height, marginBottom: 4 }}
+      className="border-b border-[var(--ui-border)] bg-transparent group/row hover:bg-[var(--ui-track-hover)] transition-colors duration-150 w-full flex items-stretch relative"
+      style={{ height }}
     >
       {/* Sidebar Track Control Header */}
       <div 
-        className="border-r border-white/5 bg-[#0c0c0e] flex items-center justify-between px-3 gap-2 select-none z-10 shrink-0 cursor-grab active:cursor-grabbing hover:bg-white/[0.03] transition-colors relative"
+        className="border-r border-[var(--ui-border)] bg-[var(--ui-panel)] flex items-center justify-between px-3 gap-2 select-none z-10 shrink-0 cursor-grab active:cursor-grabbing hover:bg-[var(--ui-track-hover)] transition-colors relative"
         style={{ width: TIMELINE_SIDEBAR_WIDTH_PX }}
         title="长按拖拽排序"
       >
@@ -60,14 +64,14 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
               <path d="M2 0 L2 6 Q2 8 4 8 L10 8" stroke="currentColor" strokeWidth="1.5" />
             </svg>
           )}
-          <span className="text-[12px] font-medium text-slate-300 group-hover/row:text-white transition-colors truncate tracking-wide">
+          <span className="text-[12px] font-medium text-slate-300 group-hover/row:text-[var(--ui-text-primary)] transition-colors truncate tracking-wide">
             {meta.label}
           </span>
         </div>
         
         {onAddClick && (
           <button 
-            className="text-slate-500 hover:text-white hover:bg-white/10 p-1 rounded transition-colors z-20 relative" 
+            className="text-slate-500 hover:text-[var(--ui-text-primary)] hover:bg-white/10 p-1 rounded transition-colors z-20 relative"
             title="在播放头位置添加片段"
             onClick={(e) => {
               e.stopPropagation();

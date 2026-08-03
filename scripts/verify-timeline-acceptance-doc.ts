@@ -71,7 +71,7 @@ const requiredPhrases = [
   "DRAG-05B | 磁吸手感",
   "DRAG-06A | 拖拽 span 数值安全",
   "DRAG-06B | 无 NaN 拖拽死锁手感",
-  "VIDEO-04A | 时间轴缩放左对齐合同",
+  "VIDEO-04A | 无限时间轴缩放与平移合同",
   "VIDEO-04B | 时间轴缩放左对齐实机验收",
   "AUDIO-01 | 波形底部显示",
   "AUDIO-02A | 左拉伸波形对齐合同",

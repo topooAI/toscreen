@@ -158,7 +158,10 @@ export function useVideoTexture({
     blurFilter.quality = 3;
     blurFilter.resolution = app.renderer.resolution;
     blurFilter.strength = 0;
-    videoContainer.filters = [blurFilter];
+    // Attach this expensive filter only while motion blur has a non-zero
+    // strength. Keeping a zero-strength filter mounted still forces Pixi to
+    // render the video through an offscreen filter pass every frame.
+    videoContainer.filters = [];
     blurFilterRef.current = blurFilter;
     
     // Use the ref here to avoid dependency on the function identity

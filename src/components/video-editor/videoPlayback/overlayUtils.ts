@@ -14,7 +14,7 @@ interface OverlayUpdateParams {
 export function updateOverlayIndicator(params: OverlayUpdateParams) {
   const { overlayEl, indicatorEl, region, focusOverride, videoSize, baseScale, isPlaying } = params;
 
-  if (!region) {
+  if (!region || isPlaying) {
     indicatorEl.style.display = 'none';
     overlayEl.style.pointerEvents = 'none';
     return;

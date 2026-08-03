@@ -39,6 +39,8 @@ const project = createProjectFromLegacyEditorState({
   cursorSize: 1.5,
   cursorSmoothing: true,
   showVectorCursor: true,
+  cursorStyle: "custom",
+  cursorCustomImage: "data:image/png;base64,dG9zY3JlZW4tY3Vyc29y",
   cursorOffset: -180,
   cropRegion: DEFAULT_CROP_REGION,
   wallpaper: "/wallpapers/wallpaper1.jpg",
@@ -60,6 +62,17 @@ if (!validation.valid) {
 }
 
 const restored = restoreLegacyEditorStateFromProjectModel(project);
+
+if (
+  restored.cursorStyle !== "custom"
+  || restored.cursorCustomImage !== "data:image/png;base64,dG9zY3JlZW4tY3Vyc29y"
+  || restored.cursorCustomImages?.default !== "data:image/png;base64,dG9zY3JlZW4tY3Vyc29y"
+  || restored.cursorData?.length !== 0
+) {
+  console.error("[ProjectModel] empty cursor telemetry must retain cursor appearance settings.");
+  console.error(restored);
+  process.exit(1);
+}
 
 if (restored.companionAudioPath !== companionAudioPath) {
   console.error("[ProjectModel] companionAudioPath restore failed.");
@@ -115,5 +128,6 @@ console.log(JSON.stringify({
   companionAudioPath: restored.companionAudioPath,
   zoomRegions: restored.zoomRegions.length,
   audioRegions: restored.audioRegions.length,
+  cursorStyle: restored.cursorStyle,
   legacyFallbackCompanionAudioPath: restoredLegacyProject.companionAudioPath,
 }, null, 2));

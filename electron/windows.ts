@@ -80,20 +80,21 @@ export function createEditorWindow(): BrowserWindow {
   const isMac = process.platform === 'darwin';
 
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
+    width: 1400,
+    height: 900,
+    minWidth: 900,
     minHeight: 600,
     ...(isMac && {
       titleBarStyle: 'hiddenInset',
       trafficLightPosition: { x: 12, y: 12 },
+      vibrancy: 'popover',
+      visualEffectState: 'active',
     }),
-    transparent: false,
     resizable: true,
     alwaysOnTop: false,
     skipTaskbar: false,
     title: 'toScreen',
-    backgroundColor: '#000000',
+    backgroundColor: isMac ? '#00000000' : '#f4f5f7',
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       nodeIntegration: false,
@@ -103,7 +104,6 @@ export function createEditorWindow(): BrowserWindow {
     },
   })
 
-  // Standard editor size, not forced maximize
   win.center();
 
   win.webContents.on('did-finish-load', () => {
@@ -115,6 +115,53 @@ export function createEditorWindow(): BrowserWindow {
   } else {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'), { 
       query: { windowType: 'editor' } 
+    })
+  }
+
+  return win
+}
+
+export function createSettingsWindow(): BrowserWindow {
+  const isMac = process.platform === 'darwin'
+
+  const win = new BrowserWindow({
+    width: 720,
+    height: 520,
+    minWidth: 720,
+    minHeight: 520,
+    maxWidth: 720,
+    maxHeight: 520,
+    ...(isMac && {
+      titleBarStyle: 'hiddenInset',
+      trafficLightPosition: { x: 14, y: 14 },
+      vibrancy: 'popover',
+      visualEffectState: 'active',
+    }),
+    title: 'ToScreen Settings',
+    backgroundColor: isMac ? '#00000000' : '#f4f5f7',
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.mjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false,
+    },
+  })
+
+  win.once('ready-to-show', () => {
+    win.show()
+    win.focus()
+  })
+
+  if (VITE_DEV_SERVER_URL) {
+    win.loadURL(VITE_DEV_SERVER_URL + '?windowType=settings')
+  } else {
+    win.loadFile(path.join(RENDERER_DIST, 'index.html'), {
+      query: { windowType: 'settings' },
     })
   }
 

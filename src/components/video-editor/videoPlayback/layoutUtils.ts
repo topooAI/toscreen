@@ -29,7 +29,11 @@ export function layoutVideoContent(params: LayoutParams): LayoutResult | null {
   const height = container.clientHeight;
 
   if (width && height) {
-    app.renderer.resize(width, height);
+    const currentWidth = app.screen.width;
+    const currentHeight = app.screen.height;
+    if (Math.abs(currentWidth - width) > 0.5 || Math.abs(currentHeight - height) > 0.5) {
+      app.renderer.resize(width, height);
+    }
     app.canvas.style.width = '100%';
     app.canvas.style.height = '100%';
   }
