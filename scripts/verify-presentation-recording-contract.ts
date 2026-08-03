@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { createProjectFromLegacyEditorState, restoreLegacyEditorStateFromProjectModel } from '../src/components/video-editor/project';
-import { presenterEffectFromCameraPath } from '../src/components/video-editor/project/presenterContract';
+import { expandPendingPresenterDuration, presenterEffectFromCameraPath } from '../src/components/video-editor/project/presenterContract';
 import { recordedShortcutEffects } from '../src/components/video-editor/presentation/presentationEffects';
+import { calculateMediaDrawRect } from '../src/components/video-editor/presentation/presentationGeometry';
+import { renderPresentationEffects } from '../src/lib/exporter/presentationRenderer';
 import { updateHeldKeyState } from '../shared/keyboardModifiers';
 
 const project = createProjectFromLegacyEditorState({
@@ -27,13 +29,24 @@ assert.ok(missing && missing.kind === 'presenter' && !missing.sourceUrl, 'missin
 
 const first = presenterEffectFromCameraPath('/tmp/live-camera.mov', 12000, []); assert.ok(first?.sourceUrl?.includes('live-camera.mov'));
 assert.equal(presenterEffectFromCameraPath('/tmp/live-camera.mov', 12000, first ? [first] : []), null, 'first-entry cameraPath must deduplicate');
+const pending = presenterEffectFromCameraPath('/tmp/pending-camera.mov', 1, []); assert.ok(pending);
+const expanded = expandPendingPresenterDuration(pending ? [pending] : [], 12_345); assert.equal(expanded[0].endMs, 12_345);
+const userEdited = pending ? [{ ...pending, endMs: 4500 }] : []; assert.strictEqual(expandPendingPresenterDuration(userEdited, 12_345), userEdited, 'user-edited ranges must not be overwritten');
 
-const held = new Set<number>();
-updateHeldKeyState(held, 'keydown', 3675); updateHeldKeyState(held, 'keydown', 42); const modifiers = updateHeldKeyState(held, 'keydown', 25);
-assert.deepEqual(modifiers, { meta: true, ctrl: false, alt: false, shift: true });
-const shortcut = recordedShortcutEffects([{ timestamp: 500, x: 0, y: 0, cx: 0, cy: 0, type: 'keydown', data: { keycode: 25, heldKeycodes: [...held] }, modifiers }])[0];
+const held = new Set<number>(); const events: any[] = [];
+const push = (timestamp: number, type: 'keydown' | 'keyup', keycode: number) => { const modifiers = updateHeldKeyState(held, type, keycode); events.push({ timestamp, x: 0, y: 0, cx: 0, cy: 0, type, data: { keycode, heldKeycodes: [...held] }, modifiers }); };
+push(500, 'keydown', 3675); push(510, 'keydown', 42); push(520, 'keydown', 25); push(560, 'keydown', 25); push(700, 'keydown', 25); push(760, 'keyup', 25); push(770, 'keyup', 42); push(780, 'keyup', 3675);
+const shortcuts = recordedShortcutEffects(events); assert.equal(shortcuts.length, 1, 'modifier-only events and key repeat must not create cards'); const shortcut = shortcuts[0];
 assert.deepEqual(shortcut.keys, ['⌘', '⇧', 'P']);
-updateHeldKeyState(held, 'keyup', 25); updateHeldKeyState(held, 'keyup', 42); const released = updateHeldKeyState(held, 'keyup', 3675);
-assert.deepEqual(released, { meta: false, ctrl: false, alt: false, shift: false });
+assert.deepEqual(events.at(-1).modifiers, { meta: false, ctrl: false, alt: false, shift: false });
+
+assert.deepEqual(calculateMediaDrawRect(1920, 1080, 0, 0, 400, 400, 'cover'), { sx: 420, sy: 0, sw: 1080, sh: 1080, dx: 0, dy: 0, dw: 400, dh: 400 });
+assert.deepEqual(calculateMediaDrawRect(1920, 1080, 0, 0, 400, 400, 'contain'), { sx: 0, sy: 0, sw: 1920, sh: 1080, dx: 0, dy: 87.5, dw: 400, dh: 225 });
+
+const commands: Array<{ name: string; args: unknown[]; fillStyle?: unknown }> = []; let fillStyle: unknown;
+const context = { canvas: {}, save() {}, restore() {}, beginPath() {}, rect(...args: unknown[]) { commands.push({ name: 'rect', args }); }, roundRect(...args: unknown[]) { commands.push({ name: 'roundRect', args }); }, fill(...args: unknown[]) { commands.push({ name: 'fill', args, fillStyle }); }, fillRect(...args: unknown[]) { commands.push({ name: 'fillRect', args, fillStyle }); }, strokeRect(...args: unknown[]) { commands.push({ name: 'strokeRect', args }); }, set fillStyle(value: unknown) { fillStyle = value; }, get fillStyle() { return fillStyle; }, set globalAlpha(_value: number) {}, set strokeStyle(_value: string) {}, set lineWidth(_value: number) {} } as unknown as CanvasRenderingContext2D;
+renderPresentationEffects(context, [{ id: 'highlight-test', kind: 'highlight', startMs: 0, endMs: 1000, bounds: { x: 25, y: 20, width: 50, height: 40 }, color: '#ffcc00', dimOpacity: .5, opacity: .75, radius: 8 }], 800, 600, 500);
+assert.deepEqual(commands.find(command => command.name === 'fill')?.args, ['evenodd']);
+assert.deepEqual(commands.find(command => command.name === 'fillRect'), { name: 'fillRect', args: [200, 120, 400, 240], fillStyle: '#ffcc00' });
 
 console.log(JSON.stringify({ status: 'ok', contract: 'recording-presentation', presenterClipRestore: true, firstCameraPath: true, shortcut: shortcut.keys }));

@@ -1,5 +1,6 @@
 import type { PresentationEffectRegion } from '@/components/video-editor/presentation/types';
 import { isRegionActive, sampleEffectBounds } from '@/components/video-editor/presentation/presentationEffects';
+import { calculateMediaDrawRect } from '@/components/video-editor/presentation/presentationGeometry';
 
 const scratchByCanvas = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
 function scratchCanvas(source: HTMLCanvasElement) {
@@ -27,7 +28,11 @@ export function renderPresentationEffects(ctx: CanvasRenderingContext2D, effects
     if (effect.kind === 'presenter') {
       if (!effect.visible) continue;
       const image = media.get(effect.id); if (!image) continue;
-      const x = effect.bounds.x / 100 * width, y = effect.bounds.y / 100 * height, w = effect.bounds.width / 100 * width, h = effect.bounds.height / 100 * height; ctx.save(); ctx.globalAlpha = effect.opacity ?? 1; ctx.beginPath(); if (effect.shape === 'circle') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); else ctx.roundRect(x, y, w, h, 12); ctx.clip(); ctx.drawImage(image, x, y, w, h); ctx.restore();
+      const x = effect.bounds.x / 100 * width, y = effect.bounds.y / 100 * height, w = effect.bounds.width / 100 * width, h = effect.bounds.height / 100 * height;
+      const sourceWidth = Number((image as { videoWidth?: number; naturalWidth?: number; width?: number }).videoWidth ?? (image as { naturalWidth?: number }).naturalWidth ?? (image as { width?: number }).width ?? 0);
+      const sourceHeight = Number((image as { videoHeight?: number; naturalHeight?: number; height?: number }).videoHeight ?? (image as { naturalHeight?: number }).naturalHeight ?? (image as { height?: number }).height ?? 0);
+      const draw = calculateMediaDrawRect(sourceWidth, sourceHeight, x, y, w, h, effect.fit);
+      ctx.save(); ctx.globalAlpha = effect.opacity ?? 1; ctx.beginPath(); if (effect.shape === 'circle') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); else ctx.roundRect(x, y, w, h, 12); ctx.clip(); ctx.drawImage(image, draw.sx, draw.sy, draw.sw, draw.sh, draw.dx, draw.dy, draw.dw, draw.dh); ctx.restore();
       continue;
     }
     const sampledBounds = effect.kind === 'mask' ? sampleEffectBounds(effect, timeMs) : effect.bounds;
@@ -42,6 +47,6 @@ export function renderPresentationEffects(ctx: CanvasRenderingContext2D, effects
       }
       ctx.restore(); continue;
     }
-    ctx.save(); ctx.globalAlpha = effect.opacity; ctx.fillStyle = `rgba(0,0,0,${effect.dimOpacity})`; ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.roundRect(x, y, w, h, effect.radius); ctx.fill('evenodd'); ctx.strokeStyle = effect.color; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h); ctx.restore();
+    ctx.save(); ctx.globalAlpha = effect.opacity; ctx.fillStyle = `rgba(0,0,0,${effect.dimOpacity})`; ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.roundRect(x, y, w, h, effect.radius); ctx.fill('evenodd'); ctx.fillStyle = effect.color; ctx.fillRect(x, y, w, h); ctx.strokeStyle = effect.color; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h); ctx.restore();
   }
 }

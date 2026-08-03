@@ -56,7 +56,7 @@ import { createEditingRenderPlan } from './editing';
 import { PresentationToolbar } from './presentation/PresentationToolbar';
 import type { PresentationEffectRegion } from './presentation/types';
 import { recordedShortcutEffects } from './presentation/presentationEffects';
-import { presenterEffectFromCameraPath } from './project/presenterContract';
+import { expandPendingPresenterDuration, presenterEffectFromCameraPath } from './project/presenterContract';
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -802,6 +802,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
   const handleDurationChange = useCallback((dur: number) => {
     setDuration(dur);
+    setPresentationEffects(current => expandPendingPresenterDuration(current, dur * 1000));
     // Sync videoElementRef when duration is first reported (video element is definitely ready)
     if (videoPlaybackRef.current?.video) {
       videoElementRef.current = videoPlaybackRef.current.video;

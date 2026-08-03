@@ -27,15 +27,31 @@ export function clickProgress(points: CursorDataPoint[], timeMs: number, duratio
 
 const KEY_LABELS: Record<number, string> = { 1: 'Esc', 14: '⌫', 15: '⇥', 28: '↵', 57: 'Space', 8: '⌫', 9: '⇥', 13: '↵', 16: '⇧', 17: '⌃', 18: '⌥', 27: 'Esc', 32: 'Space', 91: '⌘', 93: '⌘' };
 const UIOHOOK_LETTERS: Record<number, string> = { 30: 'A', 48: 'B', 46: 'C', 32: 'D', 18: 'E', 33: 'F', 34: 'G', 35: 'H', 23: 'I', 36: 'J', 37: 'K', 38: 'L', 50: 'M', 49: 'N', 24: 'O', 25: 'P', 16: 'Q', 19: 'R', 31: 'S', 20: 'T', 22: 'U', 47: 'V', 17: 'W', 45: 'X', 21: 'Y', 44: 'Z' };
-export const keyLabelForCode = (code: number) => KEY_LABELS[code] ?? UIOHOOK_LETTERS[code] ?? (code >= 65 && code <= 90 ? String.fromCharCode(code) : `Key ${code}`);
+const MODIFIER_ONLY_CODES = new Set([42, 54, 29, 3613, 56, 3640, 3675, 3676, 91, 92, 93]);
+export const keyLabelForCode = (code: number) => UIOHOOK_LETTERS[code] ?? KEY_LABELS[code] ?? (code >= 65 && code <= 90 ? String.fromCharCode(code) : `Key ${code}`);
 export function recordedShortcutEffects(points: Array<CursorDataPoint & { timestampMs?: number; data?: { keycode?: number } }>): PresentationEffectRegion[] {
-  return points.filter(point => point.type === 'keydown' && Number.isFinite(point.data?.keycode)).map((point, index) => {
-    const code = Number(point.data?.keycode); const label = keyLabelForCode(code);
+  const output: PresentationEffectRegion[] = [];
+  const heldMainKeys = new Map<number, number>();
+  let lastChordSignature = ''; let lastChordTimeMs = Number.NEGATIVE_INFINITY;
+  const ordered = [...points].sort((a, b) => Number(a.timestamp ?? a.timestampMs ?? 0) - Number(b.timestamp ?? b.timestampMs ?? 0));
+  for (const point of ordered) {
+    if (!Number.isFinite(point.data?.keycode)) continue;
+    const code = Number(point.data?.keycode);
     const startMs = Number(point.timestamp ?? point.timestampMs ?? 0);
+    if (point.type === 'keyup') { heldMainKeys.delete(code); continue; }
+    if (point.type !== 'keydown' || MODIFIER_ONLY_CODES.has(code)) continue;
+    const previousDownMs = heldMainKeys.get(code);
+    heldMainKeys.set(code, startMs);
+    if (previousDownMs !== undefined && startMs - previousDownMs <= 500) continue;
+    const label = keyLabelForCode(code);
     const modifiers = (point as typeof point & { modifiers?: { meta?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean } }).modifiers;
     const keys = [...(modifiers?.meta ? ['⌘'] : []), ...(modifiers?.ctrl ? ['⌃'] : []), ...(modifiers?.alt ? ['⌥'] : []), ...(modifiers?.shift ? ['⇧'] : []), label];
-    return { id: `recorded-key-${startMs}-${index}`, kind: 'keystroke', startMs, endMs: startMs + 900, keys: Array.from(new Set(keys)), placement: 'bottom', style: 'dark', durationMs: 900 };
-  });
+    const uniqueKeys = Array.from(new Set(keys)); const signature = uniqueKeys.join('+');
+    if (lastChordSignature === signature && startMs - lastChordTimeMs <= 500) continue;
+    lastChordSignature = signature; lastChordTimeMs = startMs;
+    output.push({ id: `recorded-key-${startMs}-${output.length}`, kind: 'keystroke', startMs, endMs: startMs + 900, keys: uniqueKeys, placement: 'bottom', style: 'dark', durationMs: 900 });
+  }
+  return output;
 }
 
 export function activeClickEffect(effects: PresentationEffectRegion[], timeMs: number) {

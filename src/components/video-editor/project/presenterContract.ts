@@ -57,6 +57,18 @@ export function presenterEffectFromCameraPath(cameraPath: string | undefined, du
   };
 }
 
+export function expandPendingPresenterDuration(effects: PresentationEffectRegion[], durationMs: number): PresentationEffectRegion[] {
+  const fullDurationMs = Math.max(1, Math.round(durationMs));
+  if (fullDurationMs <= 1) return effects;
+  let changed = false;
+  const next = effects.map(effect => {
+    if (effect.kind !== 'presenter' || effect.id !== 'presenter-recording-live' || effect.startMs !== 0 || effect.endMs !== 1) return effect;
+    changed = true;
+    return { ...effect, endMs: fullDurationMs };
+  });
+  return changed ? next : effects;
+}
+
 export function mergePresentationEffects(legacy: PresentationEffectRegion[], presenters: PresenterEffect[]): PresentationEffectRegion[] {
   const presenterClipIds = new Set(presenters.map(effect => effect.id));
   const presenterSources = new Set(presenters.map(effect => effect.sourceUrl).filter(Boolean));
