@@ -44,6 +44,7 @@ import {
   type RecentProjectEntry,
   type ToScreenPreset,
   transitionProjectDocument,
+  hydrateCurrentProjectMedia,
 } from '../projectLibrary'
 
 let selectedSource: any = null
@@ -85,6 +86,28 @@ export function registerIpcHandlers(
   const recentIndexPath = path.join(libraryDir, 'recent-projects.json')
   const presetIndexPath = path.join(libraryDir, 'presets.json')
   let currentProjectPath: string | null = null
+  let currentVideoPath: string | null = null
+  let currentProxyPath: string | null = null
+  let currentAudioPath: string | null = null
+  let currentCameraPath: string | null = null
+  let currentMicrophonePath: string | null = null
+
+  const clearCurrentProjectMedia = () => {
+    currentVideoPath = null
+    currentProxyPath = null
+    currentAudioPath = null
+    currentCameraPath = null
+    currentMicrophonePath = null
+  }
+  const hydrateMedia = (project: unknown) => {
+    const media = hydrateCurrentProjectMedia(project)
+    currentVideoPath = media.videoPath
+    currentProxyPath = media.proxyPath
+    currentAudioPath = media.audioPath
+    currentCameraPath = media.cameraPath
+    currentMicrophonePath = media.microphonePath
+    return media
+  }
 
   const rememberProject = async (projectPath: string, project: any): Promise<RecentProjectEntry> => {
     const assets = await inspectProjectAssets(project)
@@ -286,6 +309,7 @@ export function registerIpcHandlers(
     captureArea?: { x: number; y: number; width: number; height: number }
   }) => {
     currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'new' })
+    clearCurrentProjectMedia()
     const isAvailable = isNativeRecordingAvailable()
     if (!isAvailable) {
       return { success: false, error: 'Native recording is not available on this platform.' }
@@ -589,12 +613,6 @@ export function registerIpcHandlers(
     }
   });
 
-  let currentVideoPath: string | null = null;
-  let currentProxyPath: string | null = null;
-  let currentAudioPath: string | null = null;
-  let currentCameraPath: string | null = null;
-  let currentMicrophonePath: string | null = null;
-
   ipcMain.handle('set-current-video-path', (_, path: string, proxyPath?: string, audioPath?: string, cameraPath?: string, microphonePath?: string) => {
     currentVideoPath = path;
     currentProxyPath = proxyPath || null;
@@ -611,11 +629,7 @@ export function registerIpcHandlers(
   });
 
   ipcMain.handle('clear-current-video-path', () => {
-    currentVideoPath = null;
-    currentProxyPath = null;
-    currentAudioPath = null;
-    currentCameraPath = null;
-    currentMicrophonePath = null;
+    clearCurrentProjectMedia()
     currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'new' });
     return { success: true };
   });
@@ -708,7 +722,10 @@ export function registerIpcHandlers(
   ipcMain.handle('load-project', async (_, videoPath: string) => {
     try {
       if (!videoPath) return { success: false, message: 'No video path provided' };
-      const candidates = projectPathCandidatesForMediaPath(videoPath);
+      const candidates = Array.from(new Set([
+        ...(currentProjectPath ? [currentProjectPath] : []),
+        ...projectPathCandidatesForMediaPath(videoPath),
+      ]));
 
       for (const projectPath of candidates) {
         try {
@@ -751,7 +768,7 @@ export function registerIpcHandlers(
   })
 
   ipcMain.handle('project-get-current', () => ({ projectPath: currentProjectPath }))
-  ipcMain.handle('project-new', () => { currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'new' }); return { success: true } })
+  ipcMain.handle('project-new', () => { currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'new' }); clearCurrentProjectMedia(); return { success: true } })
   ipcMain.handle('project-list-recent', async () => {
     const recent = await readRecentIndex(recentIndexPath)
     const refreshed = await Promise.all(recent.map(async entry => {
@@ -768,19 +785,10 @@ export function registerIpcHandlers(
   ipcMain.handle('project-open', async (_, projectPath: string) => {
     const loaded = await readJsonWithBackup(projectPath)
     const project = loaded.value
-    const model = project?.projectModel || project
-    const assets = Array.isArray(model?.assets) ? model.assets : []
-    const screen = assets.find((asset: any) => asset.type === 'screen-recording')
-    const proxy = assets.find((asset: any) => asset.metadata?.role === 'preview-proxy')
-    const audio = assets.find((asset: any) => asset.type === 'audio' && asset.metadata?.role === 'companion-audio')
-    const camera = assets.find((asset: any) => asset.metadata?.role === 'camera-recording')
-    currentVideoPath = screen?.filePath || screen?.sourceUrl || null
-    currentProxyPath = proxy?.filePath || proxy?.sourceUrl || null
-    currentAudioPath = audio?.filePath || audio?.sourceUrl || null
-    currentCameraPath = camera?.filePath || camera?.sourceUrl || null
+    const media = hydrateMedia(project)
     currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'open', projectPath })
     await rememberProject(projectPath, project)
-    return { success: true, project, projectPath, recovered: loaded.recovered }
+    return { success: true, project, projectPath, recovered: loaded.recovered, media }
   })
   ipcMain.handle('project-remove-recent', async (_, projectPath: string) => {
     await writeRecentIndex(recentIndexPath, (await readRecentIndex(recentIndexPath)).filter(entry => entry.projectPath !== projectPath))
@@ -828,8 +836,9 @@ export function registerIpcHandlers(
     if (destination.canceled || !destination.filePaths[0]) return { success: false, cancelled: true }
     const imported = await importPortablePackage(open.filePaths[0], destination.filePaths[0])
     currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'open', projectPath: imported.projectPath })
+    const media = hydrateMedia(imported.project)
     await rememberProject(imported.projectPath, imported.project)
-    return { success: true, ...imported }
+    return { success: true, ...imported, media }
   })
 
   const readPresets = async (): Promise<{ presets: ToScreenPreset[]; defaultPresetId?: string }> => {

@@ -53,6 +53,38 @@ export interface ToScreenPreset {
   style: Record<string, unknown>
 }
 
+export interface HydratedProjectMedia {
+  videoPath: string | null
+  proxyPath: string | null
+  audioPath: string | null
+  cameraPath: string | null
+  microphonePath: string | null
+}
+
+export function hydrateCurrentProjectMedia(project: any): HydratedProjectMedia {
+  const model = project?.projectModel || project
+  const assets = Array.isArray(model?.assets) ? model.assets : []
+  const assetPath = (asset: any): string | null => {
+    const value = asset?.filePath || asset?.sourceUrl
+    if (typeof value !== 'string' || !value) return null
+    if (!value.startsWith('file://')) return value
+    try { return fileURLToPath(value) } catch { return null }
+  }
+  const byRole = (role: string) => assets.find((asset: any) => asset?.metadata?.role === role)
+  const screen = assets.find((asset: any) => asset?.type === 'screen-recording')
+  const proxy = byRole('preview-proxy')
+  const systemAudio = byRole('system-audio') || byRole('companion-audio')
+  const microphone = byRole('microphone')
+  const camera = byRole('presenter-camera')
+  return {
+    videoPath: assetPath(screen),
+    proxyPath: assetPath(proxy),
+    audioPath: assetPath(systemAudio),
+    cameraPath: assetPath(camera),
+    microphonePath: assetPath(microphone),
+  }
+}
+
 export async function atomicWriteJson(filePath: string, value: unknown): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true })
   const tempPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`
@@ -194,6 +226,8 @@ export async function importPortablePackage(packagePath: string, destinationDir:
 export function createPreset(name: string, project: Record<string, unknown>, existing?: ToScreenPreset): ToScreenPreset {
   const now = new Date().toISOString()
   const legacy = isRecord(project.legacyState) ? project.legacyState : {}
+  const clips = Array.isArray(project.clips) ? project.clips : []
+  const cursorClip = clips.find((clip: any) => clip?.type === 'cursor') as any
   return {
     format: 'toscreen-preset', version: LIBRARY_VERSION,
     id: existing?.id || crypto.randomUUID(), name: name.trim(),
@@ -202,7 +236,7 @@ export function createPreset(name: string, project: Record<string, unknown>, exi
       canvas: clone(project.canvas),
       exportSettings: clone(project.exportSettings),
       focusDefaults: clone(legacy.focusDefaults),
-      cursor: pick(legacy, ['cursorSize', 'cursorSmoothing', 'showVectorCursor', 'cursorStyle', 'cursorCustomImages', 'cursorOffset']),
+      cursor: cursorClip?.props ? clone(cursorClip.props) : pick(legacy, ['cursorSize', 'cursorSmoothing', 'showVectorCursor', 'cursorStyle', 'cursorCustomImages', 'cursorOffset']),
       click: clone(legacy.clickStyle),
       presentation: clone(legacy.presentationStyle),
       captions: clone(legacy.captionStyle),
@@ -216,8 +250,12 @@ export function applyPreset(project: Record<string, unknown>, preset: ToScreenPr
   const style = preset.style
   const legacy = isRecord(project.legacyState) ? project.legacyState : {}
   const cursor = isRecord(style.cursor) ? style.cursor : {}
+  const clips = Array.isArray(project.clips) ? project.clips.map((clip: any) => (
+    clip?.type === 'cursor' ? { ...clip, props: { ...clip.props, ...clone(cursor) } } : clip
+  )) : project.clips
   return {
     ...project,
+    clips,
     canvas: clone(style.canvas) ?? project.canvas,
     exportSettings: clone(style.exportSettings) ?? project.exportSettings,
     legacyState: {
@@ -242,7 +280,7 @@ function clone<T>(value: T): T { return value === undefined ? value : JSON.parse
 function isRecord(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === 'object' && !Array.isArray(value) }
 function getCode(error: unknown): string | undefined { return isRecord(error) && typeof error.code === 'string' ? error.code : undefined }
 function assertSafeRelativePath(relativePath: string): void {
-  if (!relativePath || path.isAbsolute(relativePath) || relativePath.split(/[\\/]+/).includes('..')) throw new Error(`Unsafe package path: ${relativePath}`)
+  if (!relativePath || path.posix.isAbsolute(relativePath) || path.win32.isAbsolute(relativePath) || relativePath.split(/[\\/]+/).includes('..')) throw new Error(`Unsafe package path: ${relativePath}`)
   const normalized = path.normalize(relativePath)
   if (normalized === '..' || normalized.startsWith(`..${path.sep}`)) throw new Error(`Unsafe package path: ${relativePath}`)
 }

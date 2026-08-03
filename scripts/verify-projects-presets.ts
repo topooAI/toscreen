@@ -3,30 +3,61 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {
-  applyPreset, atomicWriteJson, collectProjectAssetPaths, createPortablePackage, createPreset, importPortablePackage, readJsonWithBackup,
+  applyPreset, atomicWriteJson, collectProjectAssetPaths, createPortablePackage, createPreset, hydrateCurrentProjectMedia, importPortablePackage, readJsonWithBackup,
   transitionProjectDocument,
 } from '../electron/projectLibrary'
+import { createProjectFromLegacyEditorState } from '../src/components/video-editor/project/legacyAdapter'
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'toscreen-projects-'))
 try {
+  const handlersSource = await fs.readFile(path.join(process.cwd(), 'electron/ipc/handlers.ts'), 'utf8')
+  assert.match(handlersSource, /project-open[\s\S]*?const media = hydrateMedia\(project\)/, 'Recent open hydrates all current media')
+  assert.match(handlersSource, /project-import-package[\s\S]*?const media = hydrateMedia\(imported\.project\)/, 'package import hydrates package-local media before Editor')
+  assert.match(handlersSource, /currentProjectPath \? \[currentProjectPath\]/, 'Editor load prioritizes explicitly opened/imported project')
+  assert.match(handlersSource, /project-new[\s\S]*?clearCurrentProjectMedia\(\)/, 'New Project clears stale global media')
   const media = path.join(root, 'recording.webm'); await fs.writeFile(media, 'video-data')
+  const proxy = path.join(root, 'recording-proxy.mp4'); await fs.writeFile(proxy, 'proxy-data')
+  const systemAudio = path.join(root, 'system.webm'); await fs.writeFile(systemAudio, 'system-data')
+  const microphone = path.join(root, 'microphone.webm'); await fs.writeFile(microphone, 'microphone-data')
+  const camera = path.join(root, 'camera.mov'); await fs.writeFile(camera, 'camera-data')
+  const runtimeMediaPath = process.env.TOSCREEN_RUNTIME_MEDIA_PATH
+  if (runtimeMediaPath) {
+    await fs.copyFile(runtimeMediaPath, media)
+    await fs.copyFile(runtimeMediaPath, proxy)
+    await fs.copyFile(runtimeMediaPath, systemAudio)
+    await fs.copyFile(runtimeMediaPath, microphone)
+    await fs.copyFile(runtimeMediaPath, camera)
+  }
   const projectPath = path.join(root, 'Demo.toscreen')
-  const project = { id: 'p1', name: 'Demo', canvas: { padding: 12, wallpaper: '/wallpapers/wallpaper1.jpg' }, exportSettings: { quality: 'high' }, assets: [{ filePath: media, sourceUrl: `file://${media}` }, { sourceUrl: 'toscreen://music/builtin.mp3' }], clips: [{ id: 'clip-1' }], editingDocument: { clips: [{ id: 'main-1' }], speedSections: [] }, legacyState: { cursorSize: 2 } }
+  const model = createProjectFromLegacyEditorState({
+    projectId: 'p1', projectName: 'Demo', videoPath: proxy, originalVideoPath: media, companionAudioPath: systemAudio, cameraPath: camera,
+    durationSeconds: 7, projectDurationSeconds: 7, zoomRegions: [], trimRegions: [], annotationRegions: [], cursorData: [], cursorSize: 2, cursorSmoothing: true,
+    showVectorCursor: true, cursorOffset: 0, cropRegion: { x: 0, y: 0, width: 1, height: 1 }, wallpaper: '/wallpapers/wallpaper1.jpg', shadowIntensity: 0,
+    showBlur: false, motionBlurEnabled: false, borderRadius: 0, padding: 12, aspectRatio: '16:9', exportQuality: 'good',
+    audioRegions: [
+      { id: 'system', startMs: 0, endMs: 7000, sourceUrl: `file://${systemAudio}`, path: systemAudio, volume: 1, role: 'system-audio' },
+      { id: 'mic', startMs: 0, endMs: 7000, sourceUrl: `file://${microphone}`, path: microphone, volume: 0.8, role: 'microphone' },
+    ],
+  })
+  const project = { projectModel: model, wallpaper: '/wallpapers/wallpaper1.jpg', music: 'toscreen://music/builtin.mp3' }
   await atomicWriteJson(projectPath, project)
-  assert.deepEqual(collectProjectAssetPaths(project), [media], 'only user file media is portable')
-  await atomicWriteJson(projectPath, { ...project, name: 'Demo v2' })
+  assert.deepEqual(new Set(collectProjectAssetPaths(project)), new Set([media, proxy, systemAudio, microphone, camera]), 'all user media and no built-ins are portable')
+  assert.deepEqual(hydrateCurrentProjectMedia(project), { videoPath: media, proxyPath: proxy, audioPath: systemAudio, cameraPath: camera, microphonePath: microphone })
+  await atomicWriteJson(projectPath, { ...project, projectModel: { ...model, name: 'Demo v2' } })
   await fs.writeFile(projectPath, '{broken')
-  assert.equal((await readJsonWithBackup(projectPath)).value.name, 'Demo', 'first corruption restores valid backup')
+  assert.equal((await readJsonWithBackup(projectPath)).value.projectModel.name, 'Demo', 'first corruption restores valid backup')
   await fs.writeFile(projectPath, '{broken-again')
-  assert.equal((await readJsonWithBackup(projectPath)).value.name, 'Demo', 'recovery does not overwrite backup with corrupt primary')
+  assert.equal((await readJsonWithBackup(projectPath)).value.projectModel.name, 'Demo', 'recovery does not overwrite backup with corrupt primary')
   assert.equal(transitionProjectDocument('/old.toscreen', { type: 'new' }), null, 'New Project resets previous save target')
   assert.equal(transitionProjectDocument(null, { type: 'save-as', projectPath }), projectPath)
   assert.equal(transitionProjectDocument(projectPath, { type: 'open', projectPath: '/next.toscreen' }), '/next.toscreen')
 
   const packagePath = path.join(root, 'Demo.toscreenpkg'); await createPortablePackage(projectPath, packagePath)
   const destination = path.join(root, 'imported'); const imported = await importPortablePackage(packagePath, destination)
-  assert.equal((await fs.readFile((imported.project as any).assets[0].filePath, 'utf8')), 'video-data')
-  assert.ok((imported.project as any).assets[0].filePath.startsWith(destination), 'import rewrites absolute media path')
+  if (!runtimeMediaPath) assert.equal((await fs.readFile((imported.project as any).projectModel.assets[0].filePath, 'utf8')), 'video-data')
+  assert.ok((imported.project as any).projectModel.assets[0].filePath.startsWith(destination), 'import rewrites absolute media path')
+  const importedMedia = hydrateCurrentProjectMedia(imported.project)
+  for (const restoredPath of Object.values(importedMedia)) assert.ok(restoredPath?.startsWith(destination), 'import hydrates package-local media')
 
   const unsafe = JSON.parse(await fs.readFile(packagePath, 'utf8')); unsafe.assets[0].relativePath = '../escape.webm'
   const unsafePath = path.join(root, 'unsafe.toscreenpkg'); await atomicWriteJson(unsafePath, unsafe)
@@ -36,9 +67,16 @@ try {
   const corruptDest = path.join(root, 'corrupt-import'); await assert.rejects(importPortablePackage(corruptPath, corruptDest), /checksum failed/)
   assert.deepEqual(await fs.readdir(corruptDest).catch(() => []), [], 'checksum failure leaves no imported project')
 
-  const preset = createPreset('Clean', project)
-  const changed = applyPreset({ ...project, canvas: { padding: 99 } }, preset) as any
-  assert.deepEqual(changed.clips, project.clips); assert.deepEqual(changed.editingDocument, project.editingDocument)
-  assert.equal(changed.canvas.padding, 12); assert.equal(changed.legacyState.cursorSize, 2)
+  for (const unsafeRelativePath of ['/absolute.webm', 'C:\\media\\recording.webm', '\\\\server\\share\\recording.webm', 'assets\\..\\escape.webm']) {
+    const unsafeVariant = JSON.parse(await fs.readFile(packagePath, 'utf8')); unsafeVariant.assets[0].relativePath = unsafeRelativePath
+    const variantPath = path.join(root, `unsafe-${Buffer.from(unsafeRelativePath).toString('hex')}.toscreenpkg`); await atomicWriteJson(variantPath, unsafeVariant)
+    await assert.rejects(importPortablePackage(variantPath, path.join(root, 'unsafe-variants')), /Unsafe package path/)
+  }
+
+  const preset = createPreset('Clean', model)
+  const changed = applyPreset({ ...model, canvas: { ...model.canvas, padding: 99 } }, preset) as any
+  assert.deepEqual(changed.clips, model.clips); assert.deepEqual(changed.editingDocument, model.editingDocument)
+  assert.equal(changed.canvas.padding, 12); assert.equal(changed.clips.find((clip: any) => clip.type === 'cursor').props.size, 2)
   console.log('projects/presets contract: PASS')
-} finally { await fs.rm(root, { recursive: true, force: true }) }
+  if (process.env.TOSCREEN_KEEP_FIXTURE === '1') console.log(`runtime fixture: ${packagePath}`)
+} finally { if (process.env.TOSCREEN_KEEP_FIXTURE !== '1') await fs.rm(root, { recursive: true, force: true }) }

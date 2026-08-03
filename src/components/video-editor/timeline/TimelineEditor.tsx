@@ -1555,11 +1555,12 @@ export default function TimelineEditor({
     const mainClips: TimelineRenderItem[] = [];
     if (!isTrimTrackVisible) {
       const segments = editingSession
-        ? editingSession.document.clips.map((clip, index) => {
+        ? editingSession.document.clips.flatMap((clip, index) => {
             const clipSpan = editingSession.timeMap.clipProjectSpans[index];
+            if (!clipSpan) return [];
             const projectStartMs = clipSpan.projectStartMs;
             const projectEndMs = clipSpan.projectEndMs;
-            return { id: clip.id, sourceStartMs: clip.sourceStartMs, sourceEndMs: clip.sourceEndMs, effectiveStartMs: editingSession.timeMap.mapProjectToEffective(projectStartMs), effectiveEndMs: editingSession.timeMap.mapProjectToEffective(projectEndMs) };
+            return [{ id: clip.id, sourceStartMs: clip.sourceStartMs, sourceEndMs: clip.sourceEndMs, effectiveStartMs: editingSession.timeMap.mapProjectToEffective(projectStartMs), effectiveEndMs: editingSession.timeMap.mapProjectToEffective(projectEndMs) }];
           })
         : buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective);
       segments.forEach((segment) => {
