@@ -4,7 +4,7 @@
 审计对象：当前工作区 `/Users/viosson/AITD/1_PROJECTS/P28_TOSCREEN`
 对标范围：Screen Studio 官方 Guide 与 Changelog 中公开的录制、编辑、视觉包装、音频、字幕、项目和导出能力。
 
-当前集成基线：`codex/phase1-integration@38e6699`
+当前集成基线：`codex/phase1-integration@a90e48d`
 
 实时更新规则：只有功能已合入集成分支，并由统筹 Session 完成独立验证后，才把对应行更新为 `Completed`；仅在执行 Agent 分支中完成、尚未合入或尚未验证的功能继续保持 `Not completed`。
 
@@ -25,11 +25,11 @@
 | 基础剪辑 | 10 | 0 | Split、删除、重排、变速、自动加速和 Undo/Redo 已进入统一时间映射 |
 | Focus 与光标 | 13 | 0 | Focus、光标可见性与点击演示效果已形成完整编辑闭环 |
 | 视觉包装 | 8 | 0 | Mask、Highlight、快捷键卡片和 Presenter 摄像头已进入预览与导出 |
-| 音频与字幕 | 6 | 2 | 录制双轨与内置音乐已完成；转录跨架构和可见字幕轨仍在补齐 |
+| 音频与字幕 | 7 | 1 | 双轨、内置音乐与完整字幕编辑已完成；自动转录等待真实语音端到端验收 |
 | 项目与预设 | 6 | 1 | Recent Projects、便携包与 Preset 已完成；Save As 等待系统对话框实机验收 |
 | 导出与分享 | 5 | 4 | 本地 MP4 导出主链存在，发布分享能力缺失 |
 | 稳定性与验收 | 5 | 1 | 完整机器审计、控件 Wiring 与 Electron 直接启动契约已恢复绿色；真实用户整链验收仍待完成 |
-| **合计** | **64** | **9** | **录制、剪辑、Presentation 与项目主链已基本集成，字幕、发布和最终验收仍在推进** |
+| **合计** | **65** | **8** | **录制、剪辑、Presentation、字幕与项目主链已基本集成，发布和最终验收仍在推进** |
 
 功能数量只是审计索引，不代表每项工作量相等。例如“字幕系统”明显比“增加一个导出选项”更大。
 
@@ -106,8 +106,8 @@
 | 47 | 音量与音量包络 | Completed | 音频区域具有音量数据和包络编辑 | Preview/Export 音频设置验证通过 |
 | 48 | 麦克风与系统音频独立分轨 | Completed | 录制前可分别控制系统音频和麦克风，录制后生成具有明确 role 的独立素材与 Audio Region | Preview、Mixer、Project Model 和 Export 保留双轨语义 |
 | 49 | 内置背景音乐库 | Completed | 提供两首项目自有 CC0 WAV、授权与 SHA-256 清单、搜索、分类、试听和加入 Audio Track | 开发与打包资源解析、项目保存和音频混合契约已通过 |
-| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper、语言选择、来源选择、进度和取消已经合入 | 当前 helper 仅 arm64，尚未满足 x64 macOS 包；跨架构修复与实际 helper 启动验收完成前不算 Completed |
-| 51 | 字幕编辑、样式与动画 | Not completed | 已有文本编辑、样式、Split/Merge/Delete、项目 roundtrip 和 Preview/Export 渲染 | 尚缺用户可见且可拖动/Resize 的独立 Subtitle 时间线行；不能仅凭 Project Model track 算完成 |
+| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper 已是 arm64+x86_64 universal binary；语言/来源选择、进度、取消和错误处理已合入，两个架构均可实际启动 | 尚未用一段真实语音完成“识别 → 生成字幕 → 编辑 → 保存 → 导出”的端到端验收，完成前不提前改为 Completed |
+| 51 | 字幕编辑、样式与动画 | Completed | 独立 Subtitle 时间线行支持选择、拖动、左右 Resize 和删除；面板支持文本、时间、字体、字号、颜色、位置、对齐、Split/Merge 和 Fade/Pop | Timeline、Panel、Project Model、Preview、Export 共用字幕状态；三轮保存恢复幂等和 Preview/Export 契约通过 |
 
 ## 6. 项目、设置与预设
 
@@ -156,7 +156,7 @@
 
 > iPhone/iPad 屏幕录制 → 内置音乐、自动转录和字幕 → Save As / Recent Projects / 便携项目包 / Preset → GIF / 批量导出 / Quick Share / 原始素材提取 → 最终真实用户整链验收。
 
-当前已有 **64 项明确完成能力**，还有 **9 项** 保持 `Not completed`。内置音乐、Recent Projects、便携项目包与 Preset 已合入并复验；自动转录仍需补双架构 helper，字幕仍需补可见时间线轨，Save As 仍需系统保存对话框实机验收。
+当前已有 **65 项明确完成能力**，还有 **8 项** 保持 `Not completed`。内置音乐、字幕、Recent Projects、便携项目包与 Preset 已合入并复验；自动转录 helper 已完成双架构，但仍需真实语音端到端验收，Save As 仍需系统保存对话框实机验收。
 
 ## 第一阶段建议顺序
 
