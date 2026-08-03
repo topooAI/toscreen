@@ -1,4 +1,4 @@
-import { ipcMain, desktopCapturer, BrowserWindow, shell, app, dialog, screen } from 'electron'
+import { ipcMain, desktopCapturer, BrowserWindow, shell, app, dialog, screen, systemPreferences } from 'electron'
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -8,7 +8,9 @@ import { mouseTracker } from '../mouseTracker'
 import {
   isNativeRecordingAvailable,
   startNativeRecording,
-  stopNativeRecording
+  stopNativeRecording,
+  pauseNativeRecording,
+  resumeNativeRecording,
 } from '../nativeRecorder'
 
 import { generateProxyVideo } from './proxyGenerator'
@@ -190,7 +192,39 @@ export function registerIpcHandlers(
     return isNativeRecordingAvailable()
   })
 
-  ipcMain.handle('start-native-recording', async () => {
+  ipcMain.handle('get-recording-permissions', async () => {
+    const mediaStatus = (kind: 'microphone' | 'camera') => process.platform === 'darwin'
+      ? systemPreferences.getMediaAccessStatus(kind)
+      : 'granted'
+    let screenStatus = 'granted'
+    if (process.platform === 'darwin') {
+      try {
+        const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1, height: 1 } })
+        if (sources.length === 0) screenStatus = 'denied'
+      } catch {
+        screenStatus = 'denied'
+      }
+    }
+    return { screen: screenStatus, microphone: mediaStatus('microphone'), camera: mediaStatus('camera') }
+  })
+
+  ipcMain.handle('request-recording-permission', async (_, kind: 'microphone' | 'camera') => {
+    if (process.platform !== 'darwin') return true
+    return systemPreferences.askForMediaAccess(kind)
+  })
+
+  ipcMain.handle('open-recording-permission-settings', async (_, kind: 'screen' | 'microphone' | 'camera') => {
+    const pane = kind === 'screen' ? 'Privacy_ScreenCapture' : kind === 'microphone' ? 'Privacy_Microphone' : 'Privacy_Camera'
+    await shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${pane}`)
+    return { success: true }
+  })
+
+  ipcMain.handle('start-native-recording', async (_, options?: {
+    includeMicrophone?: boolean
+    includeSystemAudio?: boolean
+    audioDeviceId?: string
+    captureArea?: { x: number; y: number; width: number; height: number }
+  }) => {
     const isAvailable = isNativeRecordingAvailable()
     if (!isAvailable) {
       return { success: false, error: 'Native recording is not available on this platform.' }
@@ -198,6 +232,7 @@ export function registerIpcHandlers(
 
     let recordingBounds = undefined
     let displayId = undefined
+    let windowId = undefined
     if (selectedSource && selectedSource.id.startsWith('screen')) {
       try {
         const displays = screen.getAllDisplays()
@@ -216,10 +251,25 @@ export function registerIpcHandlers(
       }
     }
 
+    if (selectedSource?.id?.startsWith('window:')) {
+      const parsedWindowId = Number(selectedSource.id.split(':')[1])
+      if (Number.isFinite(parsedWindowId)) windowId = parsedWindowId
+    }
+
+    if (options?.captureArea) recordingBounds = options.captureArea
+
     // Start input monitoring first. MouseTracker stores absolute event times;
     // export rebases them to ScreenCaptureKit's actual first encoded frame.
     mouseTracker.start(recordingBounds)
-    const result = await startNativeRecording({ showCursor: false, displayId })
+    const result = await startNativeRecording({
+      showCursor: false,
+      displayId,
+      windowId,
+      captureArea: options?.captureArea,
+      includeMicrophone: options?.includeMicrophone,
+      includeSystemAudio: options?.includeSystemAudio,
+      audioDeviceId: options?.audioDeviceId,
+    })
     if (result.success) {
       const mainWin = getMainWindow()
       if (mainWin) {
@@ -235,6 +285,19 @@ export function registerIpcHandlers(
     }
 
     return result
+  })
+
+  ipcMain.handle('pause-native-recording', () => pauseNativeRecording())
+  ipcMain.handle('resume-native-recording', () => resumeNativeRecording())
+
+  ipcMain.handle('discard-recording-artifacts', async (_, paths: Array<string | undefined>) => {
+    const safePaths = paths.filter((candidate): candidate is string => Boolean(candidate))
+      .flatMap(candidate => [candidate, `${candidate}.clicks.json`])
+      .filter(candidate => path.dirname(candidate) === RECORDINGS_DIR)
+    await Promise.all(safePaths.map(candidate => fs.unlink(candidate).catch(() => undefined)))
+    currentVideoPath = null
+    currentAudioPath = null
+    return { success: true }
   })
 
   ipcMain.handle('stop-native-recording', async () => {

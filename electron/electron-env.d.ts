@@ -49,8 +49,14 @@ interface Window {
     getMouseTrackingStatus: () => Promise<{ isTracking: boolean; eventCount: number }>
     readClicksJson: (videoPath: string) => Promise<{ success: boolean; clicks?: any[] }>;
     isNativeRecordingAvailable: () => Promise<boolean>;
-    startNativeRecording: () => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+    startNativeRecording: (options?: RecordingOptions) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
     stopNativeRecording: () => Promise<{ success: boolean; outputPath?: string; audioOutputPath?: string; error?: string }>;
+    pauseNativeRecording: () => Promise<{ success: boolean; error?: string }>;
+    resumeNativeRecording: () => Promise<{ success: boolean; error?: string }>;
+    discardRecordingArtifacts: (paths: Array<string | undefined>) => Promise<{ success: boolean }>;
+    getRecordingPermissions: () => Promise<RecordingPermissions>;
+    requestRecordingPermission: (kind: 'microphone' | 'camera') => Promise<boolean>;
+    openRecordingPermissionSettings: (kind: 'screen' | 'microphone' | 'camera') => Promise<{ success: boolean }>;
     hudOverlayHide: () => void;
     hudOverlayClose: () => void;
     generateProxyVideo: (inputPath: string) => Promise<{ success: boolean; proxyPath?: string; error?: string }>;
@@ -58,6 +64,19 @@ interface Window {
     saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean; error?: string; message?: string }>;
     loadProject: (videoPath: string) => Promise<{ success: boolean; project?: any; projectPath?: string; message?: string }>;
   }
+}
+
+interface RecordingOptions {
+  includeMicrophone?: boolean
+  includeSystemAudio?: boolean
+  audioDeviceId?: string
+  captureArea?: { x: number; y: number; width: number; height: number }
+}
+
+interface RecordingPermissions {
+  screen: string
+  microphone: string
+  camera: string
 }
 
 interface ProcessedDesktopSource {

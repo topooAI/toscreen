@@ -1,251 +1,201 @@
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fixWebmDuration } from "@fix-webm-duration/fix";
+
+export type RecordingConfiguration = RecordingOptions & { countdownSeconds?: number };
+export type RecordingPhase = "idle" | "countdown" | "recording" | "paused" | "processing" | "error";
 
 type UseScreenRecorderReturn = {
   recording: boolean;
+  phase: RecordingPhase;
+  countdown: number | null;
+  error: string | null;
+  startRecording: (configuration?: RecordingConfiguration) => Promise<void>;
+  stopRecording: () => Promise<void>;
+  pauseRecording: () => Promise<void>;
+  resumeRecording: () => Promise<void>;
+  cancelRecording: () => Promise<void>;
+  retakeRecording: () => Promise<void>;
   toggleRecording: () => void;
   isProcessing: boolean;
   processProgress: number;
 };
 
+const TARGET_FRAME_RATE = 60;
+const TARGET_WIDTH = 3840;
+const TARGET_HEIGHT = 2160;
+
 export function useScreenRecorder(): UseScreenRecorderReturn {
-  const [recording, setRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [phase, setPhase] = useState<RecordingPhase>("idle");
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [processProgress, setProcessProgress] = useState(0);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
-  const startTime = useRef<number>(0);
-  const isNativeRef = useRef<boolean>(false);
+  const startTime = useRef(0);
+  const isNativeRef = useRef(false);
+  const cancelledRef = useRef(false);
+  const lastConfiguration = useRef<RecordingConfiguration>({ countdownSeconds: 3 });
 
-  // Target visually lossless 4K @ 60fps; fall back gracefully when hardware cannot keep up
-  const TARGET_FRAME_RATE = 60;
-  const TARGET_WIDTH = 3840;
-  const TARGET_HEIGHT = 2160;
-  const FOUR_K_PIXELS = TARGET_WIDTH * TARGET_HEIGHT;
-  const selectMimeType = () => {
-    const preferred = [
-      "video/webm;codecs=av1",
-      "video/webm;codecs=h264",
-      "video/webm;codecs=vp9",
-      "video/webm;codecs=vp8",
-      "video/webm"
-    ];
-
-    return preferred.find(type => MediaRecorder.isTypeSupported(type)) ?? "video/webm";
-  };
-
-  const computeBitrate = (width: number, height: number) => {
-    const pixels = width * height;
-    const highFrameRateBoost = TARGET_FRAME_RATE >= 60 ? 1.7 : 1;
-
-    if (pixels >= FOUR_K_PIXELS) {
-      return Math.round(45_000_000 * highFrameRateBoost);
-    }
-
-    if (pixels >= 2560 * 1440) {
-      return Math.round(28_000_000 * highFrameRateBoost);
-    }
-
-    return Math.round(18_000_000 * highFrameRateBoost);
-  };
-
-  const stopRecording = useRef(async () => {
-    if (isNativeRef.current) {
-      const result = await window.electronAPI.stopNativeRecording();
-      setRecording(false);
-      isNativeRef.current = false;
-      if (result.success && result.outputPath) {
-        setIsProcessing(true);
-        setProcessProgress(0);
-        
-        const unsubscribe = window.electronAPI.onProxyGenerationProgress((p) => {
-          setProcessProgress(p);
-        });
-        
-        console.log('[useScreenRecorder] Generating proxy for native recording...');
-        const proxyResult = await window.electronAPI.generateProxyVideo(result.outputPath);
-        unsubscribe();
-        
-        await window.electronAPI.setCurrentVideoPath(
-          result.outputPath, 
-          proxyResult.success ? proxyResult.proxyPath : undefined,
-          (result as any).audioOutputPath || undefined
-        );
-        setIsProcessing(false);
-      }
+  const finishRecording = useCallback(async (outputPath: string, audioPath?: string) => {
+    setPhase("processing");
+    setProcessProgress(0);
+    const unsubscribe = window.electronAPI.onProxyGenerationProgress(setProcessProgress);
+    try {
+      const proxyResult = await window.electronAPI.generateProxyVideo(outputPath);
+      await window.electronAPI.setCurrentVideoPath(outputPath, proxyResult.success ? proxyResult.proxyPath : undefined, audioPath);
       await window.electronAPI.switchToEditor();
-    } else if (mediaRecorder.current?.state === "recording") {
-      if (stream.current) {
-        stream.current.getTracks().forEach(track => track.stop());
-      }
-      mediaRecorder.current.stop();
-      setRecording(false);
-
-      window.electronAPI?.setRecordingState(false, startTime.current);
+    } finally {
+      unsubscribe();
+      setPhase("idle");
     }
-  });
-
-  useEffect(() => {
-    let cleanup: (() => void) | undefined;
-    
-    if (window.electronAPI?.onStopRecordingFromTray) {
-      cleanup = window.electronAPI.onStopRecordingFromTray(() => {
-        stopRecording.current();
-      });
-    }
-
-    return () => {
-      if (cleanup) cleanup();
-      
-      if (isNativeRef.current) {
-        window.electronAPI.stopNativeRecording().catch(err => {
-          console.error('[useScreenRecorder] Failed cleanup native stop:', err);
-        });
-      } else {
-        if (mediaRecorder.current?.state === "recording") {
-          mediaRecorder.current.stop();
-        }
-        if (stream.current) {
-          stream.current.getTracks().forEach(track => track.stop());
-          stream.current = null;
-        }
-      }
-    };
   }, []);
 
-  const startRecording = async () => {
-    try {
-      const selectedSource = await window.electronAPI.getSelectedSource();
-      if (!selectedSource) {
-        alert("Please select a source to record");
+  const stopRecording = useCallback(async () => {
+    if (isNativeRef.current) {
+      const result = await window.electronAPI.stopNativeRecording();
+      isNativeRef.current = false;
+      if (!result.success || !result.outputPath) {
+        setError(result.error || "Unable to stop recording");
+        setPhase("error");
         return;
       }
+      if (!cancelledRef.current) await finishRecording(result.outputPath, result.audioOutputPath);
+      else {
+        await window.electronAPI.discardRecordingArtifacts([result.outputPath, result.audioOutputPath]);
+        setPhase("idle");
+      }
+      return;
+    }
+    if (mediaRecorder.current && mediaRecorder.current.state !== "inactive") {
+      stream.current?.getTracks().forEach(track => track.stop());
+      mediaRecorder.current.stop();
+      await window.electronAPI.setRecordingState(false, startTime.current);
+    }
+  }, [finishRecording]);
 
-      // Check if native SCK recording is available
-      const isNativeAvailable = await window.electronAPI.isNativeRecordingAvailable();
-      if (isNativeAvailable) {
-        const result = await window.electronAPI.startNativeRecording();
+  useEffect(() => {
+    const cleanup = window.electronAPI.onStopRecordingFromTray(() => void stopRecording());
+    return () => {
+      cleanup();
+      stream.current?.getTracks().forEach(track => track.stop());
+    };
+  }, [stopRecording]);
+
+  const startWebRecording = useCallback(async () => {
+    const selectedSource = await window.electronAPI.getSelectedSource();
+    const mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: "desktop",
+          chromeMediaSourceId: selectedSource.id,
+          maxWidth: TARGET_WIDTH,
+          maxHeight: TARGET_HEIGHT,
+          maxFrameRate: TARGET_FRAME_RATE,
+        },
+      } as MediaTrackConstraints,
+    } as MediaStreamConstraints);
+    stream.current = mediaStream;
+    const settings = mediaStream.getVideoTracks()[0].getSettings();
+    const pixels = (settings.width || 1920) * (settings.height || 1080);
+    const bitrate = pixels >= TARGET_WIDTH * TARGET_HEIGHT ? 76_500_000 : pixels >= 2560 * 1440 ? 47_600_000 : 30_600_000;
+    const preferred = ["video/webm;codecs=av1", "video/webm;codecs=h264", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+    const mimeType = preferred.find(type => MediaRecorder.isTypeSupported(type)) || "video/webm";
+    const recorder = new MediaRecorder(mediaStream, { mimeType, videoBitsPerSecond: bitrate });
+    mediaRecorder.current = recorder;
+    chunks.current = [];
+    recorder.ondataavailable = event => { if (event.data.size) chunks.current.push(event.data); };
+    recorder.onerror = () => { setError("MediaRecorder failed"); setPhase("error"); };
+    recorder.onstop = async () => {
+      stream.current = null;
+      if (cancelledRef.current || chunks.current.length === 0) { chunks.current = []; setPhase("idle"); return; }
+      const blob = await fixWebmDuration(new Blob(chunks.current, { type: mimeType }), Date.now() - startTime.current);
+      chunks.current = [];
+      const result = await window.electronAPI.storeRecordedVideo(await blob.arrayBuffer(), `recording-${Date.now()}.webm`);
+      if (result.success && result.path) await finishRecording(result.path);
+      else { setError(result.message || "Unable to store recording"); setPhase("error"); }
+    };
+    recorder.start(1000);
+    startTime.current = Date.now();
+    await window.electronAPI.setRecordingState(true);
+    setPhase("recording");
+  }, [finishRecording]);
+
+  const startRecording = useCallback(async (configuration: RecordingConfiguration = lastConfiguration.current) => {
+    try {
+      const selectedSource = await window.electronAPI.getSelectedSource();
+      if (!selectedSource) throw new Error("Select a display, window, or area before recording");
+      lastConfiguration.current = configuration;
+      cancelledRef.current = false;
+      setError(null);
+      const seconds = Math.max(0, configuration.countdownSeconds ?? 3);
+      for (let value = seconds; value > 0; value -= 1) {
+        setPhase("countdown");
+        setCountdown(value);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (cancelledRef.current) { setCountdown(null); setPhase("idle"); return; }
+      }
+      setCountdown(null);
+      const nativeAvailable = await window.electronAPI.isNativeRecordingAvailable();
+      if (nativeAvailable) {
+        const result = await window.electronAPI.startNativeRecording(configuration);
         if (result.success) {
           isNativeRef.current = true;
           startTime.current = Date.now();
-          setRecording(true);
+          setPhase("recording");
           return;
-        } else {
-          console.warn('Native recording start failed, falling back to WebRTC:', result.error);
         }
+        console.warn("Native recording failed; using desktop MediaRecorder", result.error);
       }
-
-      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
-        audio: false,
-        video: {
-          width: { ideal: TARGET_WIDTH, max: TARGET_WIDTH },
-          height: { ideal: TARGET_HEIGHT, max: TARGET_HEIGHT },
-          frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
-          cursor: "never"
-        }
-      } as any);
-      stream.current = mediaStream;
-      if (!stream.current) {
-        throw new Error("Media stream is not available.");
-      }
-      const videoTrack = stream.current.getVideoTracks()[0];
-      try {
-        await videoTrack.applyConstraints({
-          frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
-          width: { ideal: TARGET_WIDTH, max: TARGET_WIDTH },
-          height: { ideal: TARGET_HEIGHT, max: TARGET_HEIGHT },
-        });
-      } catch (error) {
-        console.warn("Unable to lock 4K/60fps constraints, using best available track settings.", error);
-      }
-
-      let { width = 1920, height = 1080, frameRate = TARGET_FRAME_RATE } = videoTrack.getSettings();
-      
-      // Ensure dimensions are divisible by 2 for VP9/AV1 codec compatibility
-      width = Math.floor(width / 2) * 2;
-      height = Math.floor(height / 2) * 2;
-      
-      const videoBitsPerSecond = computeBitrate(width, height);
-      const mimeType = selectMimeType();
-
-      console.log(
-        `Recording at ${width}x${height} @ ${frameRate ?? TARGET_FRAME_RATE}fps using ${mimeType} / ${Math.round(
-          videoBitsPerSecond / 1_000_000
-        )} Mbps`
-      );
-      
-      chunks.current = [];
-      const recorder = new MediaRecorder(stream.current, {
-        mimeType,
-        videoBitsPerSecond,
-      });
-      mediaRecorder.current = recorder;
-      recorder.ondataavailable = e => {
-        if (e.data && e.data.size > 0) chunks.current.push(e.data);
-      };
-      recorder.onstop = async () => {
-        stream.current = null;
-        if (chunks.current.length === 0) return;
-        const duration = Date.now() - startTime.current;
-        const recordedChunks = chunks.current;
-        const buggyBlob = new Blob(recordedChunks, { type: mimeType });
-        // Clear chunks early to free memory immediately after blob creation
-        chunks.current = [];
-        const timestamp = Date.now();
-        const videoFileName = `recording-${timestamp}.webm`;
-
-        try {
-          const videoBlob = await fixWebmDuration(buggyBlob, duration);
-          const arrayBuffer = await videoBlob.arrayBuffer();
-          const videoResult = await window.electronAPI.storeRecordedVideo(arrayBuffer, videoFileName);
-          if (!videoResult.success) {
-            console.error('Failed to store video:', videoResult.message);
-            return;
-          }
-
-          if (videoResult.path) {
-            setIsProcessing(true);
-            setProcessProgress(0);
-            
-            const unsubscribe = window.electronAPI.onProxyGenerationProgress((p) => {
-              setProcessProgress(p);
-            });
-            
-            console.log('[useScreenRecorder] Generating proxy for WebRTC recording...');
-            const proxyResult = await window.electronAPI.generateProxyVideo(videoResult.path);
-            unsubscribe();
-            
-            await window.electronAPI.setCurrentVideoPath(
-              videoResult.path,
-              proxyResult.success ? proxyResult.proxyPath : undefined
-            );
-            setIsProcessing(false);
-          }
-
-          await window.electronAPI.switchToEditor();
-        } catch (error) {
-          console.error('Error saving recording:', error);
-        }
-      };
-      recorder.onerror = () => setRecording(false);
-      recorder.start(1000);
-      startTime.current = Date.now();
-      setRecording(true);
-      window.electronAPI?.setRecordingState(true);
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-      setRecording(false);
-      if (stream.current) {
-        stream.current.getTracks().forEach(track => track.stop());
-        stream.current = null;
-      }
+      await startWebRecording();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setPhase("error");
     }
-  };
+  }, [startWebRecording]);
 
-  const toggleRecording = () => {
-    recording ? stopRecording.current() : startRecording();
-  };
+  const pauseRecording = useCallback(async () => {
+    if (isNativeRef.current) {
+      const result = await window.electronAPI.pauseNativeRecording();
+      if (!result.success) { setError(result.error || "Pause failed"); return; }
+    } else if (mediaRecorder.current?.state === "recording") mediaRecorder.current.pause();
+    setPhase("paused");
+  }, []);
 
-  return { recording, toggleRecording, isProcessing, processProgress };
+  const resumeRecording = useCallback(async () => {
+    if (isNativeRef.current) {
+      const result = await window.electronAPI.resumeNativeRecording();
+      if (!result.success) { setError(result.error || "Resume failed"); return; }
+    } else if (mediaRecorder.current?.state === "paused") mediaRecorder.current.resume();
+    setPhase("recording");
+  }, []);
+
+  const cancelRecording = useCallback(async () => {
+    cancelledRef.current = true;
+    if (phase === "countdown") { setCountdown(null); setPhase("idle"); return; }
+    await stopRecording();
+  }, [phase, stopRecording]);
+
+  const retakeRecording = useCallback(async () => {
+    cancelledRef.current = true;
+    await stopRecording();
+    await startRecording(lastConfiguration.current);
+  }, [startRecording, stopRecording]);
+
+  return {
+    recording: phase === "recording" || phase === "paused",
+    phase,
+    countdown,
+    error,
+    startRecording,
+    stopRecording,
+    pauseRecording,
+    resumeRecording,
+    cancelRecording,
+    retakeRecording,
+    toggleRecording: () => void (phase === "recording" || phase === "paused" ? stopRecording() : startRecording()),
+    isProcessing: phase === "processing",
+    processProgress,
+  };
 }

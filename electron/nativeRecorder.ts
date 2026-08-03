@@ -61,6 +61,11 @@ export async function startNativeRecording(options?: {
   showCursor?: boolean
   fps?: number
   displayId?: number
+  windowId?: number
+  captureArea?: { x: number; y: number; width: number; height: number }
+  includeMicrophone?: boolean
+  includeSystemAudio?: boolean
+  audioDeviceId?: string
 }): Promise<{ success: boolean; outputPath?: string; videoStartTime?: number; error?: string }> {
   if (!MacRecorder) {
     return { success: false, error: 'node-mac-recorder is not available on this platform' }
@@ -82,8 +87,11 @@ export async function startNativeRecording(options?: {
       captureCursor: options?.showCursor === undefined ? false : options.showCursor, // node-mac-recorder 期望 captureCursor
       frameRate: options?.fps ?? 60,
       displayId: options?.displayId ?? null,
-      includeMicrophone: true,
-      includeSystemAudio: true,
+      windowId: options?.windowId ?? null,
+      captureArea: options?.captureArea ?? null,
+      includeMicrophone: options?.includeMicrophone ?? false,
+      includeSystemAudio: options?.includeSystemAudio ?? false,
+      audioDeviceId: options?.audioDeviceId ?? null,
     })
 
     const detectedVideoStartTime = await readVideoStartTime(timestamp)
@@ -100,6 +108,10 @@ export async function startNativeRecording(options?: {
       captureCursor: options?.showCursor ?? false,
       fps: options?.fps ?? 60,
       displayId: options?.displayId ?? null,
+      windowId: options?.windowId ?? null,
+      captureArea: options?.captureArea ?? null,
+      includeMicrophone: options?.includeMicrophone ?? false,
+      includeSystemAudio: options?.includeSystemAudio ?? false,
       videoStartTime: currentVideoStartTime,
     })
 
@@ -113,6 +125,32 @@ export async function startNativeRecording(options?: {
     isRecording = false
     currentOutputPath = null
     currentVideoStartTime = null
+    return { success: false, error: String(error) }
+  }
+}
+
+export async function pauseNativeRecording(): Promise<{ success: boolean; error?: string }> {
+  if (!recorderInstance || !isRecording) return { success: false, error: 'No active recording to pause' }
+  if (typeof recorderInstance.pauseRecording !== 'function') {
+    return { success: false, error: 'Native pause is not supported by the installed recorder runtime' }
+  }
+  try {
+    await recorderInstance.pauseRecording()
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}
+
+export async function resumeNativeRecording(): Promise<{ success: boolean; error?: string }> {
+  if (!recorderInstance || !isRecording) return { success: false, error: 'No active recording to resume' }
+  if (typeof recorderInstance.resumeRecording !== 'function') {
+    return { success: false, error: 'Native resume is not supported by the installed recorder runtime' }
+  }
+  try {
+    await recorderInstance.resumeRecording()
+    return { success: true }
+  } catch (error) {
     return { success: false, error: String(error) }
   }
 }

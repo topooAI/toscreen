@@ -90,12 +90,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isNativeRecordingAvailable: () => {
     return ipcRenderer.invoke('is-native-recording-available')
   },
-  startNativeRecording: () => {
-    return ipcRenderer.invoke('start-native-recording')
+  startNativeRecording: (options?: unknown) => {
+    return ipcRenderer.invoke('start-native-recording', options)
   },
   stopNativeRecording: () => {
     return ipcRenderer.invoke('stop-native-recording')
   },
+  pauseNativeRecording: () => ipcRenderer.invoke('pause-native-recording'),
+  resumeNativeRecording: () => ipcRenderer.invoke('resume-native-recording'),
+  discardRecordingArtifacts: (paths: Array<string | undefined>) => ipcRenderer.invoke('discard-recording-artifacts', paths),
+  getRecordingPermissions: () => ipcRenderer.invoke('get-recording-permissions'),
+  requestRecordingPermission: (kind: 'microphone' | 'camera') => ipcRenderer.invoke('request-recording-permission', kind),
+  openRecordingPermissionSettings: (kind: 'screen' | 'microphone' | 'camera') => ipcRenderer.invoke('open-recording-permission-settings', kind),
   generateProxyVideo: (inputPath: string) => {
     return ipcRenderer.invoke('generate-proxy-video', inputPath)
   },

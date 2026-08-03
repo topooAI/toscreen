@@ -28,6 +28,11 @@
   ],
 
   "mac": {
+    "extendInfo": {
+      "NSMicrophoneUsageDescription": "ToScreen uses the selected microphone while recording your screen.",
+      "NSCameraUsageDescription": "ToScreen checks camera access so you can prepare camera-enabled recordings.",
+      "NSScreenCaptureUsageDescription": "ToScreen records the display, window, or custom area you choose."
+    },
     "target": [
       {
         "target": "dmg",
