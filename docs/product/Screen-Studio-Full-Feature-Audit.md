@@ -4,7 +4,9 @@
 审计对象：当前工作区 `/Users/viosson/AITD/1_PROJECTS/P28_TOSCREEN`
 对标范围：Screen Studio 官方 Guide 与 Changelog 中公开的录制、编辑、视觉包装、音频、字幕、项目和导出能力。
 
-当前集成基线：`codex/phase1-integration@4044623`
+当前集成基线：`codex/phase1-integration@72e3eda`
+
+当前工作树说明：自动转录仍处于真实语音验收阶段，相关未提交改动不计入 `Completed`；本表的完成数量只按已提交、已合入和已验证能力统计。
 
 实时更新规则：只有功能已合入集成分支，并由统筹 Session 完成独立验证后，才把对应行更新为 `Completed`；仅在执行 Agent 分支中完成、尚未合入或尚未验证的功能继续保持 `Not completed`。
 
