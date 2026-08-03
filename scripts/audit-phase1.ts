@@ -73,6 +73,31 @@ const steps: AuditStep[] = [
     args: ["run", "audit:recording-asset-files"],
   },
   {
+    id: "recording-session",
+    command: npmCommand,
+    args: ["run", "audit:recording-session"],
+  },
+  {
+    id: "recording-session-contract",
+    command: npmCommand,
+    args: ["run", "audit:recording-session-contract"],
+  },
+  {
+    id: "editing-session",
+    command: npmCommand,
+    args: ["run", "audit:editing-session"],
+  },
+  {
+    id: "editing-product-integration",
+    command: npmCommand,
+    args: ["run", "audit:editing-product-integration"],
+  },
+  {
+    id: "editing-project-tail",
+    command: npmCommand,
+    args: ["run", "audit:editing-project-tail"],
+  },
+  {
     id: "preview-export-contract",
     command: npmCommand,
     args: ["run", "audit:preview-export-contract"],
@@ -181,6 +206,26 @@ const steps: AuditStep[] = [
     id: "screenstudio-control-wiring",
     command: npmCommand,
     args: ["run", "audit:screenstudio-control-wiring"],
+  },
+  {
+    id: "presentation-session",
+    command: npmCommand,
+    args: ["run", "audit:presentation"],
+  },
+  {
+    id: "presentation-ui",
+    command: npmCommand,
+    args: ["run", "audit:presentation-ui"],
+  },
+  {
+    id: "focus-30-35",
+    command: npmCommand,
+    args: ["run", "audit:focus-30-35"],
+  },
+  {
+    id: "presentation-recording-contract",
+    command: npmCommand,
+    args: ["run", "audit:presentation-recording-contract"],
   },
   {
     id: "electron-editor-runtime",
@@ -346,6 +391,16 @@ const steps: AuditStep[] = [
     id: "preview-audio-render-settings",
     command: npmCommand,
     args: ["run", "audit:preview-audio-render-settings"],
+  },
+  {
+    id: "audio-captions",
+    command: npmCommand,
+    args: ["run", "audit:audio-captions"],
+  },
+  {
+    id: "projects-presets",
+    command: npmCommand,
+    args: ["run", "audit:projects-presets"],
   },
 ];
 

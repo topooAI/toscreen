@@ -57,6 +57,8 @@
     "audit:project-model-clip-source": "tsx scripts/verify-project-model-clip-source-contract.ts",
     "audit:recordings": "tsx scripts/audit-recording-restore.ts",
     "audit:recording-asset-files": "tsx scripts/verify-recording-asset-files.ts",
+    "audit:recording-session": "tsx scripts/test-recording-session.ts",
+    "audit:recording-session-contract": "tsx scripts/verify-recording-session-contract.ts",
     "audit:project-model-future": "tsx scripts/verify-project-model-future-entries.ts",
     "audit:project-model-multisource": "tsx scripts/verify-project-model-multisource-entries.ts",
     "audit:project-model-camera": "tsx scripts/verify-project-model-camera-entries.ts",
