@@ -84,6 +84,7 @@ async function auditRecordingRestore(directory: string) {
       sourceAudioClips: number;
       restoredAudioRegions: number;
       sourceCursorClips: number;
+      sourceCursorPoints: number;
       restoredCursorPoints: number;
       wallpaper: string;
       showBlur: boolean;
@@ -111,6 +112,7 @@ async function auditRecordingRestore(directory: string) {
       const sourceCameraClips = countClips(rawProject.projectModel, "camera");
       const sourceAudioClips = countClips(rawProject.projectModel, "audio");
       const sourceCursorClips = countClips(rawProject.projectModel, "cursor");
+      const sourceCursorPoints = countCursorPoints(rawProject.projectModel);
       const restoredZoomRegions = restored?.zoomRegions.length ?? 0;
       const restoredAudioRegions = restored?.audioRegions.length ?? 0;
       const restoredCursorPoints = restored?.cursorData?.length ?? 0;
@@ -137,6 +139,7 @@ async function auditRecordingRestore(directory: string) {
             sourceAudioClips,
             restoredAudioRegions,
             sourceCursorClips,
+            sourceCursorPoints,
             restoredCursorPoints,
             wallpaper: renderSettings.canvas.wallpaper,
             showBlur: renderSettings.canvas.showBlur,
@@ -156,8 +159,8 @@ async function auditRecordingRestore(directory: string) {
         if (sourceAudioClips > 0 && restoredAudioRegions < sourceAudioClips) {
           errors.push(`Audio restore mismatch: expected at least ${sourceAudioClips} restored audio regions, got ${restoredAudioRegions}.`);
         }
-        if (sourceCursorClips > 0 && restoredCursorPoints <= 0) {
-          errors.push("Cursor restore mismatch: cursor clip exists but restored cursor data is empty.");
+        if (restoredCursorPoints !== sourceCursorPoints) {
+          errors.push(`Cursor restore mismatch: expected ${sourceCursorPoints} restored cursor points, got ${restoredCursorPoints}.`);
         }
         if (!renderSettings?.canvas.wallpaper) {
           errors.push("Canvas restore mismatch: restored wallpaper is empty.");
@@ -209,4 +212,10 @@ async function findFirstExistingPath(candidates: string[]) {
 
 function countClips(project: { clips?: Array<{ type?: string }> }, type: string) {
   return project.clips?.filter((clip) => clip.type === type).length ?? 0;
+}
+
+function countCursorPoints(project: { clips?: Array<{ type?: string; props?: { points?: unknown } }> }) {
+  return project.clips
+    ?.filter((clip) => clip.type === "cursor")
+    .reduce((total, clip) => total + (Array.isArray(clip.props?.points) ? clip.props.points.length : 0), 0) ?? 0;
 }

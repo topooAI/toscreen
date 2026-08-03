@@ -44,7 +44,8 @@ const requiredEditorNeedles = [
   ": buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective)",
   "segments.forEach((segment) => {",
   "const videoItems = isTrimTrackVisible ? videos : mainClips",
-  "return [...videoItems, ...speeds, ...zooms, ...trims, ...annotations, ...audios]",
+  "return [...videoItems, ...speeds, ...zooms, ...trims, ...annotations",
+  "...presentations",
 ];
 
 const missingEditorNeedles = requiredEditorNeedles.filter(
