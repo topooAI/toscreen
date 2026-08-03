@@ -6,6 +6,25 @@ export interface ExportDurationInput {
   projectDurationMs?: number;
 }
 
+export interface EditingExportDurationInput {
+  mainTrackDurationMs: number;
+  projectDurationMs?: number;
+}
+
+export function resolveEditingExportDurations(input: EditingExportDurationInput) {
+  const mainTrackDurationSeconds = safeMs(input.mainTrackDurationMs) / 1000;
+  const projectDurationSeconds = Math.max(
+    mainTrackDurationSeconds,
+    safeMs(input.projectDurationMs) / 1000,
+  );
+  return { mainTrackDurationSeconds, projectDurationSeconds };
+}
+
+export function shouldRenderMainTrackFrame(frameIndex: number, frameRate: number, mainTrackDurationMs: number) {
+  if (!Number.isFinite(frameIndex) || !Number.isFinite(frameRate) || frameRate <= 0) return false;
+  return frameIndex < Math.floor((safeMs(mainTrackDurationMs) / 1000) * frameRate);
+}
+
 export function resolveExportDurationSeconds(input: ExportDurationInput): number {
   const sourceDurationSeconds = safeSeconds(input.sourceDurationSeconds);
   const projectDurationSeconds = safeMs(input.projectDurationMs) / 1000;

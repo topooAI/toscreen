@@ -247,6 +247,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     () => createEditingRenderPlan(editingSession.document, recordingDurationMs),
     [editingSession.document, recordingDurationMs],
   );
+  const mainTrackDuration = editingRenderPlan.durationMs / 1000;
   useEffect(() => {
     const typingEvents = cursorData
       .filter((point) => point.type === 'keydown')
@@ -466,7 +467,9 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       }
 
       if (!projectTailStarted) {
-        const sourceTime = video && Number.isFinite(video.currentTime)
+        const sourceTime = editingRenderPlan
+          ? currentTimeStateRef.current
+          : video && Number.isFinite(video.currentTime)
           ? video.currentTime
           : currentTimeStateRef.current;
         const startTime = Math.min(
@@ -486,7 +489,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
       setCurrentTime(clampedTime);
 
-      if (video && duration > 0 && clampedTime < duration && video.paused) {
+      if (video && mainTrackDuration > 0 && clampedTime < mainTrackDuration && video.paused) {
         videoPlaybackRef.current?.play().catch(() => {});
       }
 
@@ -508,7 +511,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         projectClockRef.current = null;
       }
     };
-  }, [isPlaying, projectDuration, duration]);
+  }, [editingRenderPlan, isPlaying, mainTrackDuration, projectDuration, duration]);
 
   // Web Audio Mixer for additional audio tracks
   useAudioMixer({ 
@@ -811,7 +814,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         return;
       }
 
-      if (playback && video && currentTime < duration - 0.05) {
+      if (playback && video && currentTime < mainTrackDuration - 0.05) {
         playback.play().catch(err => {
           console.error('Video play failed:', err);
           setIsPlaying(false);
@@ -1753,8 +1756,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                         const video = videoPlaybackRef.current?.video;
                         if (
                           duration > 0 &&
-                          projectDuration > duration &&
-                          currentTimeStateRef.current >= duration - 0.05 &&
+                          projectDuration > mainTrackDuration &&
+                          currentTimeStateRef.current >= mainTrackDuration - 0.05 &&
                           time < currentTimeStateRef.current - 0.25
                         ) {
                           return;
@@ -1771,8 +1774,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                       onPlayStateChange={(playing) => {
                         if (
                           !playing &&
-                          projectDuration > duration &&
-                          currentTimeStateRef.current >= duration - 0.05 &&
+                          projectDuration > mainTrackDuration &&
+                          currentTimeStateRef.current >= mainTrackDuration - 0.05 &&
                           currentTimeStateRef.current < projectDuration
                         ) {
                           return;

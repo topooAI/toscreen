@@ -1,5 +1,5 @@
 import type { ExportConfig } from './types';
-import { resolveExportDurationSeconds } from './duration';
+import { resolveEditingExportDurations, resolveExportDurationSeconds } from './duration';
 import type { AudioRegion, TrimRegion } from '@/components/video-editor/types';
 import type { createEditingRenderPlan } from '@/components/video-editor/editing';
 
@@ -24,7 +24,10 @@ export class AudioMixerExporter {
   }
 
   private getEffectiveDuration(totalDuration: number): number {
-    if (this.config.editingRenderPlan) return this.config.editingRenderPlan.durationMs / 1000;
+    if (this.config.editingRenderPlan) return resolveEditingExportDurations({
+      mainTrackDurationMs: this.config.editingRenderPlan.durationMs,
+      projectDurationMs: this.config.projectDurationMs,
+    }).projectDurationSeconds;
     return resolveExportDurationSeconds({
       sourceDurationSeconds: totalDuration,
       trimRegions: this.trimRegions,

@@ -4,7 +4,7 @@ import { FrameRenderer } from './frameRenderer';
 import { VideoMuxer } from './muxer';
 import { AudioMixerExporter } from './audioMixerExporter';
 import { AudioEncoderWrapper } from './audioEncoder';
-import { resolveExportDurationSeconds } from './duration';
+import { resolveEditingExportDurations, resolveExportDurationSeconds, shouldRenderMainTrackFrame } from './duration';
 import type { ZoomRegion, CropRegion, TrimRegion, AnnotationRegion, AudioRegion, CursorCustomImageMap, CursorStylePreset } from '@/components/video-editor/types';
 import type { createEditingRenderPlan } from '@/components/video-editor/editing';
 
@@ -58,7 +58,10 @@ export class VideoExporter {
   }
 
   private getEffectiveDuration(totalDuration: number): number {
-    if (this.config.editingRenderPlan) return this.config.editingRenderPlan.durationMs / 1000;
+    if (this.config.editingRenderPlan) return resolveEditingExportDurations({
+      mainTrackDurationMs: this.config.editingRenderPlan.durationMs,
+      projectDurationMs: this.config.projectDurationMs,
+    }).projectDurationSeconds;
     return resolveExportDurationSeconds({
       sourceDurationSeconds: totalDuration,
       trimRegions: this.config.trimRegions,
@@ -173,6 +176,8 @@ export class VideoExporter {
       }
 
       const totalExpectedFrames = Math.floor(effectiveDuration * this.config.frameRate);
+      const mainTrackDurationMs = this.config.editingRenderPlan?.durationMs ?? effectiveDuration * 1000;
+      const mainTrackExpectedFrames = Math.floor((mainTrackDurationMs / 1000) * this.config.frameRate);
       let totalFramesExported = 0;
       let isExportingFrames = true;
 
@@ -254,6 +259,10 @@ export class VideoExporter {
           isExportingFrames = false;
           return;
         }
+        if (!shouldRenderMainTrackFrame(totalFramesExported, this.config.frameRate, mainTrackDurationMs)) {
+          isExportingFrames = false;
+          return;
+        }
 
         // 1. INSTANTLY pause to freeze the decoder clock! 
         // This ensures the video doesn't run ahead while we are busy rendering.
@@ -303,7 +312,10 @@ export class VideoExporter {
           : this.mapSourceToEffectiveTime(sourceTimeSec);
         const expectedFrameIndex = Math.floor(effectiveTimeSec * this.config.frameRate);
         
-        if (expectedFrameIndex > totalFramesExported) {
+        const shouldEncodeFrame = renderPlan
+          ? totalFramesExported < mainTrackExpectedFrames
+          : expectedFrameIndex > totalFramesExported;
+        if (shouldEncodeFrame) {
           if (audioEncoder) {
             try {
               await audioEncoder.encodeUpTo(effectiveTimeSec);
@@ -325,7 +337,7 @@ export class VideoExporter {
             // using strictly progressive virtual timestamps to guarantee butter-smooth animations!
             const sourceBitmap = await createImageBitmap(videoElement);
             
-            const framesToFill = expectedFrameIndex - totalFramesExported;
+            const framesToFill = renderPlan ? 1 : expectedFrameIndex - totalFramesExported;
             // Ensure we render at least once
             const count = Math.max(1, framesToFill);
             
@@ -349,7 +361,7 @@ export class VideoExporter {
         }
 
         // 4. Resume decoding and request next frame!
-        if (!videoElement.ended && isExportingFrames && totalFramesExported < totalExpectedFrames) {
+        if (!videoElement.ended && isExportingFrames && totalFramesExported < mainTrackExpectedFrames) {
           videoElement.requestVideoFrameCallback(processFrame);
           videoElement.play().catch(() => {});
         } else {
@@ -358,7 +370,9 @@ export class VideoExporter {
       };
 
       // Kick off the loop
-      videoElement.currentTime = 0;
+      videoElement.currentTime = this.config.editingRenderPlan
+        ? this.config.editingRenderPlan.exportSample(0).sourceTimeMs / 1000
+        : 0;
       await new Promise<void>((resolve) => {
         videoElement.addEventListener('seeked', () => resolve(), { once: true });
       });
@@ -369,7 +383,7 @@ export class VideoExporter {
       // Block until exporting finishes or cancels
       while (isExportingFrames && !this.cancelled) {
         await new Promise(resolve => setTimeout(resolve, 100));
-        if (videoElement.ended || totalFramesExported >= totalExpectedFrames) {
+        if (videoElement.ended || totalFramesExported >= mainTrackExpectedFrames) {
           isExportingFrames = false;
         }
       }

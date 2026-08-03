@@ -47,13 +47,13 @@ assertIncludes(
 );
 assertIncludes(
   videoEditor,
-  "projectDuration > duration",
-  "VideoEditor must preserve the project-duration tail path after source-video end.",
+  "projectDuration > mainTrackDuration",
+  "VideoEditor must preserve the project-duration tail path after the edited Main Track ends.",
 );
 assertIncludes(
   videoEditor,
-  "currentTimeStateRef.current >= duration - 0.05",
-  "VideoEditor must guard source video events from pulling project time back at the source tail.",
+  "currentTimeStateRef.current >= mainTrackDuration - 0.05",
+  "VideoEditor must guard source video events from pulling project time back at the edited Main Track tail.",
 );
 
 console.log(JSON.stringify({

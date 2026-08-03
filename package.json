@@ -24,6 +24,7 @@
     "audit:timeline-duration-domains": "tsx scripts/verify-timeline-duration-domains.ts",
     "audit:editing-session": "tsx scripts/verify-editing-session.ts",
     "audit:editing-product-integration": "tsx scripts/verify-editing-product-integration.ts",
+    "audit:editing-project-tail": "tsx scripts/verify-editing-project-tail.ts",
     "audit:timeline-track-origin": "tsx scripts/verify-timeline-track-origin.ts",
     "audit:timeline-lane-wrapping": "tsx scripts/verify-timeline-lane-wrapping.ts",
     "audit:timeline-drag-safety": "tsx scripts/verify-timeline-drag-safety.ts",
