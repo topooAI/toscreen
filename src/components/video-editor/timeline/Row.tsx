@@ -16,6 +16,7 @@ const ROW_METADATA: Record<string, { label: string }> = {
   "row-camera": { label: "Camera" },
   "row-trim": { label: "Trim" },
   "row-annotation": { label: "Text" },
+  "row-subtitle": { label: "Subtitles" },
   "row-audio": { label: "Audio" },
   "row-presentation": { label: "Presentation" },
 };
@@ -37,6 +38,8 @@ export default function Row({ id, children, onAddClick, height = 48 }: RowProps)
     } else if (id.startsWith("row-annotation-")) {
       const idx = parseInt(id.replace("row-annotation-", ""), 10) + 1;
       meta = { label: idx === 1 ? "Text" : `Text ${idx}` };
+    } else if (id.startsWith("row-subtitle")) {
+      meta = { label: "Subtitles" };
     } else {
       meta = { label: "Track" };
     }

@@ -21,6 +21,10 @@ export function splitSubtitle(region: SubtitleRegion, atMs: number): SubtitleReg
 export function mergeSubtitles(first: SubtitleRegion, second: SubtitleRegion): SubtitleRegion {
   return { ...first, id: `${first.id}-merged`, endMs: Math.max(first.endMs, second.endMs), text: `${first.text} ${second.text}`.trim(), userEdited: true }
 }
+export function updateSubtitleSpan(regions: SubtitleRegion[], id: string, startMs: number, endMs: number) {
+  return regions.map(region => region.id === id ? { ...region, startMs: Math.round(startMs), endMs: Math.round(endMs), userEdited: true } : region)
+}
+export function deleteSubtitle(regions: SubtitleRegion[], id: string) { return regions.filter(region => region.id !== id) }
 export function subtitleToAnnotation(region: SubtitleRegion): AnnotationRegion {
   const y = region.style.position === 'top' ? 12 : region.style.position === 'center' ? 45 : 82
   return { id: region.id, startMs: region.startMs, endMs: region.endMs, type: 'text', content: region.text, textContent: region.text, position: { x: 10, y }, size: { width: 80, height: 12 }, style: { color: region.style.color, backgroundColor: region.style.backgroundColor, fontSize: region.style.fontSize, fontFamily: region.style.fontFamily, fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none', textAlign: region.style.align }, zIndex: 100, animation: region.style.animation } as AnnotationRegion

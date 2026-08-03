@@ -58,7 +58,7 @@ import type { PresentationEffectRegion } from './presentation/types';
 import { recordedShortcutEffects } from './presentation/presentationEffects';
 import { expandPendingPresenterDuration, presenterEffectFromCameraPath } from './project/presenterContract';
 import { MediaFeaturesPanel } from './MediaFeaturesPanel';
-import { type SubtitleRegion } from './mediaFeatures';
+import { deleteSubtitle, updateSubtitleSpan, type SubtitleRegion } from './mediaFeatures';
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -99,6 +99,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [presentationEffects, setPresentationEffects] = useState<PresentationEffectRegion[]>([]);
   const [selectedPresentationId, setSelectedPresentationId] = useState<string | null>(null);
+  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -952,6 +953,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     setSelectedAnnotationId(id);
     if (id) {
       setSelectedPresentationId(null);
+      setSelectedSubtitleId(null);
       setSelectedZoomId(null);
       setSelectedTrimId(null);
       setSelectedAudioId(null);
@@ -963,12 +965,14 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     setSelectedAudioId(id);
     if (id) {
       setSelectedPresentationId(null);
+      setSelectedSubtitleId(null);
       setSelectedZoomId(null);
       setSelectedTrimId(null);
       setSelectedAnnotationId(null);
       setSelectedVideoId(null);
     }
   }, []);
+  const handleSelectSubtitle = useCallback((id: string | null) => { setSelectedSubtitleId(id); if (id) { setSelectedZoomId(null); setSelectedTrimId(null); setSelectedAnnotationId(null); setSelectedAudioId(null); setSelectedVideoId(null) } }, []);
 
   const handleSelectPresentation = useCallback((id: string | null) => {
     setSelectedPresentationId(id);
@@ -1160,6 +1164,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     setAnnotationRegions(prev => prev.filter(r => r.id !== id));
     if (selectedAnnotationId === id) setSelectedAnnotationId(null);
   }, [setAnnotationRegions, selectedAnnotationId, setSelectedAnnotationId]);
+  const handleSubtitleSpanChange = useCallback((id: string, span: Span) => setSubtitleRegions(prev => updateSubtitleSpan(prev, id, span.start, span.end)), []);
+  const handleSubtitleDelete = useCallback((id: string) => { setSubtitleRegions(prev => deleteSubtitle(prev, id)); setSelectedSubtitleId(selected => selected === id ? null : selected) }, []);
 
   // Audio Handlers
   const handleAudioAdded = useCallback((region: AudioRegion) => {
@@ -2004,6 +2010,11 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                   onAnnotationDelete={handleAnnotationDelete}
                   selectedAnnotationId={selectedAnnotationId}
                   onSelectAnnotation={handleSelectAnnotation}
+                  subtitleRegions={subtitleRegions}
+                  onSubtitleSpanChange={handleSubtitleSpanChange}
+                  onSubtitleDelete={handleSubtitleDelete}
+                  selectedSubtitleId={selectedSubtitleId}
+                  onSelectSubtitle={handleSelectSubtitle}
                   onAudioAdded={handleAudioAdded as any}
                   onAudioSpanChange={handleAudioSpanChange}
                   onAudioTrackChange={handleAudioTrackChange}
@@ -2056,7 +2067,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
       <Toaster theme={theme} className="pointer-events-auto" />
       <button className="absolute right-3 top-3 z-50 rounded bg-zinc-900 px-3 py-2 text-xs" onClick={() => setShowMediaFeatures(value => !value)}>Music & Subtitles</button>
-      {showMediaFeatures && <div className="absolute right-0 top-12 bottom-0 z-40"><MediaFeaturesPanel currentTimeMs={Math.round(currentTime * 1000)} audioRegions={audioRegions} onAddAudio={handleAudioAdded} subtitles={subtitleRegions} onChangeSubtitles={setSubtitleRegions} /></div>}
+      {showMediaFeatures && <div className="absolute right-0 top-12 bottom-0 z-40"><MediaFeaturesPanel currentTimeMs={Math.round(currentTime * 1000)} audioRegions={audioRegions} onAddAudio={handleAudioAdded} subtitles={subtitleRegions} onChangeSubtitles={setSubtitleRegions} selectedSubtitleId={selectedSubtitleId} onSelectSubtitle={handleSelectSubtitle} /></div>}
 
       <ExportDialog
         isOpen={showExportDialog}

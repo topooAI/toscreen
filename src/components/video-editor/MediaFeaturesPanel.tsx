@@ -3,7 +3,7 @@ import type { AudioRegion } from './types'
 import { bundledMusicToAudioRegion, mergeSubtitles, splitSubtitle, transcriptToSubtitles, type SubtitleRegion } from './mediaFeatures'
 
 type Track = { id: string; title: string; file: string; category: string; durationSeconds: number; source: string; license: string }
-export function MediaFeaturesPanel({ currentTimeMs, audioRegions, onAddAudio, subtitles, onChangeSubtitles }: { currentTimeMs: number; audioRegions: AudioRegion[]; onAddAudio: (region: AudioRegion) => void; subtitles: SubtitleRegion[]; onChangeSubtitles: (regions: SubtitleRegion[]) => void }) {
+export function MediaFeaturesPanel({ currentTimeMs, audioRegions, onAddAudio, subtitles, onChangeSubtitles, selectedSubtitleId: _selectedSubtitleId, onSelectSubtitle: _onSelectSubtitle }: { currentTimeMs: number; audioRegions: AudioRegion[]; onAddAudio: (region: AudioRegion) => void; subtitles: SubtitleRegion[]; onChangeSubtitles: (regions: SubtitleRegion[]) => void; selectedSubtitleId?: string | null; onSelectSubtitle?: (id: string | null) => void }) {
   const [tracks, setTracks] = useState<Track[]>([]), [query, setQuery] = useState(''), [category, setCategory] = useState('All')
   const [language, setLanguage] = useState('en-US'), [source, setSource] = useState<'system'|'microphone'|'mix'>('microphone'), [progress, setProgress] = useState(0), [error, setError] = useState('')
   const preview = useRef<HTMLAudioElement | null>(null)
