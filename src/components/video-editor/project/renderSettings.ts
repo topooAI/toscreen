@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import { resolveCursorStyle } from "../types";
 import { restoreLegacyEditorStateFromProjectModel } from "./legacyAdapter";
+import { subtitleToAnnotation } from '../mediaFeatures';
 import type { VideoEditorProject } from "./types";
 import type { EditingDocument } from "../editing";
 import type { PresentationEffectRegion } from "../presentation/types";
@@ -99,7 +100,7 @@ export function getProjectRenderSettings(project: VideoEditorProject): ProjectRe
       editingDocument: restored.editingDocument,
       zoomRegions: restored.zoomRegions,
       trimRegions: restored.trimRegions,
-      annotationRegions: restored.annotationRegions,
+      annotationRegions: [...restored.annotationRegions, ...(restored.subtitleRegions || []).map(subtitleToAnnotation)],
       audioRegions: restored.audioRegions,
     },
     cursor: {

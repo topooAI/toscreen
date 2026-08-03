@@ -21,7 +21,7 @@ import type {
   ProjectTrack,
   VideoEditorProject,
 } from "./types";
-import { subtitleToAnnotation, type SubtitleRegion } from '../mediaFeatures'
+import { defaultSubtitleStyle, subtitleToAnnotation, type SubtitleRegion } from '../mediaFeatures'
 
 const TRACK_IDS = {
   video: "track-video-main",
@@ -325,7 +325,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
   if ((input.subtitleRegions || []).length) tracks.push({ id: 'track-subtitle-main', type: 'annotation', name: 'Subtitles', order: 2.5 });
   ;(input.subtitleRegions || []).forEach(region => {
     const annotation = subtitleToAnnotation(region)
-    clips.push({ id: region.id, type: 'annotation', trackId: 'track-subtitle-main', startMs: region.startMs, endMs: region.endMs, name: region.text, props: { sourceRegion: annotation }, legacy: { source: 'VideoEditor', regionId: region.id, regionType: 'annotation' } })
+    clips.push({ id: region.id, type: 'annotation', trackId: 'track-subtitle-main', startMs: region.startMs, endMs: region.endMs, name: region.text, props: { sourceRegion: annotation }, legacy: { source: 'VideoEditor', regionId: region.id, regionType: 'subtitle' } })
   })
 
   input.audioRegions.forEach((region) => {
@@ -493,11 +493,21 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
     : [];
   const presentationEffects = mergePresentationEffects(legacyPresentationEffects, restorePresenterEffectsFromProjectModel(project));
   const autoFocusEnabled = project.legacyState?.autoFocusEnabled !== false;
+  const subtitleTrackIds = new Set(project.tracks.filter(track => track.id === 'track-subtitle-main' || track.name === 'Subtitles').map(track => track.id));
+  const storedSubtitles = Array.isArray(project.legacyState?.subtitleRegions)
+    ? project.legacyState.subtitleRegions as SubtitleRegion[]
+    : null;
+  const migratedSubtitles = project.clips.flatMap((clip): SubtitleRegion[] => {
+    if (clip.type !== 'annotation' || (!subtitleTrackIds.has(clip.trackId) && clip.legacy?.regionType !== 'subtitle')) return [];
+    const annotation = clip.props.sourceRegion;
+    const position = annotation.position.y < 30 ? 'top' : annotation.position.y < 65 ? 'center' : 'bottom';
+    return [{ id: clip.legacy?.regionId || clip.id, startMs: clip.startMs, endMs: clip.endMs, text: annotation.textContent || annotation.content || clip.name || '', userEdited: true, style: { ...defaultSubtitleStyle, fontFamily: annotation.style.fontFamily || defaultSubtitleStyle.fontFamily, fontSize: annotation.style.fontSize || defaultSubtitleStyle.fontSize, color: annotation.style.color || defaultSubtitleStyle.color, backgroundColor: annotation.style.backgroundColor || defaultSubtitleStyle.backgroundColor, position, align: annotation.style.textAlign || defaultSubtitleStyle.align, animation: annotation.animation || 'none' } }];
+  });
 
   return {
     editingDocument,
     companionAudioPath,
-    subtitleRegions: Array.isArray(project.legacyState?.subtitleRegions) ? project.legacyState.subtitleRegions as SubtitleRegion[] : [],
+    subtitleRegions: storedSubtitles ?? migratedSubtitles,
     cameraPath: project.assets.find(asset => asset.metadata?.role === 'presenter-camera')?.filePath || null,
     zoomRegions: project.clips.flatMap((clip): ZoomRegion[] => {
       if (clip.type !== "camera" || clip.props.mode !== "zoom") return [];
@@ -513,7 +523,7 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
     }),
     trimRegions: persistedTrimRegions,
     annotationRegions: project.clips.flatMap((clip): AnnotationRegion[] => (
-      clip.type === "annotation" ? [clip.props.sourceRegion] : []
+      clip.type === "annotation" && !subtitleTrackIds.has(clip.trackId) && clip.legacy?.regionType !== 'subtitle' ? [clip.props.sourceRegion] : []
     )),
     audioRegions: project.clips.flatMap((clip): AudioRegion[] => {
       if (clip.type !== "audio") return [];

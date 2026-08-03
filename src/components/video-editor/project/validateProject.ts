@@ -32,6 +32,7 @@ const VALID_TRACK_TYPES = [
   "presenter",
   "text",
   "annotation",
+  "subtitle",
   "lottie",
   "image",
   "ui-motion",

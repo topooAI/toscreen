@@ -87,7 +87,7 @@ export interface BaseProjectClip<TType extends ClipType, TProps> {
   legacy?: {
     source: "VideoEditor";
     regionId?: string;
-    regionType?: "zoom" | "trim" | "annotation" | "audio" | "screen-recording" | "cursor";
+    regionType?: "zoom" | "trim" | "annotation" | "subtitle" | "audio" | "screen-recording" | "cursor";
   };
 }
 
