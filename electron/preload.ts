@@ -13,6 +13,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   resolveBundledMusic: (fileName: string) => ipcRenderer.invoke('resolve-bundled-music', fileName),
   listBundledMusic: () => ipcRenderer.invoke('list-bundled-music'),
+  discoverIOSScreenDevices: () => ipcRenderer.invoke('ios-device-discover'),
+  startIOSDevicePreview: (deviceId: string) => ipcRenderer.invoke('ios-device-preview-start', deviceId),
+  stopIOSDevicePreview: () => ipcRenderer.invoke('ios-device-preview-stop'),
+  startIOSDeviceRecording: (deviceId: string) => ipcRenderer.invoke('ios-device-recording-start', deviceId),
+  stopIOSDeviceRecording: () => ipcRenderer.invoke('ios-device-recording-stop'),
+  cancelIOSDeviceRecording: () => ipcRenderer.invoke('ios-device-recording-cancel'),
+  onIOSDeviceState: (callback: (event: unknown) => void) => { const listener=(_:Electron.IpcRendererEvent,event:unknown)=>callback(event); ipcRenderer.on('ios-device-state',listener); return ()=>ipcRenderer.removeListener('ios-device-state',listener) },
   getSources: async (opts: Electron.SourcesOptions) => {
     return await ipcRenderer.invoke('get-sources', opts)
   },

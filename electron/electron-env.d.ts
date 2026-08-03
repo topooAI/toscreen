@@ -26,6 +26,13 @@ interface Window {
   electronAPI: {
     resolveBundledMusic: (fileName: string) => Promise<{ success: boolean; url?: string; error?: string }>
     listBundledMusic: () => Promise<{ success: boolean; manifest?: { tracks: Array<any> }; error?: string }>
+    discoverIOSScreenDevices: () => Promise<{ success: boolean; devices: IOSScreenDevice[]; error?: string }>
+    startIOSDevicePreview: (deviceId: string) => Promise<{ success: boolean; error?: string }>
+    stopIOSDevicePreview: () => Promise<{ success: boolean }>
+    startIOSDeviceRecording: (deviceId: string) => Promise<{ success: boolean; outputPath?: string; audioSupport?: string; error?: string }>
+    stopIOSDeviceRecording: () => Promise<{ success: boolean; outputPath?: string; error?: string }>
+    cancelIOSDeviceRecording: () => Promise<{ success: boolean }>
+    onIOSDeviceState: (callback: (event: unknown) => void) => () => void
     getSources: (opts: Electron.SourcesOptions) => Promise<ProcessedDesktopSource[]>
     switchToEditor: () => Promise<void>
     showRecorder: () => Promise<void>
@@ -99,6 +106,7 @@ interface RecordingOptions {
   cameraDeviceId?: string
   captureArea?: { x: number; y: number; width: number; height: number }
 }
+interface IOSScreenDevice { id: string; name: string; connected: boolean; suspended: boolean; inUse: boolean; transportType: number; audioSupport: string }
 
 interface RecordingPermissions {
   screen: string

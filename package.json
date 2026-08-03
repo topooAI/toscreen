@@ -96,7 +96,9 @@
     "audit:presentation-recording-contract": "tsx scripts/verify-presentation-recording-contract.ts",
     "audit:audio-captions": "tsx scripts/test-audio-captions.ts",
     "audit:projects-presets": "tsx scripts/verify-projects-presets.ts",
-    "build:transcriber-helper": "bash scripts/build-transcriber-helper.sh"
+    "build:transcriber-helper": "bash scripts/build-transcriber-helper.sh",
+    "build:ios-device-helper": "bash scripts/build-ios-device-capture-helper.sh",
+    "audit:ios-device-capture": "tsx scripts/test-ios-device-capture.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

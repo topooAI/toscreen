@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fixWebmDuration } from "@fix-webm-duration/fix";
 
-export type RecordingConfiguration = RecordingOptions & { countdownSeconds?: number };
+export type RecordingConfiguration = RecordingOptions & { countdownSeconds?: number; iosDeviceId?: string };
 export type RecordingPhase = "idle" | "countdown" | "recording" | "paused" | "processing" | "error";
 
 type UseScreenRecorderReturn = {
@@ -37,6 +37,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   const chunks = useRef<Blob[]>([]);
   const startTime = useRef(0);
   const isNativeRef = useRef(false);
+  const isIOSDeviceRef = useRef(false);
   const cancelledRef = useRef(false);
   const lastConfiguration = useRef<RecordingConfiguration>({ countdownSeconds: 3 });
   const webStopResolve = useRef<(() => void) | null>(null);
@@ -86,6 +87,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   }, []);
 
   const stopRecording = useCallback(async () => {
+    if (isIOSDeviceRef.current) { const result=await window.electronAPI.stopIOSDeviceRecording(); const microphonePath=await stopMicrophoneStem(); isIOSDeviceRef.current=false; if(!result.success||!result.outputPath){setError(result.error||'Unable to stop iPhone/iPad recording');setPhase('error');return} if(cancelledRef.current){await window.electronAPI.discardRecordingArtifacts([result.outputPath,microphonePath]);setPhase('idle')}else await finishRecording(result.outputPath,undefined,undefined,microphonePath); return }
     if (isNativeRef.current) {
       const result = await window.electronAPI.stopNativeRecording();
       const microphonePath = await stopMicrophoneStem();
@@ -164,8 +166,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
   const startRecording = useCallback(async (configuration: RecordingConfiguration = lastConfiguration.current) => {
     try {
-      const selectedSource = await window.electronAPI.getSelectedSource();
-      if (!selectedSource) throw new Error("Select a display, window, or area before recording");
+      if(!configuration.iosDeviceId){ const selectedSource = await window.electronAPI.getSelectedSource(); if (!selectedSource) throw new Error("Select a display, window, area, or wired iPhone/iPad before recording"); }
       lastConfiguration.current = configuration;
       cancelledRef.current = false;
       setError(null);
@@ -177,6 +178,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
         if (cancelledRef.current) { setCountdown(null); setPhase("idle"); return; }
       }
       setCountdown(null);
+      if(configuration.iosDeviceId){ const result=await window.electronAPI.startIOSDeviceRecording(configuration.iosDeviceId); if(!result.success)throw new Error(result.error||'Unable to start wired iPhone/iPad screen capture'); try{await startMicrophoneStem(configuration)}catch(error){await window.electronAPI.cancelIOSDeviceRecording();throw error} isIOSDeviceRef.current=true; startTime.current=Date.now(); setPhase('recording'); return }
       const nativeAvailable = await window.electronAPI.isNativeRecordingAvailable();
       if (nativeAvailable) {
         const result = await window.electronAPI.startNativeRecording({ ...configuration, includeMicrophone: false });
@@ -209,6 +211,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   }, [startMicrophoneStem, startWebRecording]);
 
   const pauseRecording = useCallback(async () => {
+    if(isIOSDeviceRef.current){setError('Pause is unavailable for wired iPhone/iPad capture; stop creates a complete MOV.');return}
     if (isNativeRef.current) {
       const result = await window.electronAPI.pauseNativeRecording();
       if (!result.success) { setError(result.error || "Pause failed"); return; }
@@ -218,6 +221,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   }, []);
 
   const resumeRecording = useCallback(async () => {
+    if(isIOSDeviceRef.current){setError('Resume is unavailable for wired iPhone/iPad capture.');return}
     if (isNativeRef.current) {
       const result = await window.electronAPI.resumeNativeRecording();
       if (!result.success) { setError(result.error || "Resume failed"); return; }
@@ -229,6 +233,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   const cancelRecording = useCallback(async () => {
     cancelledRef.current = true;
     if (phase === "countdown") { setCountdown(null); setPhase("idle"); return; }
+    if(isIOSDeviceRef.current){await window.electronAPI.cancelIOSDeviceRecording();await stopMicrophoneStem();isIOSDeviceRef.current=false;setPhase('idle');return}
     await stopRecording();
   }, [phase, stopRecording]);
 

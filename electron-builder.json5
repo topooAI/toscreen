@@ -23,6 +23,7 @@
   ],
   "extraResources": [
     { "from": "public/transcriber", "to": "transcriber" },
+    { "from": "public/ios-device-capture", "to": "ios-device-capture" },
     { "from": "public/music", "to": "music" },
     {
       "from": "public/wallpapers",
