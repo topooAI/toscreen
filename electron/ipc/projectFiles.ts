@@ -42,12 +42,13 @@ export function companionAudioPathCandidatesForMediaPath(mediaPath: string): str
     ? parsed.name.slice(0, -'-proxy'.length)
     : parsed.name
   const timestamp = baseName.match(/^recording-(.+)$/)?.[1]
-  const audioExtensions = ['.mov', '.m4a', '.wav', '.aac']
+  const audioExtensions = ['.webm', '.mov', '.m4a', '.wav', '.aac']
   const candidateBases = [
     `${baseName}-audio`,
     `${baseName}.audio`,
     timestamp ? `temp_audio_${timestamp}` : undefined,
     timestamp ? `temp_audio-${timestamp}` : undefined,
+    `${baseName}-system-audio`,
   ].filter((value): value is string => Boolean(value))
 
   return Array.from(new Set(

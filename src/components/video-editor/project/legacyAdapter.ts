@@ -33,6 +33,7 @@ export interface LegacyEditorProjectInput {
   videoPath: string | null;
   originalVideoPath: string | null;
   companionAudioPath?: string | null;
+  cameraPath?: string | null;
   durationSeconds: number;
   projectDurationSeconds: number;
   zoomRegions: ZoomRegion[];
@@ -70,6 +71,7 @@ export interface LegacyProjectDurationInput {
 
 export interface LegacyEditorRestoredState {
   companionAudioPath?: string | null;
+  cameraPath?: string | null;
   zoomRegions: ZoomRegion[];
   trimRegions: TrimRegion[];
   annotationRegions: AnnotationRegion[];
@@ -127,6 +129,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
   const companionAudioAssetId = input.companionAudioPath
     ? stableId("asset-audio-companion", input.companionAudioPath)
     : undefined;
+  const cameraAssetId = input.cameraPath ? stableId('asset-presenter-camera', input.cameraPath) : undefined;
 
   const assets: ProjectAsset[] = [];
   const addAsset = (asset: ProjectAsset | undefined) => {
@@ -168,6 +171,14 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
       role: "companion-audio",
     },
   } : undefined);
+  addAsset(input.cameraPath && cameraAssetId ? {
+    id: cameraAssetId,
+    type: 'video',
+    name: fileNameFromPath(input.cameraPath) || 'Recorded Camera',
+    sourceUrl: input.cameraPath,
+    filePath: input.cameraPath,
+    metadata: { role: 'presenter-camera', durationMs: sourceDurationMs },
+  } : undefined);
 
   input.audioRegions.forEach((region) => {
     const source = region.path || region.sourceUrl;
@@ -182,6 +193,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
         isOriginal: Boolean(region.isOriginal),
         isDetached: Boolean(region.isDetached),
         totalDurationMs: region.totalDurationMs,
+        role: region.role,
       },
     });
   });
@@ -193,6 +205,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
     { id: TRACK_IDS.audio, type: "audio", name: "Audio", order: 3 },
     { id: TRACK_IDS.cursor, type: "cursor", name: "Cursor", order: 4 },
   ];
+  if (cameraAssetId) tracks.push({ id: 'track-presenter-recorded', type: 'presenter', name: 'Camera', order: 5 });
   const laneAllocator = createLaneAllocator(tracks);
 
   const clips: ProjectClip[] = [];
@@ -219,6 +232,21 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
         regionType: "screen-recording",
       },
     });
+  }
+  if (cameraAssetId && input.cameraPath) {
+    clips.push({
+      id: stableId('clip-presenter-camera', input.cameraPath),
+      type: 'presenter',
+      trackId: 'track-presenter-recorded',
+      assetId: cameraAssetId,
+      startMs: 0,
+      endMs: sourceDurationMs,
+      sourceStartMs: 0,
+      sourceEndMs: sourceDurationMs,
+      name: 'Recorded Camera',
+      props: { sourceKind: 'camera', layout: 'corner', transform: { x: 0.72, y: 0.68, width: 0.24, height: 0.24, opacity: 1, borderRadius: 999 } },
+      legacy: { source: 'VideoEditor', regionType: 'screen-recording' },
+    })
   }
 
   input.zoomRegions.forEach((region) => {
@@ -432,6 +460,7 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
 
   return {
     companionAudioPath,
+    cameraPath: project.assets.find(asset => asset.metadata?.role === 'presenter-camera')?.filePath || null,
     zoomRegions: project.clips.flatMap((clip): ZoomRegion[] => {
       if (clip.type !== "camera" || clip.props.mode !== "zoom") return [];
       if (clip.props.sourceRegion) return [clip.props.sourceRegion];

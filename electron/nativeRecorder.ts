@@ -1,214 +1,149 @@
 import path from 'node:path'
+import fs from 'node:fs/promises'
+import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { RECORDINGS_DIR } from './main'
 
 const require = createRequire(import.meta.url)
-
-// Dynamically import node-mac-recorder to support graceful degradation on non-macOS platforms
 let MacRecorder: any = null
-let recorderInstance: any = null
 let nativeBinding: any = null
-
 try {
   MacRecorder = require('node-mac-recorder')
-  try {
-    const recorderEntry = require.resolve('node-mac-recorder')
-    nativeBinding = require(path.join(path.dirname(recorderEntry), 'build', 'Release', 'mac_recorder.node'))
-  } catch (bindingError) {
-    console.warn('[NativeRecorder] Video start clock is unavailable:', (bindingError as Error).message)
-  }
-} catch (e) {
-  console.warn('[NativeRecorder] node-mac-recorder not available on this platform:', (e as Error).message)
+  const recorderEntry = require.resolve('node-mac-recorder')
+  try { nativeBinding = require(path.join(path.dirname(recorderEntry), 'build', 'Release', 'mac_recorder.node')) } catch { /* optional clock */ }
+} catch (error) { console.warn('[NativeRecorder] unavailable:', (error as Error).message) }
+
+type Bounds = { x: number; y: number; width: number; height: number }
+type NativeOptions = {
+  showCursor?: boolean; fps?: number; displayId?: number; windowId?: number; captureArea?: Bounds
+  includeMicrophone?: boolean; includeSystemAudio?: boolean; audioDeviceId?: string
+  captureCamera?: boolean; cameraDeviceId?: string
 }
+type Segment = { outputPath: string; audioOutputPath?: string; cameraOutputPath?: string; videoStartTime: number; durationMs: number }
 
+let recorderInstance: any = null
 let isRecording = false
-let currentOutputPath: string | null = null
-let currentVideoStartTime: number | null = null
+let isPaused = false
+let finalOutputPath: string | null = null
+let segmentStartedAt = 0
+let segmentVideoStartTime = 0
+let activeSegmentPath: string | null = null
+let sessionOptions: NativeOptions | null = null
+let segments: Segment[] = []
 
-async function readVideoStartTime(
-  minimumStartTime: number,
-  timeoutMs = 2500,
-): Promise<number | null> {
+export function isNativeRecordingAvailable(): boolean { return Boolean(MacRecorder) && process.platform === 'darwin' }
+
+async function readVideoStartTime(minimum: number, timeoutMs = 2500): Promise<number | null> {
   if (!nativeBinding?.getVideoStartTimestamp) return null
-
   const deadline = Date.now() + timeoutMs
   while (Date.now() <= deadline) {
-    const timestamp = Number(nativeBinding.getVideoStartTimestamp())
-    // ScreenCaptureKit resets asynchronously. During that window the native
-    // binding can still expose the previous session's first-frame timestamp.
-    if (Number.isFinite(timestamp) && timestamp >= minimumStartTime) return timestamp
+    const value = Number(nativeBinding.getVideoStartTimestamp())
+    if (Number.isFinite(value) && value >= minimum) return value
     await new Promise(resolve => setTimeout(resolve, 16))
   }
-
   return null
 }
 
-/**
- * Check if native ScreenCaptureKit recording is available on this platform.
- * Requires macOS 12.3+ and node-mac-recorder to be installed.
- */
-export function isNativeRecordingAvailable(): boolean {
-  if (!MacRecorder) return false
-  if (process.platform !== 'darwin') return false
-  return true
-}
-
-/**
- * Start a native screen recording using ScreenCaptureKit.
- * The system cursor is excluded from the video stream at the OS rendering layer.
- */
-export async function startNativeRecording(options?: {
-  showCursor?: boolean
-  fps?: number
-  displayId?: number
-  windowId?: number
-  captureArea?: { x: number; y: number; width: number; height: number }
-  includeMicrophone?: boolean
-  includeSystemAudio?: boolean
-  audioDeviceId?: string
-}): Promise<{ success: boolean; outputPath?: string; videoStartTime?: number; error?: string }> {
-  if (!MacRecorder) {
-    return { success: false, error: 'node-mac-recorder is not available on this platform' }
-  }
-
-  if (isRecording) {
-    return { success: false, error: 'A recording is already in progress' }
-  }
-
+async function startSegment(): Promise<{ success: boolean; videoStartTime?: number; error?: string }> {
+  if (!MacRecorder || !finalOutputPath || !sessionOptions) return { success: false, error: 'Recording session is not configured' }
+  const segmentPath = path.join(RECORDINGS_DIR, `${path.parse(finalOutputPath).name}.segment-${segments.length}.mov`)
+  activeSegmentPath = segmentPath
+  recorderInstance = new MacRecorder()
+  segmentStartedAt = Date.now()
   try {
-    const timestamp = Date.now()
-    const fileName = `recording-${timestamp}.mov`
-    currentOutputPath = path.join(RECORDINGS_DIR, fileName)
-
-    // Create a fresh recorder instance for each session
-    recorderInstance = new MacRecorder()
-
-    await recorderInstance.startRecording(currentOutputPath, {
-      captureCursor: options?.showCursor === undefined ? false : options.showCursor, // node-mac-recorder 期望 captureCursor
-      frameRate: options?.fps ?? 60,
-      displayId: options?.displayId ?? null,
-      windowId: options?.windowId ?? null,
-      captureArea: options?.captureArea ?? null,
-      includeMicrophone: options?.includeMicrophone ?? false,
-      includeSystemAudio: options?.includeSystemAudio ?? false,
-      audioDeviceId: options?.audioDeviceId ?? null,
+    await recorderInstance.startRecording(segmentPath, {
+      captureCursor: sessionOptions.showCursor ?? false,
+      frameRate: sessionOptions.fps ?? 60,
+      displayId: sessionOptions.displayId ?? null,
+      windowId: sessionOptions.windowId ?? null,
+      captureArea: sessionOptions.captureArea ?? null,
+      includeMicrophone: sessionOptions.includeMicrophone ?? false,
+      includeSystemAudio: sessionOptions.includeSystemAudio ?? false,
+      audioDeviceId: sessionOptions.audioDeviceId ?? null,
+      captureCamera: sessionOptions.captureCamera ?? false,
+      cameraDeviceId: sessionOptions.cameraDeviceId ?? null,
     })
-
-    const detectedVideoStartTime = await readVideoStartTime(timestamp)
-    // A first encoded frame cannot predate the call that started this session.
-    // Some macOS host-clock conversions report a small negative offset; the
-    // filename/session timestamp is the authoritative lower bound shared by
-    // node-mac-recorder's cursor sidecar.
-    currentVideoStartTime = detectedVideoStartTime && detectedVideoStartTime >= timestamp
-      ? detectedVideoStartTime
-      : timestamp
+    const videoStartTime = await readVideoStartTime(segmentStartedAt) || segmentStartedAt
+    segmentVideoStartTime = videoStartTime
     isRecording = true
-
-    console.log(`[NativeRecorder] Recording started → ${currentOutputPath}`, {
-      captureCursor: options?.showCursor ?? false,
-      fps: options?.fps ?? 60,
-      displayId: options?.displayId ?? null,
-      windowId: options?.windowId ?? null,
-      captureArea: options?.captureArea ?? null,
-      includeMicrophone: options?.includeMicrophone ?? false,
-      includeSystemAudio: options?.includeSystemAudio ?? false,
-      videoStartTime: currentVideoStartTime,
-    })
-
-    return {
-      success: true,
-      outputPath: currentOutputPath,
-      videoStartTime: currentVideoStartTime || undefined,
-    }
+    isPaused = false
+    return { success: true, videoStartTime }
   } catch (error) {
-    console.error('[NativeRecorder] Failed to start recording:', error)
-    isRecording = false
-    currentOutputPath = null
-    currentVideoStartTime = null
+    recorderInstance = null
     return { success: false, error: String(error) }
   }
 }
 
-export async function pauseNativeRecording(): Promise<{ success: boolean; error?: string }> {
+async function finishSegment(): Promise<Segment> {
+  const captureEndedAt = Date.now()
+  const result = await recorderInstance.stopRecording()
+  const outputPath = result.outputPath || activeSegmentPath
+  if (!outputPath) throw new Error('Native recorder did not return a segment output path')
+  const segment: Segment = {
+    outputPath,
+    audioOutputPath: result.audioOutputPath || undefined,
+    cameraOutputPath: result.cameraOutputPath || undefined,
+    videoStartTime: segmentVideoStartTime || segmentStartedAt,
+    durationMs: Math.max(1, captureEndedAt - (segmentVideoStartTime || segmentStartedAt)),
+  }
+  segments.push(segment)
+  recorderInstance = null
+  activeSegmentPath = null
+  isRecording = false
+  return segment
+}
+
+export async function startNativeRecording(options: NativeOptions = {}): Promise<{ success: boolean; outputPath?: string; videoStartTime?: number; error?: string }> {
+  if (!isNativeRecordingAvailable()) return { success: false, error: 'node-mac-recorder is not available on this platform' }
+  if (isRecording || isPaused) return { success: false, error: 'A recording is already in progress' }
+  const timestamp = Date.now()
+  finalOutputPath = path.join(RECORDINGS_DIR, `recording-${timestamp}.mov`)
+  sessionOptions = options
+  segments = []
+  const result = await startSegment()
+  return { ...result, outputPath: result.success ? finalOutputPath : undefined }
+}
+
+export async function pauseNativeRecording(): Promise<{ success: boolean; segment?: Segment; error?: string }> {
   if (!recorderInstance || !isRecording) return { success: false, error: 'No active recording to pause' }
-  if (typeof recorderInstance.pauseRecording !== 'function') {
-    return { success: false, error: 'Native pause is not supported by the installed recorder runtime' }
-  }
+  try { const segment = await finishSegment(); isPaused = true; return { success: true, segment } }
+  catch (error) { return { success: false, error: String(error) } }
+}
+
+export async function resumeNativeRecording(): Promise<{ success: boolean; videoStartTime?: number; error?: string }> {
+  if (!isPaused) return { success: false, error: 'Recording is not paused' }
+  return startSegment()
+}
+
+async function concatFiles(inputs: string[], output: string): Promise<string | undefined> {
+  const existing: string[] = []
+  for (const input of inputs) { try { await fs.access(input); existing.push(input) } catch { /* absent optional stem */ } }
+  if (!existing.length) return undefined
+  if (existing.length === 1) { await fs.rename(existing[0], output); return output }
+  const listPath = `${output}.concat.txt`
+  await fs.writeFile(listPath, existing.map(item => `file '${item.split("'").join("'\\''")}'`).join('\n'))
+  const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path as string
+  await new Promise<void>((resolve, reject) => {
+    const process = spawn(ffmpegPath, ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', output], { stdio: 'ignore' })
+    process.once('error', reject); process.once('exit', code => code === 0 ? resolve() : reject(new Error(`ffmpeg concat exited ${code}`)))
+  })
+  await fs.unlink(listPath).catch(() => undefined)
+  await Promise.all(existing.map(item => fs.unlink(item).catch(() => undefined)))
+  return output
+}
+
+export async function stopNativeRecording(): Promise<{ success: boolean; outputPath?: string; audioOutputPath?: string; cameraOutputPath?: string; videoStartTime?: number; segmentDurationsMs?: number[]; segmentStartTimes?: number[]; error?: string }> {
+  if (!finalOutputPath || (!isRecording && !isPaused)) return { success: false, error: 'No active recording to stop' }
   try {
-    await recorderInstance.pauseRecording()
-    return { success: true }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
+    if (isRecording) await finishSegment()
+    const parsed = path.parse(finalOutputPath)
+    const audioOutputPath = await concatFiles(segments.flatMap(item => item.audioOutputPath ? [item.audioOutputPath] : []), path.join(parsed.dir, `${parsed.name}-system-audio.webm`))
+    const cameraOutputPath = await concatFiles(segments.flatMap(item => item.cameraOutputPath ? [item.cameraOutputPath] : []), path.join(parsed.dir, `${parsed.name}-camera.mov`))
+    await concatFiles(segments.map(item => item.outputPath), finalOutputPath)
+    const result = { success: true, outputPath: finalOutputPath, audioOutputPath, cameraOutputPath, videoStartTime: segments[0]?.videoStartTime, segmentDurationsMs: segments.map(item => item.durationMs), segmentStartTimes: segments.map(item => item.videoStartTime) }
+    isRecording = false; isPaused = false; finalOutputPath = null; sessionOptions = null; segments = []
+    return result
+  } catch (error) { return { success: false, error: String(error) } }
 }
 
-export async function resumeNativeRecording(): Promise<{ success: boolean; error?: string }> {
-  if (!recorderInstance || !isRecording) return { success: false, error: 'No active recording to resume' }
-  if (typeof recorderInstance.resumeRecording !== 'function') {
-    return { success: false, error: 'Native resume is not supported by the installed recorder runtime' }
-  }
-  try {
-    await recorderInstance.resumeRecording()
-    return { success: true }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-}
-
-/**
- * Stop the current native recording session.
- * Returns the output file path for downstream processing.
- */
-export async function stopNativeRecording(): Promise<{
-  success: boolean
-  outputPath?: string
-  audioOutputPath?: string
-  videoStartTime?: number
-  error?: string
-}> {
-  if (!recorderInstance || !isRecording) {
-    return { success: false, error: 'No active recording to stop' }
-  }
-
-  try {
-    const result = await recorderInstance.stopRecording()
-    // CRITICAL: node-mac-recorder internally aligns filenames using sessionTimestamp, 
-    // so we MUST use result.outputPath if returned, falling back to currentOutputPath.
-    const outputPath = result?.outputPath || currentOutputPath
-
-    console.log('[NativeRecorder] Recording stopped:', {
-      outputPath,
-      result,
-    })
-
-    isRecording = false
-    currentOutputPath = null
-    recorderInstance = null
-    const videoStartTime = currentVideoStartTime
-    currentVideoStartTime = null
-
-    return { 
-      success: true, 
-      outputPath: outputPath || undefined,
-      audioOutputPath: result?.audioOutputPath || undefined,
-      videoStartTime: videoStartTime || undefined,
-    }
-  } catch (error) {
-    console.error('[NativeRecorder] Failed to stop recording:', error)
-    isRecording = false
-    currentOutputPath = null
-    recorderInstance = null
-    currentVideoStartTime = null
-    return { success: false, error: String(error) }
-  }
-}
-
-/**
- * Get the current recording state.
- */
-export function getNativeRecordingState(): {
-  isRecording: boolean
-  outputPath: string | null
-} {
-  return { isRecording, outputPath: currentOutputPath }
-}
+export function getNativeRecordingState() { return { isRecording, isPaused, outputPath: finalOutputPath, segmentCount: segments.length + (isRecording ? 1 : 0) } }

@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { RECORDINGS_DIR } from '../main'
 import { mouseTracker } from '../mouseTracker'
+import { mergeSegmentEvents } from '../recordingTimeline'
 
 import {
   isNativeRecordingAvailable,
@@ -28,6 +29,8 @@ import {
 } from './projectFiles'
 
 let selectedSource: any = null
+let activeRecordingBounds: { x: number; y: number; width: number; height: number } | undefined
+let cursorSegments: Array<{ events: any[]; videoStartTime: number; durationMs: number }> = []
 
 function nativeCursorPathForMediaPath(mediaPath: string): string | null {
   const parsed = path.parse(mediaPath)
@@ -103,6 +106,11 @@ export function registerIpcHandlers(
     return selectedSource
   })
 
+  ipcMain.handle('get-display-bounds', (_, displayId: string) => {
+    const display = screen.getAllDisplays().find(item => String(item.id) === String(displayId)) || screen.getPrimaryDisplay()
+    return display.bounds
+  })
+
   ipcMain.handle('open-source-selector', () => {
     const sourceSelectorWin = getSourceSelectorWindow()
     if (sourceSelectorWin) {
@@ -157,6 +165,12 @@ export function registerIpcHandlers(
     }
   })
 
+  ipcMain.handle('store-recorded-audio', async (_, audioData: ArrayBuffer, fileName: string) => {
+    const audioPath = path.join(RECORDINGS_DIR, path.basename(fileName))
+    await fs.writeFile(audioPath, Buffer.from(audioData))
+    return { success: true, path: audioPath }
+  })
+
 
 
   ipcMain.handle('get-recorded-video-path', async () => {
@@ -175,12 +189,17 @@ export function registerIpcHandlers(
       const videoPath = path.join(RECORDINGS_DIR, latestVideo)
       const proxyResult = await generateProxyVideo(videoPath)
       const audioPath = await findFirstExistingPath(companionAudioPathCandidatesForMediaPath(videoPath))
+      const parsed = path.parse(videoPath)
+      const microphonePath = await findFirstExistingPath([path.join(parsed.dir, `${parsed.name}-microphone.webm`)])
+      const cameraPath = await findFirstExistingPath([path.join(parsed.dir, `${parsed.name}-camera.mov`), path.join(parsed.dir, `${parsed.name}-camera.webm`)])
 
       return {
         success: true,
         path: videoPath,
         proxyPath: proxyResult.success ? proxyResult.proxyPath : undefined,
         audioPath,
+        microphonePath,
+        cameraPath,
       }
     } catch (error) {
       console.error('Failed to get video path:', error)
@@ -223,6 +242,8 @@ export function registerIpcHandlers(
     includeMicrophone?: boolean
     includeSystemAudio?: boolean
     audioDeviceId?: string
+    captureCamera?: boolean
+    cameraDeviceId?: string
     captureArea?: { x: number; y: number; width: number; height: number }
   }) => {
     const isAvailable = isNativeRecordingAvailable()
@@ -261,6 +282,8 @@ export function registerIpcHandlers(
     // Start input monitoring first. MouseTracker stores absolute event times;
     // export rebases them to ScreenCaptureKit's actual first encoded frame.
     mouseTracker.start(recordingBounds)
+    activeRecordingBounds = recordingBounds
+    cursorSegments = []
     const result = await startNativeRecording({
       showCursor: false,
       displayId,
@@ -269,6 +292,8 @@ export function registerIpcHandlers(
       includeMicrophone: options?.includeMicrophone,
       includeSystemAudio: options?.includeSystemAudio,
       audioDeviceId: options?.audioDeviceId,
+      captureCamera: options?.captureCamera,
+      cameraDeviceId: options?.cameraDeviceId,
     })
     if (result.success) {
       const mainWin = getMainWindow()
@@ -287,8 +312,18 @@ export function registerIpcHandlers(
     return result
   })
 
-  ipcMain.handle('pause-native-recording', () => pauseNativeRecording())
-  ipcMain.handle('resume-native-recording', () => resumeNativeRecording())
+  ipcMain.handle('pause-native-recording', async () => {
+    const captured = mouseTracker.stop()
+    const result = await pauseNativeRecording()
+    if (result.success && result.segment) cursorSegments.push({ events: captured.events, videoStartTime: result.segment.videoStartTime, durationMs: result.segment.durationMs })
+    else mouseTracker.start(activeRecordingBounds)
+    return result
+  })
+  ipcMain.handle('resume-native-recording', async () => {
+    const result = await resumeNativeRecording()
+    if (result.success) mouseTracker.start(activeRecordingBounds)
+    return result
+  })
 
   ipcMain.handle('discard-recording-artifacts', async (_, paths: Array<string | undefined>) => {
     const safePaths = paths.filter((candidate): candidate is string => Boolean(candidate))
@@ -297,6 +332,8 @@ export function registerIpcHandlers(
     await Promise.all(safePaths.map(candidate => fs.unlink(candidate).catch(() => undefined)))
     currentVideoPath = null
     currentAudioPath = null
+    currentCameraPath = null
+    currentMicrophonePath = null
     return { success: true }
   })
 
@@ -306,13 +343,18 @@ export function registerIpcHandlers(
     // cursor timeline beyond the last encoded frame.
     const { events, bounds } = mouseTracker.stop()
     const result = await stopNativeRecording()
+    if (result.success && events.length) {
+      const lastDuration = result.segmentDurationsMs?.[cursorSegments.length] || 0
+      cursorSegments.push({ events, videoStartTime: result.segmentStartTimes?.[cursorSegments.length] || Date.now() - lastDuration, durationMs: lastDuration })
+    }
 
     // Export clicks after the recorder returns its final output path.
     if (result.success && result.outputPath) {
-      if (events.length > 0) {
+      const mergedEvents = mergeSegmentEvents(cursorSegments, result.videoStartTime || cursorSegments[0]?.videoStartTime || Date.now())
+      if (mergedEvents.length > 0) {
         try {
           const clicksPath = result.outputPath + '.clicks.json'
-          await mouseTracker.exportToFile(clicksPath, events, bounds, result.videoStartTime)
+          await mouseTracker.exportToFile(clicksPath, mergedEvents, bounds || activeRecordingBounds || null, result.videoStartTime)
           console.log('[IPC] Exported clicks to native recording path:', clicksPath)
         } catch (error) {
           console.error('[IPC] Failed to export clicks for native recording:', error)
@@ -320,8 +362,11 @@ export function registerIpcHandlers(
       }
 
       currentVideoPath = result.outputPath
-      currentAudioPath = (result as any).audioOutputPath || null
+      currentAudioPath = result.audioOutputPath || null
+      currentCameraPath = result.cameraOutputPath || null
     }
+    cursorSegments = []
+    activeRecordingBounds = undefined
 
     // Restore the HUD after recording ends
     const mainWin = getMainWindow()
@@ -493,17 +538,21 @@ export function registerIpcHandlers(
   let currentVideoPath: string | null = null;
   let currentProxyPath: string | null = null;
   let currentAudioPath: string | null = null;
+  let currentCameraPath: string | null = null;
+  let currentMicrophonePath: string | null = null;
 
-  ipcMain.handle('set-current-video-path', (_, path: string, proxyPath?: string, audioPath?: string) => {
+  ipcMain.handle('set-current-video-path', (_, path: string, proxyPath?: string, audioPath?: string, cameraPath?: string, microphonePath?: string) => {
     currentVideoPath = path;
     currentProxyPath = proxyPath || null;
     currentAudioPath = audioPath || null;
+    currentCameraPath = cameraPath || null;
+    currentMicrophonePath = microphonePath || null;
     return { success: true };
   });
 
   ipcMain.handle('get-current-video-path', () => {
     return currentVideoPath 
-      ? { success: true, path: currentVideoPath, proxyPath: currentProxyPath, audioPath: currentAudioPath } 
+      ? { success: true, path: currentVideoPath, proxyPath: currentProxyPath, audioPath: currentAudioPath, cameraPath: currentCameraPath, microphonePath: currentMicrophonePath }
       : { success: false };
   });
 
@@ -511,6 +560,8 @@ export function registerIpcHandlers(
     currentVideoPath = null;
     currentProxyPath = null;
     currentAudioPath = null;
+    currentCameraPath = null;
+    currentMicrophonePath = null;
     return { success: true };
   });
 

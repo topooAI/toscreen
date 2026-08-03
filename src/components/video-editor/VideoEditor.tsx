@@ -62,6 +62,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [videoPath, setVideoPath] = useState<string | null>(null);
   const [originalVideoPath, setOriginalVideoPath] = useState<string | null>(null);
   const [companionAudioPath, setCompanionAudioPath] = useState<string | null>(null);
+  const [cameraPath, setCameraPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -251,6 +252,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     videoPath,
     originalVideoPath,
     companionAudioPath,
+    cameraPath,
     durationSeconds: duration,
     projectDurationSeconds: projectDuration,
     zoomRegions,
@@ -277,6 +279,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     videoPath,
     originalVideoPath,
     companionAudioPath,
+    cameraPath,
     duration,
     projectDuration,
     zoomRegions,
@@ -596,6 +599,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           : {},
     );
     if (project.cursorOffset !== undefined) setCursorOffset(project.cursorOffset);
+    if (project.cameraPath !== undefined) setCameraPath(project.cameraPath);
     return "legacy";
   }, []);
 
@@ -626,6 +630,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           } else {
             setCompanionAudioPath(null);
           }
+          setCameraPath((result as any).cameraPath || null);
 
           // If proxy is available, use it for UI playback. Always keep original for export.
           setVideoPath((result as any).proxyPath || result.path);
@@ -650,7 +655,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
               const tempAudio = new Audio(audioUrl);
               tempAudio.addEventListener('loadedmetadata', () => {
                 const durationMs = Math.round(tempAudio.duration * 1000);
-                const audioName = (result as any).audioPath.split(/[/\\]/).pop() || "Recorded Audio";
+                const audioName = "System Audio";
                 
                 const newAudioRegion = {
                   id: crypto.randomUUID(),
@@ -665,10 +670,24 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                   sourceEndMs: durationMs,
                   isOriginal: true,
                   isDetached: false,
+                  role: 'system-audio' as const,
                 };
                 
                 setAudioRegions([newAudioRegion]);
                 console.log("[Auto-Load] Successfully loaded and attached recorded system audio track:", newAudioRegion);
+              });
+            }
+            if ((result as any).microphonePath) {
+              const microphonePath = (result as any).microphonePath as string;
+              const microphoneUrl = `file://${microphonePath.replace(/\\/g, '/')}`;
+              const microphoneAudio = new Audio(microphoneUrl);
+              microphoneAudio.addEventListener('loadedmetadata', () => {
+                const durationMs = Math.round(microphoneAudio.duration * 1000);
+                setAudioRegions(current => [...current, {
+                  id: crypto.randomUUID(), startMs: 0, endMs: durationMs, sourceUrl: microphoneUrl,
+                  volume: 1, name: 'Microphone', path: microphonePath, totalDurationMs: durationMs,
+                  sourceStartMs: 0, sourceEndMs: durationMs, isOriginal: false, isDetached: true, role: 'microphone' as const,
+                }]);
               });
             }
           }

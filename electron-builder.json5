@@ -4,6 +4,7 @@
   "appId": "com.siddharthvaddem.openscreen",
   "asar": true,
   "productName": "ToScreen",
+  "buildVersion": "0.0.34",
   "npmRebuild": true,
   "buildDependenciesFromSource": true,
   "compression": "maximum",

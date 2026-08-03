@@ -26,10 +26,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSelectedSource: () => {
     return ipcRenderer.invoke('get-selected-source')
   },
+  getDisplayBounds: (displayId: string) => ipcRenderer.invoke('get-display-bounds', displayId),
 
   storeRecordedVideo: (videoData: ArrayBuffer, fileName: string) => {
     return ipcRenderer.invoke('store-recorded-video', videoData, fileName)
   },
+  storeRecordedAudio: (audioData: ArrayBuffer, fileName: string) => ipcRenderer.invoke('store-recorded-audio', audioData, fileName),
 
   getRecordedVideoPath: () => {
     return ipcRenderer.invoke('get-recorded-video-path')
@@ -51,8 +53,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openVideoFilePicker: () => {
     return ipcRenderer.invoke('open-video-file-picker')
   },
-  setCurrentVideoPath: (path: string, proxyPath?: string, audioPath?: string) => {
-    return ipcRenderer.invoke('set-current-video-path', path, proxyPath, audioPath)
+  setCurrentVideoPath: (path: string, proxyPath?: string, audioPath?: string, cameraPath?: string, microphonePath?: string) => {
+    return ipcRenderer.invoke('set-current-video-path', path, proxyPath, audioPath, cameraPath, microphonePath)
   },
   getCurrentVideoPath: () => {
     return ipcRenderer.invoke('get-current-video-path')

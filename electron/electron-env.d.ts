@@ -29,15 +29,17 @@ interface Window {
     openSourceSelector: () => Promise<void>
     selectSource: (source: any) => Promise<any>
     getSelectedSource: () => Promise<any>
+    getDisplayBounds: (displayId: string) => Promise<{ x: number; y: number; width: number; height: number }>
     storeRecordedVideo: (videoData: ArrayBuffer, fileName: string) => Promise<{ success: boolean; path?: string; message?: string }>
-    getRecordedVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string; message?: string }>
+    storeRecordedAudio: (audioData: ArrayBuffer, fileName: string) => Promise<{ success: boolean; path?: string }>
+    getRecordedVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string; microphonePath?: string; cameraPath?: string; message?: string }>
     setRecordingState: (recording: boolean, videoStartTime?: number) => Promise<void>
     onStopRecordingFromTray: (callback: () => void) => () => void
     openExternalUrl: (url: string) => Promise<{ success: boolean; error?: string }>
     saveExportedVideo: (videoData: ArrayBuffer, fileName: string) => Promise<{ success: boolean; path?: string; message?: string; cancelled?: boolean }>
     openVideoFilePicker: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; message?: string }>
-    setCurrentVideoPath: (path: string, proxyPath?: string, audioPath?: string) => Promise<{ success: boolean }>
-    getCurrentVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string }>
+    setCurrentVideoPath: (path: string, proxyPath?: string, audioPath?: string, cameraPath?: string, microphonePath?: string) => Promise<{ success: boolean }>
+    getCurrentVideoPath: () => Promise<{ success: boolean; path?: string; proxyPath?: string; audioPath?: string; cameraPath?: string; microphonePath?: string }>
     clearCurrentVideoPath: () => Promise<{ success: boolean }>
     getPlatform: () => Promise<string>
     getEditorPreferencesSync: () => unknown
@@ -50,7 +52,7 @@ interface Window {
     readClicksJson: (videoPath: string) => Promise<{ success: boolean; clicks?: any[] }>;
     isNativeRecordingAvailable: () => Promise<boolean>;
     startNativeRecording: (options?: RecordingOptions) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
-    stopNativeRecording: () => Promise<{ success: boolean; outputPath?: string; audioOutputPath?: string; error?: string }>;
+    stopNativeRecording: () => Promise<{ success: boolean; outputPath?: string; audioOutputPath?: string; cameraOutputPath?: string; error?: string }>;
     pauseNativeRecording: () => Promise<{ success: boolean; error?: string }>;
     resumeNativeRecording: () => Promise<{ success: boolean; error?: string }>;
     discardRecordingArtifacts: (paths: Array<string | undefined>) => Promise<{ success: boolean }>;
@@ -70,6 +72,8 @@ interface RecordingOptions {
   includeMicrophone?: boolean
   includeSystemAudio?: boolean
   audioDeviceId?: string
+  captureCamera?: boolean
+  cameraDeviceId?: string
   captureArea?: { x: number; y: number; width: number; height: number }
 }
 

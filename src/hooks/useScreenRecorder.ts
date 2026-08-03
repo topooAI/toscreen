@@ -30,20 +30,26 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
   const [error, setError] = useState<string | null>(null);
   const [processProgress, setProcessProgress] = useState(0);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const microphoneRecorder = useRef<MediaRecorder | null>(null);
+  const microphoneStream = useRef<MediaStream | null>(null);
+  const microphoneChunks = useRef<Blob[]>([]);
   const stream = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
   const startTime = useRef(0);
   const isNativeRef = useRef(false);
   const cancelledRef = useRef(false);
   const lastConfiguration = useRef<RecordingConfiguration>({ countdownSeconds: 3 });
+  const webStopResolve = useRef<(() => void) | null>(null);
+  const pendingMicrophonePath = useRef<Promise<string | undefined> | null>(null);
+  const microphoneFileName = useRef<string | null>(null);
 
-  const finishRecording = useCallback(async (outputPath: string, audioPath?: string) => {
+  const finishRecording = useCallback(async (outputPath: string, audioPath?: string, cameraPath?: string, microphonePath?: string) => {
     setPhase("processing");
     setProcessProgress(0);
     const unsubscribe = window.electronAPI.onProxyGenerationProgress(setProcessProgress);
     try {
       const proxyResult = await window.electronAPI.generateProxyVideo(outputPath);
-      await window.electronAPI.setCurrentVideoPath(outputPath, proxyResult.success ? proxyResult.proxyPath : undefined, audioPath);
+      await window.electronAPI.setCurrentVideoPath(outputPath, proxyResult.success ? proxyResult.proxyPath : undefined, audioPath, cameraPath, microphonePath);
       await window.electronAPI.switchToEditor();
     } finally {
       unsubscribe();
@@ -51,28 +57,60 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     }
   }, []);
 
+  const stopMicrophoneStem = useCallback(async () => {
+    const recorder = microphoneRecorder.current
+    if (!recorder || recorder.state === 'inactive') return undefined
+    return new Promise<string | undefined>(resolve => {
+      recorder.onstop = async () => {
+        microphoneStream.current?.getTracks().forEach(track => track.stop())
+        microphoneStream.current = null
+        const blob = new Blob(microphoneChunks.current, { type: recorder.mimeType })
+        microphoneChunks.current = []
+        if (!blob.size || cancelledRef.current) { resolve(undefined); return }
+        const stored = await window.electronAPI.storeRecordedAudio(await blob.arrayBuffer(), microphoneFileName.current || `recording-${startTime.current || Date.now()}-microphone.webm`)
+        microphoneFileName.current = null
+        resolve(stored.path)
+      }
+      recorder.stop()
+    })
+  }, []);
+
+  const startMicrophoneStem = useCallback(async (configuration: RecordingConfiguration) => {
+    if (!configuration.includeMicrophone || microphoneRecorder.current?.state === 'recording') return
+    microphoneStream.current = await navigator.mediaDevices.getUserMedia({ audio: configuration.audioDeviceId ? { deviceId: { exact: configuration.audioDeviceId } } : true })
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
+    microphoneRecorder.current = new MediaRecorder(microphoneStream.current, { mimeType })
+    microphoneChunks.current = []
+    microphoneRecorder.current.ondataavailable = event => { if (event.data.size) microphoneChunks.current.push(event.data) }
+    microphoneRecorder.current.start(500)
+  }, []);
+
   const stopRecording = useCallback(async () => {
     if (isNativeRef.current) {
       const result = await window.electronAPI.stopNativeRecording();
+      const microphonePath = await stopMicrophoneStem();
       isNativeRef.current = false;
       if (!result.success || !result.outputPath) {
         setError(result.error || "Unable to stop recording");
         setPhase("error");
         return;
       }
-      if (!cancelledRef.current) await finishRecording(result.outputPath, result.audioOutputPath);
+      if (!cancelledRef.current) await finishRecording(result.outputPath, result.audioOutputPath, result.cameraOutputPath, microphonePath || undefined);
       else {
-        await window.electronAPI.discardRecordingArtifacts([result.outputPath, result.audioOutputPath]);
+        await window.electronAPI.discardRecordingArtifacts([result.outputPath, result.audioOutputPath, result.cameraOutputPath, microphonePath]);
         setPhase("idle");
       }
       return;
     }
     if (mediaRecorder.current && mediaRecorder.current.state !== "inactive") {
       stream.current?.getTracks().forEach(track => track.stop());
+      pendingMicrophonePath.current = stopMicrophoneStem()
+      const stopped = new Promise<void>(resolve => { webStopResolve.current = resolve })
       mediaRecorder.current.stop();
       await window.electronAPI.setRecordingState(false, startTime.current);
+      await stopped
     }
-  }, [finishRecording]);
+  }, [finishRecording, stopMicrophoneStem]);
 
   useEffect(() => {
     const cleanup = window.electronAPI.onStopRecordingFromTray(() => void stopRecording());
@@ -109,12 +147,14 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
     recorder.onerror = () => { setError("MediaRecorder failed"); setPhase("error"); };
     recorder.onstop = async () => {
       stream.current = null;
-      if (cancelledRef.current || chunks.current.length === 0) { chunks.current = []; setPhase("idle"); return; }
+      if (cancelledRef.current || chunks.current.length === 0) { chunks.current = []; await pendingMicrophonePath.current; pendingMicrophonePath.current = null; setPhase("idle"); webStopResolve.current?.(); webStopResolve.current = null; return; }
       const blob = await fixWebmDuration(new Blob(chunks.current, { type: mimeType }), Date.now() - startTime.current);
       chunks.current = [];
       const result = await window.electronAPI.storeRecordedVideo(await blob.arrayBuffer(), `recording-${Date.now()}.webm`);
-      if (result.success && result.path) await finishRecording(result.path);
+      const microphonePath = await pendingMicrophonePath.current; pendingMicrophonePath.current = null;
+      if (result.success && result.path) await finishRecording(result.path, undefined, undefined, microphonePath || undefined);
       else { setError(result.message || "Unable to store recording"); setPhase("error"); }
+      webStopResolve.current?.(); webStopResolve.current = null;
     };
     recorder.start(1000);
     startTime.current = Date.now();
@@ -139,27 +179,41 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       setCountdown(null);
       const nativeAvailable = await window.electronAPI.isNativeRecordingAvailable();
       if (nativeAvailable) {
-        const result = await window.electronAPI.startNativeRecording(configuration);
+        const result = await window.electronAPI.startNativeRecording({ ...configuration, includeMicrophone: false });
         if (result.success) {
-          isNativeRef.current = true;
           startTime.current = Date.now();
+          microphoneFileName.current = result.outputPath ? `${result.outputPath.split(/[/\\]/).pop()?.replace(/\.mov$/i, '')}-microphone.webm` : null
+          try { await startMicrophoneStem(configuration) }
+          catch (microphoneError) {
+            cancelledRef.current = true
+            const rolledBack = await window.electronAPI.stopNativeRecording()
+            await window.electronAPI.discardRecordingArtifacts([rolledBack.outputPath, rolledBack.audioOutputPath, rolledBack.cameraOutputPath])
+            throw microphoneError
+          }
+          isNativeRef.current = true;
           setPhase("recording");
           return;
         }
         console.warn("Native recording failed; using desktop MediaRecorder", result.error);
       }
       await startWebRecording();
+      microphoneFileName.current = `recording-${startTime.current}-microphone.webm`
+      await startMicrophoneStem(configuration)
     } catch (cause) {
+      if (mediaRecorder.current && mediaRecorder.current.state !== 'inactive') mediaRecorder.current.stop()
+      if (microphoneRecorder.current && microphoneRecorder.current.state !== 'inactive') microphoneRecorder.current.stop()
+      microphoneStream.current?.getTracks().forEach(track => track.stop())
       setError(cause instanceof Error ? cause.message : String(cause));
       setPhase("error");
     }
-  }, [startWebRecording]);
+  }, [startMicrophoneStem, startWebRecording]);
 
   const pauseRecording = useCallback(async () => {
     if (isNativeRef.current) {
       const result = await window.electronAPI.pauseNativeRecording();
       if (!result.success) { setError(result.error || "Pause failed"); return; }
     } else if (mediaRecorder.current?.state === "recording") mediaRecorder.current.pause();
+    if (microphoneRecorder.current?.state === 'recording') microphoneRecorder.current.pause()
     setPhase("paused");
   }, []);
 
@@ -168,6 +222,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       const result = await window.electronAPI.resumeNativeRecording();
       if (!result.success) { setError(result.error || "Resume failed"); return; }
     } else if (mediaRecorder.current?.state === "paused") mediaRecorder.current.resume();
+    if (microphoneRecorder.current?.state === 'paused') microphoneRecorder.current.resume()
     setPhase("recording");
   }, []);
 

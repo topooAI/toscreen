@@ -2,7 +2,8 @@
   "name": "toscreen",
   "productName": "ToScreen",
   "private": true,
-  "version": "0.0.0.34",
+  "version": "0.0.34",
+  "toscreenBaseline": "v0.0.0.34",
   "type": "module",
   "scripts": {
     "dev": "vite",
