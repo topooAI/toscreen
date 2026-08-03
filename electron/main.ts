@@ -15,6 +15,7 @@ import fs from 'node:fs/promises'
 import {
   createHudOverlayWindow,
   createEditorWindow,
+  createProjectHomeWindow,
   createSettingsWindow,
   createSourceSelectorWindow,
 } from './windows'
@@ -89,14 +90,14 @@ let sourceSelectorWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let selectedSourceName = ''
-let mainWindowMode: 'hud' | 'editor' | null = null
+let mainWindowMode: 'home' | 'hud' | 'editor' | null = null
 let isQuitting = false
 
 // Tray Icons
 const defaultTrayIcon = getTrayIcon('openscreen.png');
 const recordingTrayIcon = getTrayIcon('rec-button.png');
 
-function registerMainWindow(win: BrowserWindow, mode: 'hud' | 'editor') {
+function registerMainWindow(win: BrowserWindow, mode: 'home' | 'hud' | 'editor') {
   mainWindow = win
   mainWindowMode = mode
 
@@ -109,7 +110,7 @@ function registerMainWindow(win: BrowserWindow, mode: 'hud' | 'editor') {
     if (mode === 'editor' && !isQuitting) {
       setTimeout(() => {
         if (!mainWindow && !isQuitting) {
-          registerMainWindow(createHudOverlayWindow(), 'hud')
+          registerMainWindow(createProjectHomeWindow(), 'home')
         }
       }, 0)
     }
@@ -121,7 +122,7 @@ function createInitialWindow() {
     registerMainWindow(createEditorWindow(), 'editor')
     return
   }
-  registerMainWindow(createHudOverlayWindow(), 'hud')
+  registerMainWindow(createProjectHomeWindow(), 'home')
 }
 
 function showOrCreateMainWindow() {
@@ -132,7 +133,7 @@ function showOrCreateMainWindow() {
     return
   }
 
-  registerMainWindow(createHudOverlayWindow(), 'hud')
+  registerMainWindow(createProjectHomeWindow(), 'home')
 }
 
 function createTray() {
@@ -190,6 +191,12 @@ function createEditorWindowWrapper() {
 
   const previousWindow = mainWindow
   registerMainWindow(createEditorWindow(), 'editor')
+  if (previousWindow && !previousWindow.isDestroyed()) previousWindow.close()
+}
+
+function createRecordingWindowWrapper() {
+  const previousWindow = mainWindow
+  registerMainWindow(createHudOverlayWindow(), 'hud')
   if (previousWindow && !previousWindow.isDestroyed()) previousWindow.close()
 }
 
@@ -366,5 +373,6 @@ app.whenReady().then(async () => {
     }
   )
   registerTranscriptionHandlers(() => mainWindow)
+  ipcMain.handle('show-recorder', () => createRecordingWindowWrapper())
   createInitialWindow()
 })

@@ -28,6 +28,7 @@ interface Window {
     listBundledMusic: () => Promise<{ success: boolean; manifest?: { tracks: Array<any> }; error?: string }>
     getSources: (opts: Electron.SourcesOptions) => Promise<ProcessedDesktopSource[]>
     switchToEditor: () => Promise<void>
+    showRecorder: () => Promise<void>
     openSourceSelector: () => Promise<void>
     selectSource: (source: any) => Promise<any>
     getSelectedSource: () => Promise<any>
@@ -65,11 +66,28 @@ interface Window {
     hudOverlayClose: () => void;
     generateProxyVideo: (inputPath: string) => Promise<{ success: boolean; proxyPath?: string; error?: string }>;
     onProxyGenerationProgress: (callback: (percent: number) => void) => () => void;
-    saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean; error?: string; message?: string }>;
+    saveProject: (videoPath: string, projectData: any) => Promise<{ success: boolean; projectPath?: string; error?: string; message?: string }>;
     loadProject: (videoPath: string) => Promise<{ success: boolean; project?: any; projectPath?: string; message?: string }>;
     transcribeAudio: (input: { paths: string[]; language: string }) => Promise<{ success: boolean; segments?: Array<{ startMs: number; endMs: number; text: string }>; error?: string; cancelled?: boolean }>
     cancelTranscription: () => Promise<boolean>
     onTranscriptionProgress: (callback: (event: unknown) => void) => () => void
+    saveProjectAs: (projectData: unknown) => Promise<any>;
+    getCurrentProject: () => Promise<{ projectPath: string | null }>;
+    newProject: () => Promise<{ success: boolean }>;
+    listRecentProjects: () => Promise<any>;
+    openProject: (projectPath: string) => Promise<any>;
+    removeRecentProject: (projectPath: string) => Promise<any>;
+    deleteProject: (projectPath: string, deleteAssets?: boolean) => Promise<any>;
+    relinkProjectAsset: (projectPath: string, missingPath: string) => Promise<any>;
+    exportProjectPackage: (projectPath?: string) => Promise<any>;
+    importProjectPackage: () => Promise<any>;
+    listPresets: () => Promise<any>;
+    savePreset: (name: string, project: unknown, presetId?: string) => Promise<any>;
+    deletePreset: (presetId: string) => Promise<any>;
+    setDefaultPreset: (presetId?: string) => Promise<any>;
+    applyPreset: (project: unknown, presetId: string) => Promise<any>;
+    exportPreset: (presetId: string) => Promise<any>;
+    importPreset: () => Promise<any>;
   }
 }
 

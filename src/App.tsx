@@ -4,6 +4,7 @@ import { SourceSelector } from "./components/launch/SourceSelector";
 import VideoEditor from "./components/video-editor/VideoEditor";
 import EditingRuntimeAudit from "./components/video-editor/timeline/EditingRuntimeAudit";
 import { SettingsWindow } from "./components/settings/SettingsWindow";
+import { ProjectHome } from './components/projects/ProjectHome'
 import {
   loadEditorPreferences,
   sanitizeEditorPreferences,
@@ -46,6 +47,9 @@ export default function App() {
       break;
     case 'editor':
       content = <VideoEditor theme={theme} />;
+      break;
+    case 'home':
+      content = <ProjectHome />;
       break;
     case 'editing-audit':
       content = <EditingRuntimeAudit />;

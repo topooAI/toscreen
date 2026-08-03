@@ -27,6 +27,24 @@ import {
   projectPathCandidatesForMediaPath,
   projectPathForMediaPath,
 } from './projectFiles'
+import {
+  PACKAGE_EXTENSION,
+  PRESET_EXTENSION,
+  PROJECT_EXTENSION,
+  applyPreset,
+  atomicWriteJson,
+  createPortablePackage,
+  createPreset,
+  importPortablePackage,
+  inspectProjectAssets,
+  readRecentIndex,
+  readJsonWithBackup,
+  validatePreset,
+  writeRecentIndex,
+  type RecentProjectEntry,
+  type ToScreenPreset,
+  transitionProjectDocument,
+} from '../projectLibrary'
 
 let selectedSource: any = null
 let activeRecordingBounds: { x: number; y: number; width: number; height: number } | undefined
@@ -63,6 +81,27 @@ export function registerIpcHandlers(
   getSourceSelectorWindow: () => BrowserWindow | null,
   onRecordingStateChange?: (recording: boolean, sourceName: string) => void
 ) {
+  const libraryDir = path.join(app.getPath('userData'), 'project-library')
+  const recentIndexPath = path.join(libraryDir, 'recent-projects.json')
+  const presetIndexPath = path.join(libraryDir, 'presets.json')
+  let currentProjectPath: string | null = null
+
+  const rememberProject = async (projectPath: string, project: any): Promise<RecentProjectEntry> => {
+    const assets = await inspectProjectAssets(project)
+    const entry: RecentProjectEntry = {
+      id: String(project?.projectModel?.id || project?.id || projectPath),
+      name: String(project?.projectModel?.name || project?.name || path.basename(projectPath, path.extname(projectPath))),
+      projectPath,
+      thumbnailPath: project?.thumbnailPath,
+      updatedAt: String(project?.projectModel?.updatedAt || project?.updatedAt || new Date().toISOString()),
+      durationMs: Number(project?.projectModel?.durationMs || project?.durationMs || 0),
+      assetStatus: assets.missing.length ? 'missing' : 'ready',
+      missingAssets: assets.missing,
+    }
+    const recent = await readRecentIndex(recentIndexPath)
+    await writeRecentIndex(recentIndexPath, [entry, ...recent.filter(item => item.projectPath !== projectPath)].slice(0, 100))
+    return entry
+  }
   // Try to auto-select the primary screen
   (async () => {
     try {
@@ -246,6 +285,7 @@ export function registerIpcHandlers(
     cameraDeviceId?: string
     captureArea?: { x: number; y: number; width: number; height: number }
   }) => {
+    currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'new' })
     const isAvailable = isNativeRecordingAvailable()
     if (!isAvailable) {
       return { success: false, error: 'Native recording is not available on this platform.' }
@@ -576,6 +616,7 @@ export function registerIpcHandlers(
     currentAudioPath = null;
     currentCameraPath = null;
     currentMicrophonePath = null;
+    currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'new' });
     return { success: true };
   });
 
@@ -653,9 +694,11 @@ export function registerIpcHandlers(
   ipcMain.handle('save-project', async (_, videoPath: string, projectData: any) => {
     try {
       if (!videoPath) return { success: false, message: 'No video path provided' };
-      const projectPath = projectPathForMediaPath(videoPath);
-      await fs.writeFile(projectPath, JSON.stringify(projectData, null, 2), 'utf8');
-      return { success: true };
+      const projectPath = currentProjectPath || projectPathForMediaPath(videoPath);
+      await atomicWriteJson(projectPath, projectData);
+      currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'save-as', projectPath })
+      await rememberProject(projectPath, projectData)
+      return { success: true, projectPath };
     } catch (error) {
       console.error('[IPC] Failed to save project:', error);
       return { success: false, error: String(error) };
@@ -669,8 +712,11 @@ export function registerIpcHandlers(
 
       for (const projectPath of candidates) {
         try {
-          const rawData = await fs.readFile(projectPath, 'utf8');
-          return { success: true, project: JSON.parse(rawData), projectPath };
+          const loaded = await readJsonWithBackup(projectPath)
+          const project = loaded.value
+          currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'open', projectPath })
+          await rememberProject(projectPath, project)
+          return { success: true, project, projectPath, recovered: loaded.recovered };
         } catch (error) {
           const code = typeof error === 'object' && error && 'code' in error ? (error as { code?: string }).code : undefined;
           if (code && code !== 'ENOENT') throw error;
@@ -683,6 +729,126 @@ export function registerIpcHandlers(
       return { success: false, message: 'Failed to load project', error: String(error) };
     }
   });
+
+  ipcMain.handle('project-save-as', async (_, projectData: any) => {
+    const owner = getMainWindow() || undefined
+    const result = await dialog.showSaveDialog(owner!, {
+      title: 'Save ToScreen Project As',
+      defaultPath: `${projectData?.projectModel?.name || projectData?.name || 'Untitled'}${PROJECT_EXTENSION}`,
+      filters: [{ name: 'ToScreen Project', extensions: [PROJECT_EXTENSION.slice(1)] }],
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+    })
+    if (result.canceled || !result.filePath) return { success: false, cancelled: true }
+    const projectPath = result.filePath.endsWith(PROJECT_EXTENSION) ? result.filePath : `${result.filePath}${PROJECT_EXTENSION}`
+    const name = path.basename(projectPath, PROJECT_EXTENSION)
+    const next = projectData?.projectModel
+      ? { ...projectData, projectModel: { ...projectData.projectModel, name, updatedAt: new Date().toISOString() } }
+      : { ...projectData, name, updatedAt: new Date().toISOString() }
+    await atomicWriteJson(projectPath, next)
+    currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'save-as', projectPath })
+    await rememberProject(projectPath, next)
+    return { success: true, projectPath, project: next, name }
+  })
+
+  ipcMain.handle('project-get-current', () => ({ projectPath: currentProjectPath }))
+  ipcMain.handle('project-new', () => { currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'new' }); return { success: true } })
+  ipcMain.handle('project-list-recent', async () => {
+    const recent = await readRecentIndex(recentIndexPath)
+    const refreshed = await Promise.all(recent.map(async entry => {
+      try {
+        const loaded = await readJsonWithBackup(entry.projectPath)
+        const project = loaded.value
+        const assets = await inspectProjectAssets(project)
+        return { ...entry, assetStatus: loaded.recovered ? 'recovered' as const : assets.missing.length ? 'missing' as const : 'ready' as const, missingAssets: assets.missing }
+      } catch (error) { return { ...entry, assetStatus: (typeof error === 'object' && error && 'code' in error && (error as any).code === 'ENOENT') ? 'missing-project' as const : 'corrupt' as const } }
+    }))
+    await writeRecentIndex(recentIndexPath, refreshed)
+    return { success: true, projects: refreshed }
+  })
+  ipcMain.handle('project-open', async (_, projectPath: string) => {
+    const loaded = await readJsonWithBackup(projectPath)
+    const project = loaded.value
+    const model = project?.projectModel || project
+    const assets = Array.isArray(model?.assets) ? model.assets : []
+    const screen = assets.find((asset: any) => asset.type === 'screen-recording')
+    const proxy = assets.find((asset: any) => asset.metadata?.role === 'preview-proxy')
+    const audio = assets.find((asset: any) => asset.type === 'audio' && asset.metadata?.role === 'companion-audio')
+    const camera = assets.find((asset: any) => asset.metadata?.role === 'camera-recording')
+    currentVideoPath = screen?.filePath || screen?.sourceUrl || null
+    currentProxyPath = proxy?.filePath || proxy?.sourceUrl || null
+    currentAudioPath = audio?.filePath || audio?.sourceUrl || null
+    currentCameraPath = camera?.filePath || camera?.sourceUrl || null
+    currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'open', projectPath })
+    await rememberProject(projectPath, project)
+    return { success: true, project, projectPath, recovered: loaded.recovered }
+  })
+  ipcMain.handle('project-remove-recent', async (_, projectPath: string) => {
+    await writeRecentIndex(recentIndexPath, (await readRecentIndex(recentIndexPath)).filter(entry => entry.projectPath !== projectPath))
+    return { success: true }
+  })
+  ipcMain.handle('project-delete', async (_, projectPath: string, deleteAssets = false) => {
+    const answer = await dialog.showMessageBox(getMainWindow()!, {
+      type: 'warning', buttons: ['Cancel', 'Delete Project'], defaultId: 0, cancelId: 0,
+      title: 'Delete project?', message: 'Delete this project file?',
+      detail: deleteAssets ? 'Project and referenced source media will be deleted.' : 'Source recordings and imported media will be kept.',
+    })
+    if (answer.response !== 1) return { success: false, cancelled: true }
+    if (deleteAssets) {
+      const project = JSON.parse(await fs.readFile(projectPath, 'utf8'))
+      const assets = await inspectProjectAssets(project)
+      const ownedRoot = path.dirname(projectPath)
+      await Promise.all(assets.ready.filter(asset => path.dirname(asset) === ownedRoot || asset.startsWith(`${ownedRoot}${path.sep}assets${path.sep}`)).map(asset => fs.unlink(asset).catch(() => undefined)))
+    }
+    await fs.unlink(projectPath)
+    await writeRecentIndex(recentIndexPath, (await readRecentIndex(recentIndexPath)).filter(entry => entry.projectPath !== projectPath))
+    return { success: true }
+  })
+  ipcMain.handle('project-relink', async (_, projectPath: string, missingPath: string) => {
+    const result = await dialog.showOpenDialog(getMainWindow()!, { title: `Relink ${path.basename(missingPath)}`, properties: ['openFile'] })
+    if (result.canceled || !result.filePaths[0]) return { success: false, cancelled: true }
+    const projectText = await fs.readFile(projectPath, 'utf8')
+    const project = JSON.parse(projectText.split(missingPath).join(result.filePaths[0]))
+    await atomicWriteJson(projectPath, project)
+    await rememberProject(projectPath, project)
+    return { success: true, project }
+  })
+  ipcMain.handle('project-export-package', async (_, projectPath?: string) => {
+    const source = projectPath || currentProjectPath
+    if (!source) return { success: false, error: 'Save the project before exporting a package.' }
+    const result = await dialog.showSaveDialog(getMainWindow()!, { defaultPath: `${path.basename(source, path.extname(source))}${PACKAGE_EXTENSION}`, filters: [{ name: 'ToScreen Project Package', extensions: [PACKAGE_EXTENSION.slice(1)] }] })
+    if (result.canceled || !result.filePath) return { success: false, cancelled: true }
+    const outputPath = result.filePath.endsWith(PACKAGE_EXTENSION) ? result.filePath : `${result.filePath}${PACKAGE_EXTENSION}`
+    const pkg = await createPortablePackage(source, outputPath)
+    return { success: true, outputPath, assetCount: pkg.assets.length }
+  })
+  ipcMain.handle('project-import-package', async () => {
+    const open = await dialog.showOpenDialog(getMainWindow()!, { properties: ['openFile'], filters: [{ name: 'ToScreen Project Package', extensions: [PACKAGE_EXTENSION.slice(1)] }] })
+    if (open.canceled || !open.filePaths[0]) return { success: false, cancelled: true }
+    const destination = await dialog.showOpenDialog(getMainWindow()!, { title: 'Choose project destination', properties: ['openDirectory', 'createDirectory'] })
+    if (destination.canceled || !destination.filePaths[0]) return { success: false, cancelled: true }
+    const imported = await importPortablePackage(open.filePaths[0], destination.filePaths[0])
+    currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'open', projectPath: imported.projectPath })
+    await rememberProject(imported.projectPath, imported.project)
+    return { success: true, ...imported }
+  })
+
+  const readPresets = async (): Promise<{ presets: ToScreenPreset[]; defaultPresetId?: string }> => {
+    try { const value = JSON.parse(await fs.readFile(presetIndexPath, 'utf8')); return { presets: Array.isArray(value.presets) ? value.presets : [], defaultPresetId: value.defaultPresetId } }
+    catch { return { presets: [] } }
+  }
+  ipcMain.handle('preset-list', async () => ({ success: true, ...(await readPresets()) }))
+  ipcMain.handle('preset-save', async (_, name: string, project: Record<string, unknown>, presetId?: string) => {
+    const index = await readPresets(); const existing = index.presets.find(item => item.id === presetId)
+    const preset = createPreset(name, project, existing)
+    const presets = [preset, ...index.presets.filter(item => item.id !== preset.id)]
+    await atomicWriteJson(presetIndexPath, { version: 1, presets, defaultPresetId: index.defaultPresetId })
+    return { success: true, preset }
+  })
+  ipcMain.handle('preset-delete', async (_, presetId: string) => { const index = await readPresets(); await atomicWriteJson(presetIndexPath, { version: 1, presets: index.presets.filter(item => item.id !== presetId), defaultPresetId: index.defaultPresetId === presetId ? undefined : index.defaultPresetId }); return { success: true } })
+  ipcMain.handle('preset-set-default', async (_, presetId?: string) => { const index = await readPresets(); await atomicWriteJson(presetIndexPath, { version: 1, presets: index.presets, defaultPresetId: presetId }); return { success: true } })
+  ipcMain.handle('preset-apply', async (_, project: Record<string, unknown>, presetId: string) => { const preset = (await readPresets()).presets.find(item => item.id === presetId); if (!preset) throw new Error('Preset not found.'); return { success: true, project: applyPreset(project, preset) } })
+  ipcMain.handle('preset-export', async (_, presetId: string) => { const preset = (await readPresets()).presets.find(item => item.id === presetId); if (!preset) throw new Error('Preset not found.'); const result = await dialog.showSaveDialog(getMainWindow()!, { defaultPath: `${preset.name}${PRESET_EXTENSION}`, filters: [{ name: 'ToScreen Preset', extensions: [PRESET_EXTENSION.slice(1)] }] }); if (result.canceled || !result.filePath) return { success: false, cancelled: true }; const outputPath = result.filePath.endsWith(PRESET_EXTENSION) ? result.filePath : `${result.filePath}${PRESET_EXTENSION}`; await atomicWriteJson(outputPath, preset); return { success: true, outputPath } })
+  ipcMain.handle('preset-import', async () => { const result = await dialog.showOpenDialog(getMainWindow()!, { properties: ['openFile'], filters: [{ name: 'ToScreen Preset', extensions: [PRESET_EXTENSION.slice(1)] }] }); if (result.canceled || !result.filePaths[0]) return { success: false, cancelled: true }; const preset = JSON.parse(await fs.readFile(result.filePaths[0], 'utf8')); validatePreset(preset); const index = await readPresets(); await atomicWriteJson(presetIndexPath, { version: 1, presets: [preset, ...index.presets.filter(item => item.id !== preset.id)], defaultPresetId: index.defaultPresetId }); return { success: true, preset } })
 
   // Proxy Generation API
   ipcMain.handle('generate-proxy-video', async (event, inputPath: string) => {

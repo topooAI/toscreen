@@ -73,6 +73,13 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [cameraPath, setCameraPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState('Untitled Project');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [presets, setPresets] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [defaultPresetId, setDefaultPresetId] = useState('');
+  const defaultPresetAppliedRef = useRef(false);
+  const restoredSavedProjectRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -282,6 +289,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   ), [editingRenderPlan, zoomRegions, annotationRegions, audioRegions, presentationEffects, subtitleRegions]);
 
   const currentProjectModel = useMemo(() => createProjectFromLegacyEditorState({
+    projectName,
     videoPath,
     originalVideoPath,
     companionAudioPath,
@@ -342,6 +350,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     exportQuality,
     editingSession.document,
     presentationEffects,
+    projectName,
   ]);
 
   const currentRenderSettings = useMemo(
@@ -351,6 +360,30 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const updatePresentationEffect = useCallback((id: string, patch: Partial<PresentationEffectRegion>) => setPresentationEffects(current => current.map(effect => effect.id === id ? ({ ...effect, ...patch } as PresentationEffectRegion) : effect)), []);
   const deletePresentationEffect = useCallback((id: string) => { setPresentationEffects(current => current.filter(effect => effect.id !== id)); setSelectedPresentationId(current => current === id ? null : current); }, []);
   const changePresentationSpan = useCallback((id: string, span: Span) => updatePresentationEffect(id, { startMs: Math.round(span.start), endMs: Math.round(span.end) } as Partial<PresentationEffectRegion>), [updatePresentationEffect]);
+
+  const refreshPresets = useCallback(async () => {
+    const result = await window.electronAPI.listPresets();
+    if (result.success) { setPresets(result.presets || []); setDefaultPresetId(result.defaultPresetId || ''); }
+  }, []);
+  useEffect(() => { void refreshPresets() }, [refreshPresets]);
+
+  const saveSnapshot = useCallback(() => createProjectAutosaveSnapshot(currentProjectModel, audioRegions), [currentProjectModel, audioRegions]);
+  const handleSaveAsProject = useCallback(async () => {
+    setSaveStatus('saving');
+    try {
+      const result = await window.electronAPI.saveProjectAs(saveSnapshot());
+      if (result.cancelled) { setSaveStatus('saved'); return; }
+      if (!result.success) throw new Error(result.error || 'Save As failed');
+      setProjectName(result.name); setSaveStatus('saved'); toast.success(`Saved as ${result.name}`);
+    } catch (error) { setSaveStatus('error'); toast.error('Save As failed', { description: String(error) }); }
+  }, [saveSnapshot]);
+
+  const handleCreatePreset = useCallback(async () => {
+    const name = window.prompt('Preset name'); if (!name?.trim()) return;
+    const result = await window.electronAPI.savePreset(name, currentProjectModel);
+    if (result.success) { setSelectedPresetId(result.preset.id); await refreshPresets(); toast.success('Preset saved'); }
+  }, [currentProjectModel, refreshPresets]);
+
 
   const runtimeAudioRegions = useMemo(
     () => resolveRuntimeAudioRegions(currentRenderSettings.timeline.audioRegions, audioRegions),
@@ -564,6 +597,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     if (project.projectModel) {
       const validation = validateVideoEditorProject(project.projectModel);
       if (validation.valid) {
+        setProjectName(project.projectModel.name || 'Untitled Project');
         const restored = restoreLegacyEditorStateFromProjectModel(project.projectModel);
         const screenClip = project.projectModel.clips.find(
           (clip: { type?: string }) => clip.type === "screen-recording",
@@ -660,6 +694,20 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     return "legacy";
   }, [duration, editingSession.restore]);
 
+  const handleApplyPreset = useCallback(async () => {
+    if (!selectedPresetId) return;
+    const result = await window.electronAPI.applyPreset(currentProjectModel, selectedPresetId);
+    if (result.success) { applyLoadedProject({ projectModel: result.project }); toast.success('Preset applied; media and timeline kept'); }
+  }, [applyLoadedProject, currentProjectModel, selectedPresetId]);
+
+  useEffect(() => {
+    if (!originalVideoPath || !defaultPresetId || defaultPresetAppliedRef.current || restoredSavedProjectRef.current) return;
+    defaultPresetAppliedRef.current = true;
+    void window.electronAPI.applyPreset(currentProjectModel, defaultPresetId).then(result => {
+      if (result.success) applyLoadedProject({ projectModel: result.project });
+    });
+  }, [applyLoadedProject, currentProjectModel, defaultPresetId, originalVideoPath]);
+
   useEffect(() => {
     async function loadVideo() {
       try {
@@ -697,6 +745,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           // Try to load auto-saved project
           const projectResult = await window.electronAPI.loadProject(result.path);
           if (projectResult.success && projectResult.project) {
+            restoredSavedProjectRef.current = true;
             const restoredFrom = applyLoadedProject(projectResult.project);
             toast.success("工程已自动恢复");
             console.info(`[ProjectModel] Auto-restored project via ${restoredFrom}`, {
@@ -706,6 +755,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                 : (result as any).audioPath,
             });
           } else {
+            restoredSavedProjectRef.current = false;
             // New recording project! Auto-load the companion recorded audio track if available
             if ((result as any).audioPath) {
               const audioUrl = `file://${(result as any).audioPath.replace(/\\/g, '/')}`;
@@ -789,6 +839,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   useEffect(() => {
     if (!originalVideoPath) return;
     const timeout = setTimeout(() => {
+      setSaveStatus('saving');
       const projectModel = currentProjectModel;
       const projectModelValidation = validateVideoEditorProject(projectModel);
       if (!projectModelValidation.valid) {
@@ -797,9 +848,10 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         console.info("[ProjectModel] Sidecar model warnings", projectModelValidation.warnings);
       }
       const projectData = createProjectAutosaveSnapshot(projectModel, audioRegions);
-      window.electronAPI.saveProject(originalVideoPath, projectData).catch(e => {
-        console.error("Auto-save failed", e);
-      });
+      window.electronAPI.saveProject(originalVideoPath, projectData).then(result => {
+        if (!result.success) throw new Error(result.error || result.message || 'Save failed');
+        setSaveStatus('saved');
+      }).catch(e => { setSaveStatus('error'); console.error("Auto-save failed", e); toast.error('Auto-save failed', { description: String(e) }); });
     }, 1000); // 1s debounce
     return () => clearTimeout(timeout);
   }, [
@@ -1774,11 +1826,23 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           </div>
         </div>
       )}
-      <div
-        className="h-10 flex-shrink-0 z-50"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        aria-hidden="true"
-      />
+      <div className="h-10 flex-shrink-0 z-50 flex items-center gap-2 px-20 border-b border-[var(--ui-border)]" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+        <strong className="text-xs truncate max-w-48">{projectName}</strong>
+        <span className={`text-[10px] ${saveStatus === 'error' ? 'text-red-500' : 'text-[var(--ui-text-secondary)]'}`}>{saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Save failed' : 'Saved'}</span>
+        <div className="ml-auto flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={async () => { if (!originalVideoPath) return; setSaveStatus('saving'); const result = await window.electronAPI.saveProject(originalVideoPath, saveSnapshot()); setSaveStatus(result.success ? 'saved' : 'error'); if (!result.success) toast.error('Save failed', { description: result.error || result.message }); }}>Save</button>
+          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={() => void handleSaveAsProject()}>Save As…</button>
+          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={async () => { const result = await window.electronAPI.exportProjectPackage(); if (result.success) toast.success(`Package exported with ${result.assetCount} assets`); else if (!result.cancelled) toast.error(result.error || 'Package export failed'); }}>Package…</button>
+          <select aria-label="Style preset" value={selectedPresetId} onChange={event => setSelectedPresetId(event.target.value)} className="text-[11px] bg-transparent border border-[var(--ui-border)] rounded px-1 py-1"><option value="">Preset</option>{presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select>
+          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={() => void handleCreatePreset()}>New preset</button>
+          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={() => void handleApplyPreset()}>Apply</button>
+          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={async () => { const selected = presets.find(item => item.id === selectedPresetId); if (!selected) return; await window.electronAPI.savePreset(selected.name, currentProjectModel, selected.id); await refreshPresets(); toast.success('Preset updated'); }}>Update</button>
+          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={async () => { if (!selectedPresetId || !window.confirm('Delete this preset?')) return; await window.electronAPI.deletePreset(selectedPresetId); setSelectedPresetId(''); await refreshPresets(); }}>Delete</button>
+          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={async () => { await window.electronAPI.setDefaultPreset(selectedPresetId); setDefaultPresetId(selectedPresetId); toast.success('Default preset updated'); }}>Default</button>
+          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={async () => { const result = await window.electronAPI.importPreset(); if (result.success) { setSelectedPresetId(result.preset.id); await refreshPresets(); } else if (!result.cancelled) toast.error(result.error || 'Preset import failed'); }}>Import preset</button>
+          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={async () => { const result = await window.electronAPI.exportPreset(selectedPresetId); if (result.success) toast.success('Preset exported'); }}>Export preset</button>
+        </div>
+      </div>
 
       <div className="flex-1 p-1 min-h-0 relative">
         <PanelGroup

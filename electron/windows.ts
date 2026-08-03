@@ -121,6 +121,20 @@ export function createEditorWindow(): BrowserWindow {
   return win
 }
 
+export function createProjectHomeWindow(): BrowserWindow {
+  const isMac = process.platform === 'darwin'
+  const win = new BrowserWindow({
+    width: 1180, height: 760, minWidth: 900, minHeight: 620,
+    ...(isMac && { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 }, vibrancy: 'popover', visualEffectState: 'active' }),
+    title: 'ToScreen', backgroundColor: isMac ? '#00000000' : '#f4f5f7',
+    webPreferences: { preload: path.join(__dirname, 'preload.mjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false },
+  })
+  win.center()
+  if (VITE_DEV_SERVER_URL) win.loadURL(VITE_DEV_SERVER_URL + '?windowType=home')
+  else win.loadFile(path.join(RENDERER_DIST, 'index.html'), { query: { windowType: 'home' } })
+  return win
+}
+
 export function createSettingsWindow(): BrowserWindow {
   const isMac = process.platform === 'darwin'
 

@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   switchToEditor: () => {
     return ipcRenderer.invoke('switch-to-editor')
   },
+  showRecorder: () => ipcRenderer.invoke('show-recorder'),
   openSourceSelector: () => {
     return ipcRenderer.invoke('open-source-selector')
   },
@@ -115,6 +116,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadProject: (videoPath: string) => {
     return ipcRenderer.invoke('load-project', videoPath)
   },
+  saveProjectAs: (projectData: unknown) => ipcRenderer.invoke('project-save-as', projectData),
+  getCurrentProject: () => ipcRenderer.invoke('project-get-current'),
+  newProject: () => ipcRenderer.invoke('project-new'),
+  listRecentProjects: () => ipcRenderer.invoke('project-list-recent'),
+  openProject: (projectPath: string) => ipcRenderer.invoke('project-open', projectPath),
+  removeRecentProject: (projectPath: string) => ipcRenderer.invoke('project-remove-recent', projectPath),
+  deleteProject: (projectPath: string, deleteAssets?: boolean) => ipcRenderer.invoke('project-delete', projectPath, deleteAssets),
+  relinkProjectAsset: (projectPath: string, missingPath: string) => ipcRenderer.invoke('project-relink', projectPath, missingPath),
+  exportProjectPackage: (projectPath?: string) => ipcRenderer.invoke('project-export-package', projectPath),
+  importProjectPackage: () => ipcRenderer.invoke('project-import-package'),
+  listPresets: () => ipcRenderer.invoke('preset-list'),
+  savePreset: (name: string, project: unknown, presetId?: string) => ipcRenderer.invoke('preset-save', name, project, presetId),
+  deletePreset: (presetId: string) => ipcRenderer.invoke('preset-delete', presetId),
+  setDefaultPreset: (presetId?: string) => ipcRenderer.invoke('preset-set-default', presetId),
+  applyPreset: (project: unknown, presetId: string) => ipcRenderer.invoke('preset-apply', project, presetId),
+  exportPreset: (presetId: string) => ipcRenderer.invoke('preset-export', presetId),
+  importPreset: () => ipcRenderer.invoke('preset-import'),
   onProxyGenerationProgress: (callback: (percent: number) => void) => {
     const listener = (_event: any, percent: number) => callback(percent)
     ipcRenderer.on('proxy-generation-progress', listener)
