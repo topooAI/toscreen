@@ -80,7 +80,8 @@ const missingItemNeedles = requiredItemNeedles.filter((needle) => !handleBlock.i
 const missingInteractionNeedles = [
   "const TIMELINE_RESIZE_HIT_AREA_PX = 18;",
   "resizeHandleWidth: TIMELINE_RESIZE_HIT_AREA_PX",
-  "const canTimelineDirectResize = isTrim || isAudio || isAnnotation;",
+  "const canTimelineDirectResize = isTrim || isAudio || isAnnotation",
+  "|| isSpeed",
   "if (!onDirectSpanChange || !canTimelineDirectResize) return;",
 ].filter((needle) => !itemContent.includes(needle));
 const forbiddenItemNeedlesFound = forbiddenItemNeedles.filter((needle) => handleBlock.includes(needle));
@@ -164,7 +165,7 @@ console.log(JSON.stringify({
     "left and right handles share zoomEndCap positioning",
     "dnd-timeline edge hit radius covers the visually inset handle",
     "handles render only a vertical white rounded pill",
-    "Annotation and Audio use direct resize handles; Focus remains on dnd-timeline",
+    "Annotation, Audio, and Speed regions use direct resize handles; Focus remains on dnd-timeline",
     "new Annotation clips receive a full one-second duration and may extend the project",
     "Annotation resize preview, lifecycle, and magnetic snap callbacks are wired",
     "hover/selected states reveal handles for all clip color classes",

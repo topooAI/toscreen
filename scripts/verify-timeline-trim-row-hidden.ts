@@ -39,9 +39,12 @@ const requiredEditorNeedles = [
   "rowId: TRIM_ROW_ID",
   "})) : []",
   "if (!isTrimTrackVisible) {",
-  "buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective).forEach((segment) => {",
+  "const segments = editingSession",
+  "editingSession.document.clips.map((clip, index) => {",
+  ": buildMainClipSegments(trimRegions, sourceTotalMs, mapSourceToEffective)",
+  "segments.forEach((segment) => {",
   "const videoItems = isTrimTrackVisible ? videos : mainClips",
-  "return [...videoItems, ...zooms, ...trims, ...annotations, ...audios]",
+  "return [...videoItems, ...speeds, ...zooms, ...trims, ...annotations, ...audios]",
 ];
 
 const missingEditorNeedles = requiredEditorNeedles.filter(
@@ -86,7 +89,7 @@ console.log(JSON.stringify({
   checked: [
     "Trim track visibility is forced off in TimelineEditor.",
     "Trim items are mounted inside the main video row instead of a standalone Trim row.",
-    "Trim-folded main video clips are generated through buildMainClipSegments.",
+    "Editing Session main clips are rendered in project order, with the legacy Trim-folded segment builder retained as migration fallback.",
     "TimelineEditor does not render a dedicated row-trim Row.",
   ],
 }, null, 2));
