@@ -77,6 +77,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [shadowIntensity, setShadowIntensity] = useState(editorDefaults.shadowIntensity);
   const [showBlur, setShowBlur] = useState(false);
   const [motionBlurEnabled, setMotionBlurEnabled] = useState(editorDefaults.motionBlurEnabled);
+  const [autoFocusEnabled, setAutoFocusEnabled] = useState(true);
   const [borderRadius, setBorderRadius] = useState(editorDefaults.borderRadius);
   const [padding, setPadding] = useState(editorDefaults.padding);
   const [cropRegion, setCropRegion] = useState<CropRegion>(DEFAULT_CROP_REGION);
@@ -87,6 +88,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [annotationRegions, setAnnotationRegions] = useState<AnnotationRegion[]>([]);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [presentationEffects, setPresentationEffects] = useState<PresentationEffectRegion[]>([]);
+  const [selectedPresentationId, setSelectedPresentationId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -302,6 +304,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     exportQuality,
     editingDocument: editingSession.document,
     presentationEffects,
+    autoFocusEnabled,
   }), [
     videoPath,
     originalVideoPath,
@@ -337,6 +340,9 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     () => getProjectRenderSettings(currentProjectModel),
     [currentProjectModel],
   );
+  const updatePresentationEffect = useCallback((id: string, patch: Partial<PresentationEffectRegion>) => setPresentationEffects(current => current.map(effect => effect.id === id ? ({ ...effect, ...patch } as PresentationEffectRegion) : effect)), []);
+  const deletePresentationEffect = useCallback((id: string) => { setPresentationEffects(current => current.filter(effect => effect.id !== id)); setSelectedPresentationId(current => current === id ? null : current); }, []);
+  const changePresentationSpan = useCallback((id: string, span: Span) => updatePresentationEffect(id, { startMs: Math.round(span.start), endMs: Math.round(span.end) } as Partial<PresentationEffectRegion>), [updatePresentationEffect]);
 
   const runtimeAudioRegions = useMemo(
     () => resolveRuntimeAudioRegions(currentRenderSettings.timeline.audioRegions, audioRegions),
@@ -566,13 +572,16 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         setTrimRegions(restored.trimRegions);
         editingSession.restore(restored.editingDocument);
         setAnnotationRegions(restored.annotationRegions);
-        setPresentationEffects(restored.presentationEffects ?? []);
+        const restoredPresentation = restored.presentationEffects ?? [];
+        const cameraAsset = project.projectModel.assets?.find((asset: any) => asset.metadata?.role === 'camera' || asset.metadata?.sourceKind === 'camera');
+        setPresentationEffects(cameraAsset && !restoredPresentation.some(effect => effect.kind === 'presenter') ? [...restoredPresentation, { id: `presenter-${cameraAsset.id}`, kind: 'presenter', startMs: 0, endMs: project.projectModel.durationMs, sourceUrl: cameraAsset.filePath ? toFileUrl(cameraAsset.filePath) : cameraAsset.sourceUrl, posterDataUrl: cameraAsset.metadata?.posterDataUrl, sourceStartMs: Number(cameraAsset.metadata?.sourceStartMs ?? 0), shape: 'circle', bounds: { x: 76, y: 68, width: 18, height: 24 }, visible: true, fit: 'cover' } as PresentationEffectRegion] : restoredPresentation);
         setAudioRegions(restored.audioRegions);
         setCropRegion(restored.cropRegion);
         setWallpaper(restored.wallpaper);
         setShadowIntensity(restored.shadowIntensity);
         setShowBlur(restored.showBlur);
         if (restored.motionBlurEnabled !== undefined) setMotionBlurEnabled(restored.motionBlurEnabled);
+        if (restored.autoFocusEnabled !== undefined) setAutoFocusEnabled(restored.autoFocusEnabled);
         setBorderRadius(restored.borderRadius);
         setPadding(restored.padding);
         setAspectRatio(restored.aspectRatio);
@@ -604,6 +613,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     }
     if (project.annotationRegions) setAnnotationRegions(project.annotationRegions);
     if (Array.isArray(project.presentationEffects)) setPresentationEffects(project.presentationEffects);
+    else if (project.cameraSourceUrl || project.cameraPosterDataUrl) setPresentationEffects([{ id: 'presenter-recording', kind: 'presenter', startMs: 0, endMs: Math.round((project.projectDurationSeconds ?? project.duration ?? 0) * 1000), sourceUrl: project.cameraSourceUrl, posterDataUrl: project.cameraPosterDataUrl, sourceStartMs: Number(project.cameraSourceStartMs ?? 0), shape: 'circle', bounds: { x: 76, y: 68, width: 18, height: 24 }, visible: true, fit: 'cover' }]);
     if (project.audioRegions) {
       const restoredAudio = project.audioRegions.map((ar: any) => ({
         ...ar,
@@ -852,6 +862,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const handleSelectZoom = useCallback((id: string | null) => {
     setSelectedZoomId(id);
     if (id) {
+      setSelectedPresentationId(null);
       setSelectedTrimId(null);
       setSelectedAnnotationId(null);
       setSelectedAudioId(null);
@@ -862,6 +873,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const handleSelectTrim = useCallback((id: string | null) => {
     setSelectedTrimId(id);
     if (id) {
+      setSelectedPresentationId(null);
       setSelectedZoomId(null);
       setSelectedAnnotationId(null);
       setSelectedAudioId(null);
@@ -872,6 +884,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const handleSelectAnnotation = useCallback((id: string | null) => {
     setSelectedAnnotationId(id);
     if (id) {
+      setSelectedPresentationId(null);
       setSelectedZoomId(null);
       setSelectedTrimId(null);
       setSelectedAudioId(null);
@@ -882,9 +895,21 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const handleSelectAudio = useCallback((id: string | null) => {
     setSelectedAudioId(id);
     if (id) {
+      setSelectedPresentationId(null);
       setSelectedZoomId(null);
       setSelectedTrimId(null);
       setSelectedAnnotationId(null);
+      setSelectedVideoId(null);
+    }
+  }, []);
+
+  const handleSelectPresentation = useCallback((id: string | null) => {
+    setSelectedPresentationId(id);
+    if (id) {
+      setSelectedZoomId(null);
+      setSelectedTrimId(null);
+      setSelectedAnnotationId(null);
+      setSelectedAudioId(null);
       setSelectedVideoId(null);
     }
   }, []);
@@ -1004,6 +1029,17 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       ),
     );
   }, [selectedZoomId]);
+  const copySelectedFocus = useCallback(() => {
+    const region = zoomRegions.find(item => item.id === selectedZoomId && item.kind !== 'camera'); if (!region) return;
+    const portable = { version: 1, type: 'toscreen-focus', durationMs: region.endMs - region.startMs, depth: region.depth, focus: region.focus, focusMode: region.focusMode, source: region.source, transition: region.transition ?? 'smooth' };
+    localStorage.setItem('toscreen:focus-clipboard', JSON.stringify(portable));
+    void navigator.clipboard?.writeText(JSON.stringify(portable)).catch(() => {}); toast.success('Focus copied');
+  }, [selectedZoomId, zoomRegions]);
+  const pasteFocus = useCallback(async () => {
+    let raw = localStorage.getItem('toscreen:focus-clipboard'); try { raw = await navigator.clipboard?.readText() || raw; } catch { /* local portable fallback */ }
+    if (!raw) return; try { const data = JSON.parse(raw); if (data.type !== 'toscreen-focus') return; const startMs = Math.round(currentTime * 1000); const region: ZoomRegion = { id: `focus-${Date.now()}`, startMs, endMs: startMs + Math.max(100, Number(data.durationMs)), depth: data.depth, focus: data.focus, focusMode: data.focusMode, source: data.source, transition: data.transition }; setZoomRegions(current => [...current, region]); setSelectedZoomId(region.id); toast.success('Focus pasted'); } catch { toast.error('Clipboard does not contain a Focus clip'); }
+  }, [currentTime]);
+  useEffect(() => { const onKey = (event: KeyboardEvent) => { if (!(event.metaKey || event.ctrlKey) || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return; if (event.key.toLowerCase() === 'c' && selectedZoomId) { event.preventDefault(); copySelectedFocus(); } if (event.key.toLowerCase() === 'v') { event.preventDefault(); void pasteFocus(); } }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [copySelectedFocus, pasteFocus, selectedZoomId]);
 
   const handleZoomDelete = useCallback((id: string) => {
     setZoomRegions((prev) => prev.filter((region) => region.id !== id));
@@ -1268,6 +1304,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
 
   const handleAutoZoom = useCallback(async () => {
+    if (!autoFocusEnabled) { toast.info('Auto Focus is disabled for this project.'); return; }
     if (!originalVideoPath) {
       toast.error("No original video path currently loaded.");
       return;
@@ -1311,7 +1348,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     } finally {
       setLoading(false);
     }
-  }, [originalVideoPath, recordingDurationMs]);
+  }, [autoFocusEnabled, originalVideoPath, recordingDurationMs]);
 
   // Check for available auto-zoom data when video loads
   useEffect(() => {
@@ -1515,6 +1552,10 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
             selectedCameraMotion={selectedZoomId ? zoomRegions.find((region) => region.id === selectedZoomId)?.cameraMotion : null}
             onCameraMotionChange={handleCameraMotionChange}
             onZoomDelete={handleZoomDelete}
+            selectedZoomInstant={zoomRegions.find(region => region.id === selectedZoomId)?.transition === 'instant'}
+            onZoomInstantChange={(instant) => selectedZoomId && setZoomRegions(current => current.map(region => region.id === selectedZoomId ? { ...region, transition: instant ? 'instant' : 'smooth' } : region))}
+            onZoomCopy={copySelectedFocus}
+            onZoomPaste={() => void pasteFocus()}
             selectedTrimId={selectedTrimId}
             onTrimDelete={handleTrimDelete}
             shadowIntensity={shadowIntensity}
@@ -1562,16 +1603,20 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
             onSelectAudio={handleSelectAudio}
             onSeparateAudio={handleSeparateAudio}
             hasOriginalAudio={audioRegions.some(r => r.isOriginal && !r.isDetached)}
+            selectedPresentation={presentationEffects.find(effect => effect.id === selectedPresentationId) ?? null}
+            onPresentationChange={updatePresentationEffect}
+            onPresentationDelete={deletePresentationEffect}
+            playheadMs={Math.round(currentTime * 1000)}
           />
         ), [
           wallpaper, zoomRegions, selectedZoomId, selectedTrimId, shadowIntensity,
           showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, aspectRatio,
           exportQuality, selectedAnnotationId, annotationRegions, cursorSize,
-          cursorSmoothing, showVectorCursor, cursorStyle, cursorCustomImages, cursorOffset, selectedVideoId, selectedAudioId, audioRegions,
-          handleZoomDepthChange, handleZoomDelete, handleCameraMotionChange, handleTrimDelete,
+          cursorSmoothing, showVectorCursor, cursorStyle, cursorCustomImages, cursorOffset, selectedVideoId, selectedAudioId, audioRegions, presentationEffects, selectedPresentationId, currentTime,
+          handleZoomDepthChange, handleZoomDelete, handleCameraMotionChange, handleTrimDelete, copySelectedFocus, pasteFocus,
           handleAnnotationContentChange, handleAnnotationTypeChange,
           handleAnnotationStyleChange, handleAnnotationFigureDataChange, handleAnnotationDelete,
-          videoPlaybackRef.current?.video, handleSeparateAudio, handleSelectAudio, handleCursorStyleChange, handleCursorCustomImagesChange
+          videoPlaybackRef.current?.video, handleSeparateAudio, handleSelectAudio, handleCursorStyleChange, handleCursorCustomImagesChange, updatePresentationEffect, deletePresentationEffect
         ]);
 
   if (loading) {
@@ -1823,13 +1868,20 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                       cursorOffset={currentRenderSettings.cursor.offsetMs}
                       isLayoutResizing={isLayoutResizing}
                       presentationEffects={currentRenderSettings.effects.presentation}
+                      selectedPresentationId={selectedPresentationId}
+                      onSelectPresentation={handleSelectPresentation}
+                      onPresentationBoundsChange={(id, bounds) => {
+                        const effect = presentationEffects.find(item => item.id === id);
+                        if (effect?.kind === 'mask' && effect.follow === 'keyframes') updatePresentationEffect(id, { bounds, followKeyframes: [...effect.followKeyframes.filter(point => Math.abs(point.timeMs - currentTime * 1000) > 1), { timeMs: Math.round(currentTime * 1000), x: bounds.x, y: bounds.y }] } as Partial<PresentationEffectRegion>);
+                        else updatePresentationEffect(id, { bounds } as Partial<PresentationEffectRegion>);
+                      }}
                     />
                     <PresentationToolbar
                       timeMs={Math.round(currentTime * 1000)}
                       durationMs={Math.round(projectDuration * 1000)}
                       effects={presentationEffects}
-                      onAdd={(effect) => setPresentationEffects((current) => [...current, effect])}
-                      onRemove={(id) => setPresentationEffects((current) => current.filter((effect) => effect.id !== id))}
+                      onAdd={(effect) => { setPresentationEffects((current) => [...current, effect]); handleSelectPresentation(effect.id); }}
+                      onRemove={deletePresentationEffect}
                     />
                   </div>
                 </div>
@@ -1885,6 +1937,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                   onSelectAudio={handleSelectAudio}
                   audioRegions={audioRegions}
                   onAutoZoom={handleAutoZoom}
+                  autoFocusEnabled={autoFocusEnabled}
+                  onAutoFocusEnabledChange={setAutoFocusEnabled}
                   isFullScreenBinding={isFullScreenBinding}
                   onFullScreenBindingChange={setIsFullScreenBinding}
                   isPlaying={isPlaying}
@@ -1892,6 +1946,15 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                   selectedVideoId={selectedVideoId}
                   onSelectVideo={setSelectedVideoId}
                   videoPath={videoPath ? toFileUrl(videoPath) : undefined}
+                  presentationEffects={presentationEffects}
+                  selectedPresentationId={selectedPresentationId}
+                  onSelectPresentation={handleSelectPresentation}
+                  onPresentationAdded={(span) => {
+                    const effect: PresentationEffectRegion = { id: `presentation-${Date.now()}`, startMs: Math.round(span.start), endMs: Math.round(span.end), kind: 'cursor-visibility', visible: false };
+                    setPresentationEffects(current => [...current, effect]); setSelectedPresentationId(effect.id);
+                  }}
+                  onPresentationSpanChange={changePresentationSpan}
+                  onPresentationDelete={deletePresentationEffect}
                 />
             </div>
               </div>

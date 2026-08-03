@@ -88,7 +88,9 @@
     "audit:phase1-handoff": "tsx scripts/verify-phase1-handoff-packet.ts",
     "audit:export-audio-render-settings": "tsx scripts/verify-export-audio-render-settings.ts",
     "audit:preview-audio-render-settings": "tsx scripts/verify-preview-audio-render-settings.ts",
-    "audit:presentation": "tsx scripts/verify-presentation-session.ts"
+    "audit:presentation": "tsx scripts/verify-presentation-session.ts",
+    "audit:presentation-ui": "tsx scripts/verify-presentation-ui-integration.ts",
+    "audit:focus-30-35": "tsx scripts/verify-focus-30-35.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

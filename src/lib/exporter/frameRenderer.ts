@@ -9,7 +9,7 @@ import { prepareCursorTrack, sampleCursorTrack } from '@/components/video-editor
 import { drawCursorVisual } from '@/components/video-editor/videoPlayback/cursorVisuals';
 import { clampFocusToStage as clampFocusToStageUtil, videoFocusToStage } from '@/components/video-editor/videoPlayback/focusUtils';
 import { renderAnnotations } from './annotationRenderer';
-import { clickProgress, isCursorHiddenAt } from '@/components/video-editor/presentation/presentationEffects';
+import { activeClickEffect, clickProgress, isCursorHiddenAt } from '@/components/video-editor/presentation/presentationEffects';
 import type { PresentationEffectRegion } from '@/components/video-editor/presentation/types';
 import { renderPresentationEffects } from './presentationRenderer';
 
@@ -246,6 +246,7 @@ export class FrameRenderer {
   private currentVideoTime = 0;
   private cursorTrack: CursorDataPoint[] = [];
   private cursorCustomImages: Partial<Record<CursorCustomState, HTMLImageElement>> = {};
+  private presentationMedia = new Map<string, HTMLVideoElement | HTMLImageElement>();
 
   constructor(config: FrameRenderConfig) {
     this.config = config;
@@ -307,6 +308,7 @@ export class FrameRenderer {
     // Setup background (render separately, not in PixiJS)
     await this.setupBackground();
     await this.setupCustomCursor();
+    await this.setupPresentationMedia();
 
     // Setup blur filter for video container
     this.blurFilter = new BlurFilter();
@@ -435,6 +437,31 @@ export class FrameRenderer {
     this.cursorCustomImages = loaded;
   }
 
+  private async setupPresentationMedia(): Promise<void> {
+    for (const effect of this.config.presentationEffects ?? []) {
+      if (effect.kind !== 'presenter') continue;
+      if (effect.sourceUrl) {
+        const video = document.createElement('video'); video.src = effect.sourceUrl; video.muted = true; video.preload = 'auto';
+        await new Promise<void>((resolve) => { video.onloadedmetadata = () => resolve(); video.onerror = () => resolve(); video.load(); });
+        if (video.readyState >= 1) this.presentationMedia.set(effect.id, video);
+      } else if (effect.posterDataUrl) {
+        const image = new Image(); image.src = effect.posterDataUrl;
+        await new Promise<void>((resolve) => { image.onload = () => resolve(); image.onerror = () => resolve(); });
+        if (image.complete) this.presentationMedia.set(effect.id, image);
+      }
+    }
+  }
+
+  private async seekPresentationMedia(timeMs: number): Promise<void> {
+    for (const effect of this.config.presentationEffects ?? []) {
+      if (effect.kind !== 'presenter' || !effect.sourceUrl) continue;
+      const video = this.presentationMedia.get(effect.id); if (!(video instanceof HTMLVideoElement)) continue;
+      const target = Math.max(0, Math.min(((effect.sourceStartMs ?? 0) + timeMs - effect.startMs) / 1000, Number.isFinite(video.duration) ? video.duration : Infinity));
+      if (Math.abs(video.currentTime - target) < .001) continue;
+      await new Promise<void>((resolve) => { video.onseeked = () => resolve(); video.onerror = () => resolve(); video.currentTime = target; });
+    }
+  }
+
   async renderFrame(videoSource: HTMLVideoElement | VideoFrame | ImageBitmap, timestamp: number): Promise<void> {
     if (!this.app || !this.videoContainer || !this.cameraContainer) {
       throw new Error('Renderer not initialized');
@@ -468,6 +495,7 @@ export class FrameRenderer {
     this.updateLayout();
 
     const timeMs = this.currentVideoTime * 1000;
+    await this.seekPresentationMedia(timeMs);
     const TICKS_PER_FRAME = 1;
     
     let maxMotionIntensity = 0;
@@ -518,17 +546,18 @@ export class FrameRenderer {
       );
     }
     if (this.compositeCtx && this.config.presentationEffects?.length) {
-      renderPresentationEffects(this.compositeCtx, this.config.presentationEffects, this.config.width, this.config.height, timeMs);
+      renderPresentationEffects(this.compositeCtx, this.config.presentationEffects, this.config.width, this.config.height, timeMs, this.presentationMedia);
     }
 
     // Render cursor on top of annotations
     if (this.compositeCtx && this.config.cursorData?.length) {
       const ripple = clickProgress(this.cursorTrack, timeMs);
-      if (ripple) {
-        const radius = 11 + ripple.progress * 36;
+      const clickEffect = activeClickEffect(this.config.presentationEffects ?? [], timeMs);
+      if (ripple && clickEffect) {
+        const radius = (11 + ripple.progress * 36) * clickEffect.size;
         this.compositeCtx.save();
-        this.compositeCtx.globalAlpha = 1 - ripple.progress;
-        this.compositeCtx.strokeStyle = '#ffffff'; this.compositeCtx.lineWidth = 3;
+        this.compositeCtx.globalAlpha = (1 - ripple.progress) * clickEffect.intensity;
+        this.compositeCtx.strokeStyle = clickEffect.style === 'shockwave' ? '#FFD748' : '#ffffff'; this.compositeCtx.lineWidth = 3;
         this.compositeCtx.fillStyle = 'rgba(13,153,255,.20)';
         this.compositeCtx.beginPath(); this.compositeCtx.arc(ripple.point.cx * this.config.width, ripple.point.cy * this.config.height, radius, 0, Math.PI * 2); this.compositeCtx.fill(); this.compositeCtx.stroke();
         this.compositeCtx.restore();
@@ -832,5 +861,7 @@ export class FrameRenderer {
     this.compositeCanvas = null;
     this.compositeCtx = null;
     this.cursorCustomImages = {};
+    for (const media of this.presentationMedia.values()) { if (media instanceof HTMLVideoElement) { media.pause(); media.removeAttribute('src'); media.load(); } }
+    this.presentationMedia.clear();
   }
 }

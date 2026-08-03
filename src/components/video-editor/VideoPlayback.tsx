@@ -21,6 +21,8 @@ import type { createEditingRenderPlan } from './editing';
 import { PresentationOverlay } from "./presentation/PresentationOverlay";
 import type { PresentationEffectRegion } from "./presentation/types";
 import { useClickSound } from "./presentation/useClickSound";
+import { PresentationCanvasEditor } from "./presentation/PresentationCanvasEditor";
+import type { PresentationBounds } from "./presentation/types";
 
 interface VideoPlaybackProps {
   editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
@@ -61,6 +63,9 @@ interface VideoPlaybackProps {
   cursorOffset?: number;
   isLayoutResizing?: boolean;
   presentationEffects?: PresentationEffectRegion[];
+  selectedPresentationId?: string | null;
+  onSelectPresentation?: (id: string | null) => void;
+  onPresentationBoundsChange?: (id: string, bounds: PresentationBounds) => void;
 }
 
 export interface VideoPlaybackRef {
@@ -111,6 +116,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
   isLayoutResizing = false,
   editingRenderPlan,
   presentationEffects = [],
+  selectedPresentationId = null, onSelectPresentation, onPresentationBoundsChange,
 }, ref) => {
   // 1. Refs for DOM elements
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -224,7 +230,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
     mediaDurationMs: sourceDurationMs,
     presentationEffects,
   });
-  useClickSound(cursorData, Math.round(currentTime * 1000), isPlaying);
+  useClickSound(cursorData, presentationEffects, Math.round(currentTime * 1000), isPlaying);
 
   // 4. Props-to-Ref synchronization
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -899,7 +905,8 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
           })()}
         </div>
       )}
-      {pixiReady && videoReady && <PresentationOverlay effects={presentationEffects} cursorData={cursorData.length ? mappedCursorData : []} timeMs={Math.round(currentTime * 1000)} />}
+      {pixiReady && videoReady && <PresentationOverlay effects={presentationEffects} cursorData={cursorData.length ? mappedCursorData : []} timeMs={Math.round(currentTime * 1000)} playing={isPlaying} />}
+      {pixiReady && videoReady && overlayRef.current && <PresentationCanvasEditor effects={presentationEffects} selectedId={selectedPresentationId} timeMs={Math.round(currentTime * 1000)} width={overlayRef.current.clientWidth || 800} height={overlayRef.current.clientHeight || 600} onSelect={(id) => onSelectPresentation?.(id)} onBoundsChange={(id, bounds) => onPresentationBoundsChange?.(id, bounds)} />}
       <video
         ref={videoRef}
         src={videoPath}

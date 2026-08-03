@@ -2,6 +2,8 @@ import type { ExportConfig } from './types';
 import { resolveEditingExportDurations, resolveExportDurationSeconds } from './duration';
 import type { AudioRegion, TrimRegion } from '@/components/video-editor/types';
 import type { createEditingRenderPlan } from '@/components/video-editor/editing';
+import type { PresentationEffectRegion } from '@/components/video-editor/presentation/types';
+import { activeClickEffect } from '@/components/video-editor/presentation/presentationEffects';
 
 type AudioMixerExportConfig = ExportConfig & {
   audioRegions?: AudioRegion[];
@@ -9,6 +11,7 @@ type AudioMixerExportConfig = ExportConfig & {
   projectDurationMs?: number;
   editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
   cursorData?: Array<{ timestamp?: number; timestampMs?: number; isClick?: boolean; type?: string }>;
+  presentationEffects?: PresentationEffectRegion[];
 };
 
 export class AudioMixerExporter {
@@ -151,9 +154,11 @@ export class AudioMixerExporter {
         if (!(point.isClick || point.type === 'click' || point.type === 'mousedown')) continue;
         const clickTime = Number(point.timestamp ?? point.timestampMs) / 1000;
         if (!Number.isFinite(clickTime) || clickTime < 0 || clickTime >= effectiveDuration) continue;
+        const clickConfig = activeClickEffect(this.config.presentationEffects ?? [], clickTime * 1000);
+        if (!clickConfig?.soundEnabled) continue;
         const oscillator = offlineCtx.createOscillator(); const gain = offlineCtx.createGain();
         oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(1150, clickTime); oscillator.frequency.exponentialRampToValueAtTime(520, clickTime + .045);
-        gain.gain.setValueAtTime(.12, clickTime); gain.gain.exponentialRampToValueAtTime(.001, clickTime + .055);
+        gain.gain.setValueAtTime(.12 * clickConfig.soundVolume, clickTime); gain.gain.exponentialRampToValueAtTime(.001, clickTime + .055);
         oscillator.connect(gain); gain.connect(offlineCtx.destination); oscillator.start(clickTime); oscillator.stop(clickTime + .06);
       }
 

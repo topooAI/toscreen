@@ -62,6 +62,7 @@ export interface LegacyEditorProjectInput {
   editingDocument?: EditingDocument;
   now?: Date;
   presentationEffects?: PresentationEffectRegion[];
+  autoFocusEnabled?: boolean;
 }
 
 export interface LegacyProjectDurationInput {
@@ -100,6 +101,7 @@ export interface LegacyEditorRestoredState {
   cursorOffset?: number;
   editingDocument: EditingDocument;
   presentationEffects?: PresentationEffectRegion[];
+  autoFocusEnabled?: boolean;
 }
 
 export function calculateLegacyProjectDurationSeconds(input: LegacyProjectDurationInput): number {
@@ -436,6 +438,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
       trimRegions: input.trimRegions,
       motionBlurEnabled: input.motionBlurEnabled,
       presentationEffects: input.presentationEffects ?? [],
+      autoFocusEnabled: input.autoFocusEnabled ?? true,
     },
   };
 }
@@ -476,6 +479,7 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
   const presentationEffects = Array.isArray(project.legacyState?.presentationEffects)
     ? project.legacyState.presentationEffects as PresentationEffectRegion[]
     : [];
+  const autoFocusEnabled = project.legacyState?.autoFocusEnabled !== false;
 
   return {
     editingDocument,
@@ -507,6 +511,7 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
     showBlur: project.canvas.background.showBlur,
     motionBlurEnabled: legacyMotionBlurEnabled,
     presentationEffects,
+    autoFocusEnabled,
     borderRadius: project.canvas.borderRadius,
     padding: project.canvas.padding,
     aspectRatio: project.canvas.aspectRatio,

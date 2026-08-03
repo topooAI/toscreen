@@ -14,6 +14,7 @@ function easeOut(value: number): number {
 }
 
 function getTransitionDuration(region: ZoomRegion): number {
+  if (region.transition === 'instant') return 0;
   return Math.min(TRANSITION_WINDOW_MS, Math.max(0, (region.endMs - region.startMs) / 2));
 }
 

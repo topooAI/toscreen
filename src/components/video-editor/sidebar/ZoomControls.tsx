@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Copy, ClipboardPaste, Trash2, Zap } from "lucide-react";
 import { KeyboardShortcutsHelp } from "../KeyboardShortcutsHelp";
 import { ZOOM_DEPTH_SCALES, type ZoomDepth } from "../types";
 
@@ -11,6 +11,10 @@ interface ZoomControlsProps {
     onZoomDepthChange?: (depth: ZoomDepth) => void;
     selectedZoomId?: string | null;
     onZoomDelete?: (id: string) => void;
+    instant?: boolean;
+    onInstantChange?: (instant: boolean) => void;
+    onCopy?: () => void;
+    onPaste?: () => void;
 }
 
 const ZOOM_DEPTH_OPTIONS: Array<{ depth: ZoomDepth; label: string }> = (
@@ -25,6 +29,7 @@ export function ZoomControls({
     onZoomDepthChange,
     selectedZoomId,
     onZoomDelete,
+    instant, onInstantChange, onCopy, onPaste,
 }: ZoomControlsProps) {
     const zoomEnabled = Boolean(selectedZoomId);
 
@@ -77,7 +82,7 @@ export function ZoomControls({
                 )}
 
                 {zoomEnabled && (
-                    <Button
+                    <><Button type="button" variant="outline" className="mt-3 h-8 w-full justify-start gap-2" onClick={() => onInstantChange?.(!instant)}><Zap className="h-3.5 w-3.5" />Instant Zoom: {instant ? 'On' : 'Off'}</Button><div className="mt-2 grid grid-cols-2 gap-2"><Button type="button" variant="outline" className="h-8 gap-1" onClick={onCopy}><Copy className="h-3.5 w-3.5" />Copy</Button><Button type="button" variant="outline" className="h-8 gap-1" onClick={onPaste}><ClipboardPaste className="h-3.5 w-3.5" />Paste</Button></div><Button
                         onClick={handleDeleteClick}
                         variant="destructive"
                         size="sm"
@@ -85,7 +90,7 @@ export function ZoomControls({
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                         Delete Zoom Region
-                    </Button>
+                    </Button></>
                 )}
             </div>
         </div>

@@ -35,6 +35,7 @@ import { resolveTimelineSeekFromClientX } from "./timelineSeekMapping";
 import { FALLBACK_TRACK_START_PX, resolveTrackStartPx } from "./timelineTrackOrigin";
 import type { Range, Span } from "dnd-timeline";
 import type { ZoomRegion, TrimRegion, AnnotationRegion, AudioRegion } from "../types";
+import type { PresentationEffectRegion } from "../presentation/types";
 import { v4 as uuidv4 } from 'uuid';
 import type { EditingCommand, EditingDocument, MainTrackTimeMap } from '../editing';
 
@@ -44,6 +45,7 @@ const ZOOM_ROW_ID = "row-zoom-0";
 const CAMERA_ROW_ID = "row-camera-0";
 const TRIM_ROW_ID = "row-trim";
 const SPEED_ROW_ID = "row-speed";
+const PRESENTATION_ROW_ID = "row-presentation";
 
 function TimelineToolTooltip({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -121,6 +123,8 @@ interface TimelineEditorProps {
   onAudioVolumeKeyframesChange?: (id: string, keyframes: any[]) => void;
   onAudioVolumeChange?: (id: string, volume: number) => void;
   onAutoZoom?: () => void;
+  autoFocusEnabled?: boolean;
+  onAutoFocusEnabledChange?: (enabled: boolean) => void;
   isFullScreenBinding: boolean;
   onFullScreenBindingChange: (enabled: boolean) => void;
   isPlaying: boolean;
@@ -130,6 +134,12 @@ interface TimelineEditorProps {
   onTimelineResizeStart?: () => void;
   onTimelineResizeEnd?: () => void;
   videoPath?: string;
+  presentationEffects?: PresentationEffectRegion[];
+  selectedPresentationId?: string | null;
+  onSelectPresentation?: (id: string | null) => void;
+  onPresentationAdded?: (span: Span) => void;
+  onPresentationSpanChange?: (id: string, span: Span) => void;
+  onPresentationDelete?: (id: string) => void;
 }
 
 interface TimelineScaleConfig {
@@ -146,7 +156,7 @@ interface TimelineRenderItem {
   span: Span;
   label: string;
   zoomDepth?: number;
-  variant: 'zoom' | 'trim' | 'annotation' | 'audio' | 'video' | 'speed';
+  variant: 'zoom' | 'trim' | 'annotation' | 'presentation' | 'audio' | 'video' | 'speed';
   sourceUrl?: string;
   sourceStartMs?: number;
   sourceEndMs?: number;
@@ -555,6 +565,9 @@ function Timeline({
   getVisualResizeSnapSpan,
   selectedSpeedId,
   onSelectSpeed,
+  selectedPresentationId,
+  onSelectPresentation,
+  onAddPresentation,
 }: {
   items: TimelineRenderItem[];
   zoomRegions: ZoomRegion[];
@@ -592,6 +605,9 @@ function Timeline({
   getVisualResizeSnapSpan?: (id: string, span: Span, snapThresholdMs: number) => Span;
   selectedSpeedId?: string | null;
   onSelectSpeed?: (id: string | null) => void;
+  selectedPresentationId?: string | null;
+  onSelectPresentation?: (id: string | null) => void;
+  onAddPresentation?: () => void;
 }) {
   
   const trackRenderer = useMemo(() => {
@@ -718,6 +734,19 @@ function Timeline({
         ));
       })()}
 
+      <Row id={PRESENTATION_ROW_ID} onAddClick={onAddPresentation}>
+        {items.filter(item => item.rowId === PRESENTATION_ROW_ID).map((item) => (
+          <Item key={item.id} id={item.id} rowId={item.rowId} span={item.span}
+            isSelected={item.id === selectedPresentationId}
+            onSelect={() => onSelectPresentation?.(item.id)} variant="presentation"
+            onDirectSpanChange={onItemSpanChange} onDirectSpanPreview={onItemResizePreview}
+            onDirectResizeStart={onTimelineResizeStart} onDirectResizeEnd={onTimelineResizeEnd}
+            getVisualSnapSpan={getVisualSnapSpan} getVisualResizeSnapSpan={getVisualResizeSnapSpan}>
+            {item.label}
+          </Item>
+        ))}
+      </Row>
+
       {(() => {
         const annotationRowIds = Array.from(new Set(
           items.filter(item => item.rowId.startsWith("row-annotation-")).map(item => item.rowId)
@@ -790,7 +819,7 @@ function Timeline({
       })()}
     </>
   );
-}, [items, zoomRegions, zoomBoundaryRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onAudioVolumeKeyframesChange, onItemSpanChange, onItemResizePreview, getVisualSnapSpan, getVisualResizeSnapSpan, onTimelineResizeStart, onTimelineResizeEnd]);
+}, [items, zoomRegions, zoomBoundaryRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedPresentationId, selectedAudioId, waveformCache, selectedVideoId, onSelectVideo, onSelectAudio, onSelectPresentation, onAddPresentation, onAudioVolumeKeyframesChange, onItemSpanChange, onItemResizePreview, getVisualSnapSpan, getVisualResizeSnapSpan, onTimelineResizeStart, onTimelineResizeEnd]);
 
 const { setTimelineRef, style, range, pixelsToValue, valueToPixels, direction, setSidebarRef } = useTimelineContext();
   const localTimelineRef = useRef<HTMLDivElement | null>(null);
@@ -932,6 +961,7 @@ export default function TimelineEditor({
   onSelectAudio,
   onAudioVolumeKeyframesChange,
   onAutoZoom,
+  autoFocusEnabled = true, onAutoFocusEnabledChange,
   isFullScreenBinding,
   onFullScreenBindingChange,
   isPlaying,
@@ -943,6 +973,7 @@ export default function TimelineEditor({
   onTimelineResizeStart,
   onTimelineResizeEnd,
   videoPath,
+  presentationEffects = [], selectedPresentationId, onSelectPresentation, onPresentationAdded, onPresentationSpanChange, onPresentationDelete,
 }: TimelineEditorProps) {
   const projectTotalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
   const sourceTotalMs = useMemo(() => Math.max(0, Math.round((sourceVideoDuration ?? videoDuration) * 1000)), [sourceVideoDuration, videoDuration]);
@@ -1031,6 +1062,9 @@ export default function TimelineEditor({
     onAudioDelete(selectedAudioId);
     onSelectAudio(null);
   }, [selectedAudioId, onAudioDelete, onSelectAudio]);
+  const deleteSelectedPresentation = useCallback(() => {
+    if (!selectedPresentationId) return; onPresentationDelete?.(selectedPresentationId); onSelectPresentation?.(null);
+  }, [onPresentationDelete, onSelectPresentation, selectedPresentationId]);
 
   const hasInitializedRangeRef = useRef(activeDurationMs > 0);
   useEffect(() => {
@@ -1324,6 +1358,10 @@ export default function TimelineEditor({
     
     onAnnotationAdded({ start: startPos, end: endPos });
   }, [videoDuration, activeDurationMs, currentTimeMs, onAnnotationAdded]);
+  const handleAddPresentation = useCallback(() => {
+    if (!onPresentationAdded || activeDurationMs <= 0) return;
+    onPresentationAdded({ start: Math.max(0, currentTimeMs), end: Math.min(activeDurationMs, Math.max(0, currentTimeMs) + 1600) });
+  }, [activeDurationMs, currentTimeMs, onPresentationAdded]);
 
   const handleSplitZoom = useCallback(() => {
     if (!selectedZoomId || !onZoomSplit) return;
@@ -1407,12 +1445,14 @@ export default function TimelineEditor({
           deleteSelectedAnnotation();
         } else if (selectedAudioId) {
           deleteSelectedAudio();
+        } else if (selectedPresentationId) {
+          deleteSelectedPresentation();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [addKeyframe, handleAddZoom, handleAddTrim, handleAddAnnotation, deleteSelectedKeyframe, deleteSelectedZoom, deleteSelectedTrim, deleteSelectedAnnotation, deleteSelectedAudio, selectedKeyframeId, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, annotationRegions, currentTime, onSelectAnnotation, editingSession, onSelectVideo, selectedMainClip, splitSelectedMainClip]);
+  }, [addKeyframe, handleAddZoom, handleAddTrim, handleAddAnnotation, deleteSelectedKeyframe, deleteSelectedZoom, deleteSelectedTrim, deleteSelectedAnnotation, deleteSelectedAudio, deleteSelectedPresentation, selectedKeyframeId, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedAudioId, selectedPresentationId, annotationRegions, currentTime, onSelectAnnotation, editingSession, onSelectVideo, selectedMainClip, splitSelectedMainClip]);
 
   const clampedRange = useMemo<Range>(() => {
     const start = Math.max(0, range.start);
@@ -1509,6 +1549,8 @@ export default function TimelineEditor({
       variant: 'speed',
       speedRate: section.rate,
     }));
+    // Presentation effects are already stored in project time. Do not apply the source trim map again.
+    const presentations: TimelineRenderItem[] = presentationEffects.map((region) => ({ id: region.id, rowId: PRESENTATION_ROW_ID, span: { start: region.startMs, end: region.endMs }, label: region.kind.replace('-', ' '), variant: 'presentation' }));
 
     const mainClips: TimelineRenderItem[] = [];
     if (!isTrimTrackVisible) {
@@ -1541,10 +1583,10 @@ export default function TimelineEditor({
     }
 
     const videoItems = isTrimTrackVisible ? videos : mainClips;
-    return [...videoItems, ...speeds, ...zooms, ...trims, ...annotations, ...audios];
+    return [...videoItems, ...speeds, ...zooms, ...trims, ...annotations, ...presentations, ...audios];
   }, [
     isTrimTrackVisible, mapSourceToEffective, sourceTotalMs, zoomRegions,
-    trimRegions, annotationRegions, audioRegions, totalMs, waveformCache, videoPath, editingSession
+    trimRegions, annotationRegions, presentationEffects, audioRegions, totalMs, waveformCache, videoPath, editingSession
   ]);
 
   const getMagneticSnapResultForSpan = useCallback((
@@ -1704,6 +1746,8 @@ export default function TimelineEditor({
       onTrimSpanChange?.(id, targetSpan);
     } else if ((annotationRegions || []).some(r => r.id === id)) {
       onAnnotationSpanChange?.(id, targetSpan);
+    } else if (presentationEffects.some(r => r.id === id)) {
+      onPresentationSpanChange?.(id, span);
     } else if ((audioRegions || []).some(r => r.id === id)) {
       // 音频片段最大时长限制：不允许拖拽超过音频文件的实际时长
       const audioRegion = audioRegions?.find(r => r.id === id);
@@ -1737,7 +1781,7 @@ export default function TimelineEditor({
       }
       onAudioSpanChange?.(id, targetSpan);
     }
-  }, [editingSession, mapEffectiveToProject, zoomRegions, trimRegions, annotationRegions, audioRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, onAudioSpanChange, isTrimTrackVisible, mapEffectiveToSource, sourceTotalMs, safeMinDurationMs]);
+  }, [editingSession, mapEffectiveToProject, zoomRegions, trimRegions, annotationRegions, presentationEffects, audioRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, onPresentationSpanChange, onAudioSpanChange, isTrimTrackVisible, mapEffectiveToSource, sourceTotalMs, safeMinDurationMs]);
 
   const handleItemDragSpanChange = useCallback((id: string, span: Span) => {
     const mainClip = editingSession?.document.clips.find((clip) => clip.id === id);
@@ -1834,6 +1878,7 @@ export default function TimelineEditor({
               </Button>
             </TimelineToolTooltip>
           )}
+          <TimelineToolTooltip label={`Project Auto Focus: ${autoFocusEnabled ? 'On' : 'Off'}`}><Button variant="ghost" size="icon" aria-label="Toggle Project Auto Focus" aria-pressed={autoFocusEnabled} onClick={() => onAutoFocusEnabledChange?.(!autoFocusEnabled)} className={cn('h-7 w-7', autoFocusEnabled ? 'bg-[var(--ui-control)] text-[#7C5CFC]' : 'text-[var(--ui-text-tertiary)]')}><PiMagicWandBold className="h-3 w-3" /></Button></TimelineToolTooltip>
           <TimelineToolTooltip label="Remove Segment (T)">
             <Button
               onClick={handleAddTrim}
@@ -1947,6 +1992,8 @@ export default function TimelineEditor({
             selectedZoomId={selectedZoomId}
             selectedTrimId={selectedTrimId}
             selectedAnnotationId={selectedAnnotationId}
+            selectedPresentationId={selectedPresentationId}
+            onSelectPresentation={onSelectPresentation}
             selectedAudioId={selectedAudioId}
             onSelectAudio={onSelectAudio}
             waveformCache={waveformCache}
@@ -1957,6 +2004,7 @@ export default function TimelineEditor({
             onAddZoom={handleAddZoom}
             onAddCamera={handleAddCamera}
             onAddAnnotation={handleAddAnnotation}
+            onAddPresentation={handleAddPresentation}
             videoRef={videoRef}
             mapSourceToEffective={mapSourceToEffective}
             mapEffectiveToSource={editingSession ? ((timeMs: number) => timeMs) : mapEffectiveToSource}

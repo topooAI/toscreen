@@ -47,6 +47,7 @@ export interface ProjectRenderSettings {
   effects: {
     motionBlurEnabled: boolean;
     presentation: PresentationEffectRegion[];
+    autoFocusEnabled: boolean;
   };
   exportSettings: {
     quality: ExportQuality;
@@ -115,6 +116,7 @@ export function getProjectRenderSettings(project: VideoEditorProject): ProjectRe
     effects: {
       motionBlurEnabled: restored.motionBlurEnabled ?? true,
       presentation: restored.presentationEffects ?? [],
+      autoFocusEnabled: restored.autoFocusEnabled ?? true,
     },
     exportSettings: {
       quality: restored.exportQuality,

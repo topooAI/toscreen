@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict'; import fs from 'node:fs';
+const read = (file: string) => fs.readFileSync(file, 'utf8');
+const timeline = read('src/components/video-editor/timeline/TimelineEditor.tsx'); const item = read('src/components/video-editor/timeline/Item.tsx'); const editor = read('src/components/video-editor/VideoEditor.tsx'); const sidebar = read('src/components/video-editor/sidebar/Sidebar.tsx'); const canvas = read('src/components/video-editor/presentation/PresentationCanvasEditor.tsx'); const settings = read('src/components/video-editor/presentation/PresentationSettingsPanel.tsx');
+for (const needle of ['PRESENTATION_ROW_ID', 'onPresentationAdded', 'onPresentationSpanChange', 'onPresentationDelete', 'selectedPresentationId', 'variant="presentation"']) assert.match(timeline, new RegExp(needle));
+assert.match(item, /isPresentation[\s\S]+canTimelineDirectDrag[\s\S]+isPresentation/); assert.match(item, /canTimelineDirectResize[\s\S]+isPresentation/);
+assert.match(canvas, /onDragStop/); assert.match(canvas, /onResizeStop/); assert.match(canvas, /sampleEffectBounds/);
+for (const needle of ['Cursor visible', 'Mode', 'Follow', 'Style', 'Sound volume', 'Display duration', 'Shape']) assert.match(settings, new RegExp(needle));
+assert.match(sidebar, /PresentationSettingsPanel/); assert.match(editor, /cameraAsset[\s\S]+kind: 'presenter'/); assert.match(editor, /presentationEffects=\{presentationEffects\}/);
+assert.match(timeline, /Presentation effects are already stored in project time/); assert.doesNotMatch(timeline, /presentations[^;]+mapTime\(/);
+console.log(JSON.stringify({ status: 'ok', contract: 'presentation-ui', timeline: ['add','select','drag','resize-left-right','delete'], canvas: ['drag','resize'], inspector: true }));

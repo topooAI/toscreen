@@ -25,6 +25,8 @@ import { LayoutControls } from "./LayoutControls";
 import { ZoomControls } from "./ZoomControls";
 import { CursorControls } from "./CursorControls";
 import { CameraMotionControls } from "./CameraMotionControls";
+import type { PresentationEffectRegion } from "../presentation/types";
+import { PresentationSettingsPanel } from "../presentation/PresentationSettingsPanel";
 
 interface SidebarProps {
     selected: string;
@@ -78,6 +80,14 @@ interface SidebarProps {
     isOriginalAudioSelected?: boolean;
     onSelectAudio?: (id: string | null) => void;
     hasOriginalAudio?: boolean;
+    selectedZoomInstant?: boolean;
+    onZoomInstantChange?: (instant: boolean) => void;
+    onZoomCopy?: () => void;
+    onZoomPaste?: () => void;
+    selectedPresentation?: PresentationEffectRegion | null;
+    onPresentationChange?: (id: string, patch: Partial<PresentationEffectRegion>) => void;
+    onPresentationDelete?: (id: string) => void;
+    playheadMs?: number;
 }
 
 const ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1', '4:3', '4:5'];
@@ -174,6 +184,10 @@ export function Sidebar(props: SidebarProps) {
             />
         </section>
     );
+    if (props.selectedPresentation && props.onPresentationChange && props.onPresentationDelete) {
+        const effect = props.selectedPresentation;
+        return inspector('Presentation', <PresentationSettingsPanel effect={effect} playheadMs={props.playheadMs ?? effect.startMs} onChange={(patch) => props.onPresentationChange!(effect.id, patch)} onDelete={() => props.onPresentationDelete!(effect.id)} />);
+    }
 
     if (selectedAnnotation && props.onAnnotationContentChange && props.onAnnotationTypeChange && props.onAnnotationStyleChange && props.onAnnotationDelete) {
         return inspector(
@@ -253,6 +267,10 @@ export function Sidebar(props: SidebarProps) {
                         onZoomDepthChange={props.onZoomDepthChange}
                         selectedZoomId={props.selectedZoomId}
                         onZoomDelete={props.onZoomDelete}
+                        instant={props.selectedZoomInstant}
+                        onInstantChange={props.onZoomInstantChange}
+                        onCopy={props.onZoomCopy}
+                        onPaste={props.onZoomPaste}
                     />
                 </section>
                 <section className="border-t border-[var(--ui-border)] px-4 py-3">

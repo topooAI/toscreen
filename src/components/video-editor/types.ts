@@ -28,6 +28,7 @@ export interface ZoomRegion {
    * rendering on their own Camera lane. Focus sampling ignores these clips. */
   kind?: 'focus' | 'camera';
   cameraMotion?: CameraMotionPreset;
+  transition?: 'smooth' | 'instant';
 }
 
 export interface CameraMotionTransform {

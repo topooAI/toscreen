@@ -106,7 +106,7 @@ interface ItemProps {
   onSelect?: () => void;
   children?: React.ReactNode;
   zoomDepth?: number;
-  variant?: 'zoom' | 'trim' | 'annotation' | 'video' | 'audio' | 'speed';
+  variant?: 'zoom' | 'trim' | 'annotation' | 'presentation' | 'video' | 'audio' | 'speed';
   isNestedTrim?: boolean;
   audioPeaks?: number[];
   audioPeaksDurationMs?: number;
@@ -187,8 +187,9 @@ function ItemComponent({
   const isAudio = variant === 'audio';
   const isAnnotation = variant === 'annotation';
   const isSpeed = variant === 'speed';
-  const canTimelineDirectDrag = isAudio || isAnnotation || isSpeed;
-  const canTimelineDirectResize = isTrim || isAudio || isAnnotation || isSpeed;
+  const isPresentation = variant === 'presentation';
+  const canTimelineDirectDrag = isAudio || isAnnotation || isSpeed || isPresentation;
+  const canTimelineDirectResize = isTrim || isAudio || isAnnotation || isSpeed || isPresentation;
   const dynamicResizeHandleWidth = isZoom || isTrim
     ? 5
     : 5;

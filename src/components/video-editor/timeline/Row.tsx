@@ -17,6 +17,7 @@ const ROW_METADATA: Record<string, { label: string }> = {
   "row-trim": { label: "Trim" },
   "row-annotation": { label: "Text" },
   "row-audio": { label: "Audio" },
+  "row-presentation": { label: "Presentation" },
 };
 
 export default function Row({ id, children, onAddClick, height = 48 }: RowProps) {
