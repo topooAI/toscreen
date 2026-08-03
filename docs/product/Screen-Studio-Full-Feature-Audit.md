@@ -4,7 +4,7 @@
 审计对象：当前工作区 `/Users/viosson/AITD/1_PROJECTS/P28_TOSCREEN`
 对标范围：Screen Studio 官方 Guide 与 Changelog 中公开的录制、编辑、视觉包装、音频、字幕、项目和导出能力。
 
-当前集成基线：`codex/phase1-integration@e628f0f`
+当前集成基线：`codex/phase1-integration@1441e34`
 
 实时更新规则：只有功能已合入集成分支，并由统筹 Session 完成独立验证后，才把对应行更新为 `Completed`；仅在执行 Agent 分支中完成、尚未合入或尚未验证的功能继续保持 `Not completed`。
 
@@ -25,11 +25,11 @@
 | 基础剪辑 | 10 | 0 | Split、删除、重排、变速、自动加速和 Undo/Redo 已进入统一时间映射 |
 | Focus 与光标 | 13 | 0 | Focus、光标可见性与点击演示效果已形成完整编辑闭环 |
 | 视觉包装 | 8 | 0 | Mask、Highlight、快捷键卡片和 Presenter 摄像头已进入预览与导出 |
-| 音频与字幕 | 5 | 3 | 录制双轨已完成；音乐、转录与字幕仍在待集成分支 |
+| 音频与字幕 | 6 | 2 | 录制双轨与内置音乐已完成；转录跨架构和可见字幕轨仍在补齐 |
 | 项目与预设 | 3 | 4 | 自动保存和恢复已具备，项目管理尚未成型 |
 | 导出与分享 | 5 | 4 | 本地 MP4 导出主链存在，发布分享能力缺失 |
 | 稳定性与验收 | 5 | 1 | 完整机器审计、控件 Wiring 与 Electron 直接启动契约已恢复绿色；真实用户整链验收仍待完成 |
-| **合计** | **60** | **13** | **已完成第一批核心功能集成，第二批项目、字幕与发布能力仍在集成中** |
+| **合计** | **61** | **12** | **已完成第一批核心功能集成，第二批项目、字幕与发布能力仍在集成中** |
 
 功能数量只是审计索引，不代表每项工作量相等。例如“字幕系统”明显比“增加一个导出选项”更大。
 
@@ -105,9 +105,9 @@
 | 46 | 音频波形 | Completed | 有波形解析、缓存与时间线展示 | 波形布局已有验证脚本 |
 | 47 | 音量与音量包络 | Completed | 音频区域具有音量数据和包络编辑 | Preview/Export 音频设置验证通过 |
 | 48 | 麦克风与系统音频独立分轨 | Completed | 录制前可分别控制系统音频和麦克风，录制后生成具有明确 role 的独立素材与 Audio Region | Preview、Mixer、Project Model 和 Export 保留双轨语义 |
-| 49 | 内置背景音乐库 | Not completed | 可以导入自己的音频文件 | 没有内置音乐、试听、分类和授权信息 |
-| 50 | 自动语音转录 | Not completed | 项目模型预留了 transcriptId 等字段 | 没有 Whisper 执行、语言选择、进度和错误处理 |
-| 51 | 字幕编辑、样式与动画 | Not completed | 项目模型允许 subtitle/caption 扩展类型 | 没有字幕轨、文本编辑器、样式、断句和导出渲染 |
+| 49 | 内置背景音乐库 | Completed | 提供两首项目自有 CC0 WAV、授权与 SHA-256 清单、搜索、分类、试听和加入 Audio Track | 开发与打包资源解析、项目保存和音频混合契约已通过 |
+| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper、语言选择、来源选择、进度和取消已经合入 | 当前 helper 仅 arm64，尚未满足 x64 macOS 包；跨架构修复与实际 helper 启动验收完成前不算 Completed |
+| 51 | 字幕编辑、样式与动画 | Not completed | 已有文本编辑、样式、Split/Merge/Delete、项目 roundtrip 和 Preview/Export 渲染 | 尚缺用户可见且可拖动/Resize 的独立 Subtitle 时间线行；不能仅凭 Project Model track 算完成 |
 
 ## 6. 项目、设置与预设
 
@@ -156,7 +156,7 @@
 
 > iPhone/iPad 屏幕录制 → 内置音乐、自动转录和字幕 → Save As / Recent Projects / 便携项目包 / Preset → GIF / 批量导出 / Quick Share / 原始素材提取 → 最终真实用户整链验收。
 
-当前已有 **60 项明确完成能力**，还有 **13 项** 保持 `Not completed`。Recording 音频/字幕与 Editing 项目/预设已经在各自 Agent 分支完成初步验证，但在统筹合入前不会提前改表；每次合入并复验后，本表会继续实时更新。
+当前已有 **61 项明确完成能力**，还有 **12 项** 保持 `Not completed`。内置音乐已合入并复验；自动转录仍需补双架构 helper，字幕仍需补可见时间线轨。Editing 项目/预设已经在 Agent 分支完成初步验证，但在统筹合入前不会提前改表；每次合入并复验后，本表会继续实时更新。
 
 ## 第一阶段建议顺序
 
