@@ -23,6 +23,7 @@ import type { PresentationEffectRegion } from "./presentation/types";
 import { useClickSound } from "./presentation/useClickSound";
 import { PresentationCanvasEditor } from "./presentation/PresentationCanvasEditor";
 import type { PresentationBounds } from "./presentation/types";
+import { resolveSourceDurationSeconds } from "./timeline/timelineMediaAvailability";
 
 interface VideoPlaybackProps {
   editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
@@ -155,6 +156,10 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
 
   const [videoReady, setVideoReady] = useState(false);
   const [sourceDurationMs, setSourceDurationMs] = useState(0);
+  const reportSourceDuration = (nextDuration: number) => {
+    setSourceDurationMs(current => resolveSourceDurationSeconds(current / 1000, nextDuration) * 1000);
+    onDurationChange(nextDuration);
+  };
   const videoSpriteRef = useRef<Sprite | null>(null);
   const maskGraphicsRef = useRef<Graphics | null>(null);
   const blackTailGraphicsRef = useRef<Graphics | null>(null);
@@ -177,10 +182,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
       onTimeUpdate((effectiveMs ?? sourceTime * 1000) / 1000);
     },
     onPlayStateChange,
-    onDurationChange: (nextDuration) => {
-      setSourceDurationMs(Math.max(0, nextDuration * 1000));
-      onDurationChange(nextDuration);
-    },
+    onDurationChange: reportSourceDuration,
     onLoadedMetadata: () => {},
     trimRegionsRef,
     layoutVideoContent: () => layoutVideoContentRef.current?.(),
@@ -807,7 +809,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
 
   const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const video = e.currentTarget;
-    onDurationChange(video.duration);
+    reportSourceDuration(video.duration);
     video.currentTime = 0;
     video.pause();
     allowPlaybackRef.current = false;
@@ -916,7 +918,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
         playsInline
         onLoadedMetadata={handleLoadedMetadata}
         onDurationChange={e => {
-          onDurationChange(e.currentTarget.duration);
+          reportSourceDuration(e.currentTarget.duration);
         }}
         onError={() => {
           if (videoPath) onError('Failed to load video');

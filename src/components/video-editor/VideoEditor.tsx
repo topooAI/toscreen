@@ -60,7 +60,7 @@ import { recordedShortcutEffects } from './presentation/presentationEffects';
 import { expandPendingPresenterDuration, presenterEffectFromCameraPath } from './project/presenterContract';
 import { MediaFeaturesPanel } from './MediaFeaturesPanel';
 import { deleteSubtitle, updateSubtitleSpan, type SubtitleRegion } from './mediaFeatures';
-import { restoredSourceDurationSeconds } from './timeline/timelineMediaAvailability';
+import { resolveSourceDurationSeconds, restoredSourceDurationSeconds } from './timeline/timelineMediaAvailability';
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -870,7 +870,11 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   ]);
 
   const handleDurationChange = useCallback((dur: number) => {
-    setDuration(dur);
+    // Chromium can emit durationchange with 0/NaN/Infinity while a restored
+    // file source is attaching. Never let that transient metadata erase the
+    // validated duration seeded from the project model.
+    if (!Number.isFinite(dur) || dur <= 0) return;
+    setDuration(current => resolveSourceDurationSeconds(current, dur));
     setPresentationEffects(current => expandPendingPresenterDuration(current, dur * 1000));
     // Sync videoElementRef when duration is first reported (video element is definitely ready)
     if (videoPlaybackRef.current?.video) {

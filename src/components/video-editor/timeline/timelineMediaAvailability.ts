@@ -12,3 +12,8 @@ export function restoredSourceDurationSeconds(projectModel: any): number {
 export function timelineMediaIsAvailable(videoPath: string | undefined, videoDurationSeconds: number): boolean {
   return Boolean(videoPath && Number.isFinite(videoDurationSeconds) && videoDurationSeconds > 0)
 }
+
+export function resolveSourceDurationSeconds(currentSeconds: number, metadataSeconds: number): number {
+  if (Number.isFinite(metadataSeconds) && metadataSeconds > 0) return metadataSeconds
+  return Number.isFinite(currentSeconds) && currentSeconds > 0 ? currentSeconds : 0
+}

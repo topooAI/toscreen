@@ -7,7 +7,7 @@ import {
   transitionProjectDocument,
 } from '../electron/projectLibrary'
 import { createProjectFromLegacyEditorState } from '../src/components/video-editor/project/legacyAdapter'
-import { restoredSourceDurationSeconds, timelineMediaIsAvailable } from '../src/components/video-editor/timeline/timelineMediaAvailability'
+import { resolveSourceDurationSeconds, restoredSourceDurationSeconds, timelineMediaIsAvailable } from '../src/components/video-editor/timeline/timelineMediaAvailability'
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'toscreen-projects-'))
 try {
@@ -17,6 +17,10 @@ try {
   assert.equal(timelineMediaIsAvailable('file:///project/media.mov', restoredDuration), true, 'A restored Preview source must make its Timeline available before media metadata fires')
   assert.equal(timelineMediaIsAvailable(undefined, restoredDuration), false, 'Persisted duration without hydrated media must not hide the missing-video state')
   assert.equal(timelineMediaIsAvailable('file:///project/media.mov', 0), false, 'A path without a valid duration is not a usable Timeline source')
+  assert.equal(resolveSourceDurationSeconds(restoredDuration, 0), restoredDuration, 'transient zero metadata must not erase a restored source duration')
+  assert.equal(resolveSourceDurationSeconds(restoredDuration, Number.NaN), restoredDuration, 'NaN metadata must not erase a restored source duration')
+  assert.equal(resolveSourceDurationSeconds(restoredDuration, Number.POSITIVE_INFINITY), restoredDuration, 'stream-style infinite metadata must not erase a restored source duration')
+  assert.equal(resolveSourceDurationSeconds(restoredDuration, 14.25), 14.25, 'valid media metadata remains authoritative')
   const handlersSource = await fs.readFile(path.join(process.cwd(), 'electron/ipc/handlers.ts'), 'utf8')
   assert.match(handlersSource, /project-open[\s\S]*?const media = hydrateMedia\(project\)/, 'Recent open hydrates all current media')
   assert.match(handlersSource, /project-import-package[\s\S]*?const media = hydrateMedia\(imported\.project\)/, 'package import hydrates package-local media before Editor')
