@@ -1524,12 +1524,15 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           totalDurationMs: recordingDurationMs,
         }),
       }));
-      const bestCandidate = telemetryCandidates.reduce((best, candidate) => {
-        if (candidate.regions.length !== best.regions.length) {
-          return candidate.regions.length > best.regions.length ? candidate : best;
-        }
-        return candidate.events.length > best.events.length ? candidate : best;
-      });
+      // The recording sidecar owns the precise media clock and remains
+      // authoritative whenever it can produce a camera plan. The saved project
+      // is a recovery source, not a competing generator that may change a
+      // previously stable result by contributing additional native samples.
+      const sidecarCandidate = telemetryCandidates[0];
+      const projectCandidate = telemetryCandidates[1];
+      const bestCandidate = sidecarCandidate.regions.length > 0
+        ? sidecarCandidate
+        : projectCandidate;
       const newRegions = bestCandidate.regions;
 
       if (newRegions.length === 0) {
