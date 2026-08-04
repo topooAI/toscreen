@@ -99,6 +99,7 @@
     "build:transcriber-helper": "bash scripts/build-transcriber-helper.sh",
     "build:ios-device-helper": "bash scripts/build-ios-device-capture-helper.sh",
     "audit:ios-device-capture": "tsx scripts/test-ios-device-capture.ts",
+    "accept:ios-device": "node --import tsx scripts/accept-ios-device-hardware.ts",
     "audit:export-share": "tsx scripts/verify-export-share.ts",
     "audit:share-worker": "tsx services/share-worker/test.ts"
   },
