@@ -107,7 +107,7 @@
 | 46 | 音频波形 | Completed | 有波形解析、缓存与时间线展示 | 波形布局已有验证脚本 |
 | 47 | 音量与音量包络 | Completed | 音频区域具有音量数据和包络编辑 | Preview/Export 音频设置验证通过 |
 | 48 | 麦克风与系统音频独立分轨 | Completed | 录制前可分别控制系统音频和麦克风，录制后生成具有明确 role 的独立素材与 Audio Region | Preview、Mixer、Project Model 和 Export 保留双轨语义 |
-| 49 | 内置背景音乐库 | Completed | 提供两首项目自有 CC0 WAV、授权与 SHA-256 清单、搜索、分类、试听和加入 Audio Track；入口已接入右侧 Inspector 标题栏，不再以黑色绝对定位按钮遮挡顶部 Preset 区域 | 开发与打包资源解析、项目保存和音频混合契约已通过；2026-08-04 浅色主题实测面板为语义化浅色背景和深色文字 |
+| 49 | 内置背景音乐库 | Completed | 提供两首项目自有 CC0 WAV、授权与 SHA-256 清单、搜索、分类、试听和加入 Audio Track；入口已接入右侧 Inspector 标题栏，不再以黑色绝对定位按钮遮挡顶部 Preset 区域 | 开发与打包资源解析、项目保存和音频混合契约已通过；2026-08-04 浅色主题与新 arm64 正式包均实测黑块消失，面板为语义化浅色背景和深色文字 |
 | 50 | 自动语音转录 | Completed | 本地 macOS Speech helper 是 arm64+x86_64 universal、独立 ad-hoc 签名应用；语言/来源选择、进度、取消和错误处理已合入；`npm run accept:transcription` 使用与产品一致的 App Bundle/TCC 身份 | 2026-08-04 开启系统听写后统筹实跑为 `completed`：Speech Recognition `authorized`，得到 8 个非空分段，并完成字幕编辑、项目保存重开及 Preview/Export 共用数据合同；真实用户项目观感和正式签名重装稳定性继续归入 #73 最终验收 |
 | 51 | 字幕编辑、样式与动画 | Completed | 独立 Subtitle 时间线行支持选择、拖动、左右 Resize 和删除；音乐/字幕面板作为右侧 Inspector 正常导航页面打开，支持文本、时间、字体、字号、颜色、位置、对齐、Split/Merge 和 Fade/Pop | Timeline、Panel、Project Model、Preview、Export 共用字幕状态；三轮保存恢复幂等、Preview/Export 契约和 Inspector 入口回归均通过 |
 
