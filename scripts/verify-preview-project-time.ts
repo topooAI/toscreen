@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createEditingRenderPlan } from "../src/components/video-editor/editing/renderPlan";
+import { MAX_SOURCE_FRAME_SEEK_RETRIES, resolveSourceFrameSeekDecision } from "../src/lib/exporter/sourceFrameSeek";
 
 const repoRoot = process.cwd();
 const videoPlaybackPath = path.join(
@@ -89,12 +90,51 @@ if (Math.abs(sampledSourceFocusStartMs - sourceFocusStartMs) > 0.001) {
   fail("Preview Focus sampling must map the compressed timeline position back to its source timestamp.", { sampledSourceFocusStartMs });
 }
 
+const vfrNearestFrame = resolveSourceFrameSeekDecision({
+  actualSourceTimeMs: 647,
+  targetSourceTimeMs: 622,
+  sourceFrameRate: 55.68,
+  retryCount: 0,
+});
+if (vfrNearestFrame.retry || vfrNearestFrame.acceptNearest) {
+  fail("A nearby VFR source frame must be accepted without seeking again.", vfrNearestFrame);
+}
+const boundedSeek = resolveSourceFrameSeekDecision({
+  actualSourceTimeMs: 540,
+  targetSourceTimeMs: 622,
+  sourceFrameRate: 55.68,
+  retryCount: MAX_SOURCE_FRAME_SEEK_RETRIES,
+});
+if (boundedSeek.retry || !boundedSeek.acceptNearest) {
+  fail("A source frame must be accepted after the bounded seek budget is exhausted.", boundedSeek);
+}
+const retryDistantFrame = resolveSourceFrameSeekDecision({
+  actualSourceTimeMs: 540,
+  targetSourceTimeMs: 622,
+  sourceFrameRate: 55.68,
+  retryCount: 0,
+});
+if (!retryDistantFrame.retry || retryDistantFrame.acceptNearest) {
+  fail("A distant source frame must retry while the bounded seek budget remains.", retryDistantFrame);
+}
+assertIncludes(
+  videoExporter,
+  "await seekVideoToSourceTime(target.sourceTimeMs / 1000)",
+  "Speed export must wait for source seeking to settle before requesting another decoded frame.",
+);
+assertIncludes(
+  videoExporter,
+  "sourceSeekRetryCount += 1",
+  "Speed export must count retries per effective frame.",
+);
+
 console.log(JSON.stringify({
   status: "ok",
   checks: [
     "VideoPlayback visual time derives from shared effective time",
     "Focus timeline placement uses effective time while Preview samples source time",
     "Export maps effective frames back to source-domain Focus and cursor time",
+    "Speed export accepts nearest VFR frames with bounded settled-seek retries",
     "Preview has black-tail layer after source video end",
     "VideoEditor guards source-video tail events from resetting project time",
   ],

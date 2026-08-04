@@ -8,6 +8,7 @@ import { resolveEditingExportDurations, resolveExportDurationSeconds, shouldRend
 import type { ZoomRegion, CropRegion, TrimRegion, AnnotationRegion, AudioRegion, CursorCustomImageMap, CursorStylePreset } from '@/components/video-editor/types';
 import type { createEditingRenderPlan } from '@/components/video-editor/editing';
 import type { PresentationEffectRegion } from '@/components/video-editor/presentation/types';
+import { resolveSourceFrameSeekDecision } from './sourceFrameSeek';
 
 interface VideoExporterConfig extends ExportConfig {
   editingRenderPlan?: ReturnType<typeof createEditingRenderPlan>;
@@ -186,6 +187,8 @@ export class VideoExporter {
       const mainTrackExpectedFrames = Math.floor((mainTrackDurationMs / 1000) * this.config.frameRate);
       let totalFramesExported = 0;
       let isExportingFrames = true;
+      let sourceSeekFrameIndex = -1;
+      let sourceSeekRetryCount = 0;
 
       const reportFrameProgress = () => {
         if (totalFramesExported % 5 === 0) {
@@ -203,6 +206,29 @@ export class VideoExporter {
         while (this.encodeQueue >= this.MAX_ENCODE_QUEUE && !this.cancelled) {
           await new Promise(resolve => setTimeout(resolve, 10));
         }
+      };
+
+      const seekVideoToSourceTime = async (targetSourceTimeSec: number) => {
+        await new Promise<void>((resolve) => {
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeoutId);
+            videoElement.removeEventListener('seeked', finish);
+            videoElement.removeEventListener('error', finish);
+            resolve();
+          };
+          const timeoutId = window.setTimeout(finish, 1500);
+          videoElement.addEventListener('seeked', finish, { once: true });
+          videoElement.addEventListener('error', finish, { once: true });
+          videoElement.currentTime = targetSourceTimeSec;
+          if (!videoElement.seeking) {
+            window.requestAnimationFrame(() => {
+              if (!videoElement.seeking) finish();
+            });
+          }
+        });
       };
 
       const encodeRenderedFrame = async (source: ImageBitmap | HTMLVideoElement, frameIndex: number) => {
@@ -278,8 +304,23 @@ export class VideoExporter {
         const renderPlan = this.config.editingRenderPlan;
         if (renderPlan) {
           const target = renderPlan.exportSample((totalFramesExported / this.config.frameRate) * 1000);
-          if (Math.abs(sourceTimeSec * 1000 - target.sourceTimeMs) > 20) {
-            videoElement.currentTime = target.sourceTimeMs / 1000;
+          if (sourceSeekFrameIndex !== totalFramesExported) {
+            sourceSeekFrameIndex = totalFramesExported;
+            sourceSeekRetryCount = 0;
+          }
+          const seekDecision = resolveSourceFrameSeekDecision({
+            actualSourceTimeMs: sourceTimeSec * 1000,
+            targetSourceTimeMs: target.sourceTimeMs,
+            sourceFrameRate: videoInfo.frameRate,
+            retryCount: sourceSeekRetryCount,
+          });
+          if (seekDecision.retry) {
+            sourceSeekRetryCount += 1;
+            await seekVideoToSourceTime(target.sourceTimeMs / 1000);
+            if (this.cancelled) {
+              isExportingFrames = false;
+              return;
+            }
             videoElement.requestVideoFrameCallback(processFrame);
             videoElement.play().catch(() => {});
             return;
@@ -355,6 +396,8 @@ export class VideoExporter {
               if (!encoded) break;
 
               totalFramesExported++;
+              sourceSeekFrameIndex = -1;
+              sourceSeekRetryCount = 0;
             }
             
             sourceBitmap.close();
