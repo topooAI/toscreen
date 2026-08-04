@@ -5,6 +5,7 @@ const repoRoot = process.cwd();
 
 const files = {
   packageJson: path.join(repoRoot, "package.json"),
+  electronBuilder: path.join(repoRoot, "electron-builder.json5"),
   viteConfig: path.join(repoRoot, "vite.config.ts"),
   electronWindows: path.join(repoRoot, "electron", "windows.ts"),
   electronMain: path.join(repoRoot, "electron", "main.ts"),
@@ -29,6 +30,13 @@ const checks = [
     file: "packageJson",
     needles: [
       "\"dev:editor\": \"TOSCREEN_DEV_WINDOW_TYPE=editor vite\"",
+    ],
+  },
+  {
+    area: "toscreen-application-identity",
+    file: "electronBuilder",
+    needles: [
+      '"appId": "ai.topoo.toscreen"',
     ],
   },
   {
