@@ -44,7 +44,7 @@
 | 3 | 鼠标、点击与输入事件采集 | Completed | 独立 sidecar 记录鼠标位置、点击和键盘输入事件 | 已能供光标渲染和 Auto Focus 使用 |
 | 4 | 单窗口录制 | Completed | 所选 Electron DesktopCapturer Window ID 会传给 ScreenCaptureKit 原生录制器并限制到目标窗口 | `audit:recording-session` 与 Recording contract 已通过 |
 | 5 | 自定义区域录制 | Completed | Area 入口提供跨显示器可拖动、可缩放的区域选择框，并传递绝对坐标到原生录制 | 已覆盖负坐标显示器与区域边界 |
-| 6 | iPhone / iPad 录制 | Not completed | 已实现 AVFoundation `.external` / `.muxed` 有线设备屏幕发现、状态、预览、录制、取消和 Editor 恢复链；Continuity Camera 不会冒充屏幕源 | universal helper 与无设备运行验证通过，但本机未发现有线 iPhone/iPad，尚缺至少 5 秒真机录制、锁屏/断开和恢复验收 |
+| 6 | iPhone / iPad 录制 | Not completed | 已实现 AVFoundation `.external` / `.muxed` 有线设备屏幕发现、状态、预览、录制、取消和 Editor 恢复链；Continuity Camera 不会冒充屏幕源 | universal helper 与无设备运行验证通过，但本机实际枚举为 `devices: 0`；尚缺至少 5 秒真机录制、锁屏/断开、Editor 恢复，以及正式签名/公证验收 |
 | 7 | 摄像头录制 | Completed | 可发现、预览和选择 Camera/Continuity Camera，并生成独立 Presenter Camera 素材和轨道 | Recording 与 Presentation 资产契约已联通 |
 | 8 | 麦克风选择、开关和电平 | Completed | 录制启动栏支持麦克风设备选择、开关、电平和权限状态 | 选择结果进入原生录制参数并生成独立麦克风素材 |
 | 9 | 系统音频选择与开关 | Completed | 录制前可独立开关系统音频，并在失败时返回明确状态 | 录制结果以独立系统音频素材恢复 |
@@ -108,7 +108,7 @@
 | 47 | 音量与音量包络 | Completed | 音频区域具有音量数据和包络编辑 | Preview/Export 音频设置验证通过 |
 | 48 | 麦克风与系统音频独立分轨 | Completed | 录制前可分别控制系统音频和麦克风，录制后生成具有明确 role 的独立素材与 Audio Region | Preview、Mixer、Project Model 和 Export 保留双轨语义 |
 | 49 | 内置背景音乐库 | Completed | 提供两首项目自有 CC0 WAV、授权与 SHA-256 清单、搜索、分类、试听和加入 Audio Track | 开发与打包资源解析、项目保存和音频混合契约已通过 |
-| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper 已是 arm64+x86_64 universal binary；语言/来源选择、进度、取消和错误处理已合入，两个架构均可实际启动 | 真实语音验收已进入正式 Editor，但 macOS 当前返回 Speech Recognition 未授权/拒绝；允许 ToScreen 语音识别后仍需完成“识别 → 生成字幕 → 编辑 → 保存 → 导出”闭环 |
+| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper 已是 arm64+x86_64 universal binary；语言/来源选择、进度、取消和错误处理已实现；当前 TCC 已允许 ToScreen 与 helper 使用 Speech Recognition | 权限修复和 helper 改动尚未提交，仍缺真实语音产生非空字幕，以及“识别 → 编辑 → 保存重开 → 预览 → 导出”端到端；还需验证正式签名和重装后的授权稳定性 |
 | 51 | 字幕编辑、样式与动画 | Completed | 独立 Subtitle 时间线行支持选择、拖动、左右 Resize 和删除；面板支持文本、时间、字体、字号、颜色、位置、对齐、Split/Merge 和 Fade/Pop | Timeline、Panel、Project Model、Preview、Export 共用字幕状态；三轮保存恢复幂等和 Preview/Export 契约通过 |
 
 ## 6. 项目、设置与预设
