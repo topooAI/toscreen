@@ -861,12 +861,15 @@ const { setTimelineRef, style, range, pixelsToValue, valueToPixels, direction, s
       return;
     }
 
-    if (!onSeek || videoDurationMs <= 0) return;
-    
     onSelectZoom?.(null);
     onSelectTrim?.(null);
     onSelectAnnotation?.(null);
     onSelectAudio?.(null);
+    onSelectPresentation?.(null);
+    onSelectSubtitle?.(null);
+    onSelectVideo(null);
+
+    if (!onSeek || videoDurationMs <= 0) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const seek = resolveTimelineSeekFromClientX({
@@ -884,7 +887,7 @@ const { setTimelineRef, style, range, pixelsToValue, valueToPixels, direction, s
       `[TimelineSeek] rawX=${seek.rawX.toFixed(1)} trackStart=${trackStartPx.toFixed(1)} effectiveMs=${seek.effectiveMs.toFixed(1)} sourceMs=${seek.sourceMs.toFixed(1)}`
     );
     onSeek(seek.sourceMs / 1000);
-  }, [isTimelineResizing, trackStartPx, range.start, pixelsToValue, onSeek, videoDurationMs, onSelectZoom, onSelectTrim, onSelectAnnotation, onSelectAudio, isTrimTrackVisible, mapEffectiveToSource]);
+  }, [isTimelineResizing, trackStartPx, range.start, pixelsToValue, onSeek, videoDurationMs, onSelectZoom, onSelectTrim, onSelectAnnotation, onSelectAudio, onSelectPresentation, onSelectSubtitle, onSelectVideo, isTrimTrackVisible, mapEffectiveToSource]);
 
   return (
     <div

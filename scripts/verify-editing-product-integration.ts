@@ -44,6 +44,24 @@ assert.ok(sidebar.includes("return inspector(\n            'Canvas',"));
 assert.ok(sidebar.includes('data-inspector-section="video-playback"'));
 assert.ok(sidebar.includes('{canvasInspector}'));
 assert.ok(sidebar.indexOf('const canvasInspector = (') < sidebar.indexOf('data-inspector-section="video-playback"'));
+const blankTimelineClickHandler = timeline.slice(
+  timeline.indexOf('const handleTimelineClick'),
+  timeline.indexOf('return (', timeline.indexOf('const handleTimelineClick')),
+);
+for (const clearSelection of [
+  'onSelectZoom?.(null);',
+  'onSelectTrim?.(null);',
+  'onSelectAnnotation?.(null);',
+  'onSelectAudio?.(null);',
+  'onSelectPresentation?.(null);',
+  'onSelectSubtitle?.(null);',
+  'onSelectVideo(null);',
+]) {
+  assert.ok(
+    blankTimelineClickHandler.includes(clearSelection),
+    `Timeline blank-space click must clear the active Inspector selection: ${clearSelection}`,
+  );
+}
 assert.deepEqual(
   migrateLegacyTrimsToEditingDocument([{ id: 'legacy-cut', startMs: 2000, endMs: 4000 }], 6000).clips.map((clip) => [clip.sourceStartMs, clip.sourceEndMs]),
   [[0, 2000], [4000, 6000]],
@@ -83,5 +101,6 @@ console.log(JSON.stringify({ status: 'ok', checks: [
   'Project Model persists and migrates EditingDocument',
   'Preview/VideoExporter/AudioMixerExporter consume editing render plan',
   'Preview applies speed sections from the media playback clock',
+  'Timeline blank space clears Main Clip and other Inspector selections',
   'recorded keydown sidecar remains available to the editing speed engine',
 ] }, null, 2));
