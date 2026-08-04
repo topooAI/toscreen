@@ -20,7 +20,7 @@ for (const [content, needles] of [
   [timeline, ['aria-label="Split Main Clip"', 'aria-label="Delete Main Clip"', 'aria-label="Add Speed Region"', 'aria-label="Selected Speed Region rate"', "type: 'reorder'", 'variant="speed"', "editingSession?.redo()", "editingSession?.undo()"]],
   [projectTypes, ['editingDocument?: EditingDocument']],
   [legacyAdapter, ['migrateLegacyTrimsToEditingDocument', 'editingDocument: input.editingDocument']],
-  [playback, ['resolvePlaybackRate: (sourceTimeMs)', 'editingRenderPlan.timeMap.rateAtProjectTime', 'editingRenderPlan.timeMap.clips[clipIndex + 1]']],
+  [playback, ['const resolvePlaybackRate = useCallback', 'vid.playbackRate = resolvePlaybackRate(vid.currentTime * 1000)', 'editingRenderPlan.timeMap.rateAtProjectTime', 'editingRenderPlan.timeMap.clips[clipIndex + 1]']],
   [videoEvents, ['syncPlaybackRate(video.currentTime * 1000)', 'video.playbackRate = rate']],
   [exporter, ['editingRenderPlan.exportSample', 'this.config.editingRenderPlan']],
   [audioExporter, ['timeMap.mapProjectToSource', 'source.playbackRate.value = rate']],

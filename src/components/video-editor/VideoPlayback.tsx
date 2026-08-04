@@ -164,6 +164,11 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
   const maskGraphicsRef = useRef<Graphics | null>(null);
   const blackTailGraphicsRef = useRef<Graphics | null>(null);
   const blurFilterRef = useRef<BlurFilter | null>(null);
+  const resolvePlaybackRate = useCallback((sourceTimeMs: number) => {
+    if (!editingRenderPlan) return 1;
+    const projectTimeMs = editingRenderPlan.timeMap.mapSourceToProject(sourceTimeMs);
+    return projectTimeMs === null ? 1 : editingRenderPlan.timeMap.rateAtProjectTime(projectTimeMs);
+  }, [editingRenderPlan]);
 
   const {
     videoReadyRafRef,
@@ -191,11 +196,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
     videoSpriteRef,
     maskGraphicsRef,
     blurFilterRef,
-    resolvePlaybackRate: (sourceTimeMs) => {
-      if (!editingRenderPlan) return 1;
-      const projectTimeMs = editingRenderPlan.timeMap.mapSourceToProject(sourceTimeMs);
-      return projectTimeMs === null ? 1 : editingRenderPlan.timeMap.rateAtProjectTime(projectTimeMs);
-    },
+    resolvePlaybackRate,
   });
 
   // Map RawClickEvent to CursorDataPoint
@@ -381,6 +382,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
       if (!vid) return;
       try {
         allowPlaybackRef.current = true;
+        vid.playbackRate = resolvePlaybackRate(vid.currentTime * 1000);
         await vid.play();
       } catch (error) {
         allowPlaybackRef.current = false;
