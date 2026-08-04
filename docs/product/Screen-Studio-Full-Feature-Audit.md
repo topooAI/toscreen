@@ -4,7 +4,7 @@
 审计对象：当前工作区 `/Users/viosson/AITD/1_PROJECTS/P28_TOSCREEN`
 对标范围：Screen Studio 官方 Guide 与 Changelog 中公开的录制、编辑、视觉包装、音频、字幕、项目和导出能力。
 
-当前集成基线：`codex/phase1-integration@f11379a`
+当前集成基线：`codex/phase1-integration@b1cca1d`
 
 当前工作树说明：自动转录仍处于真实语音验收阶段，相关未提交改动不计入 `Completed`；本表的完成数量只按已提交、已合入和已验证能力统计。
 
@@ -134,7 +134,7 @@
 | 63 | 导出进度、取消和成功反馈 | Completed | 有进度条、取消按钮、错误和成功状态 | 仍需做大文件实际取消的破坏性回归 |
 | 64 | GIF 导出 | Completed | Export Dialog 支持范围、尺寸、FPS、循环、进度、取消、错误和保存，并使用真实 GIF 编码路径 | 独立验收生成 `GIF89a`、160×90、10 帧、1 秒的实际文件 |
 | 65 | 批量导出 | Completed | 串行队列支持当前项目、已保存项目和多个 Preset，并持久化任务状态 | 已验证串行执行、失败隔离、重试、取消和应用重启恢复 |
-| 66 | Quick Share、在线链接、私密链接和评论 | Not completed | 已在 Topoo Cloudflare 账户部署独立 D1、R2、Worker、签名 Secret 和 `share.topoo.ai`；正式 Electron 已用真实 Topoo 用户完成 OAuth 轮询登录、加密会话重启恢复、MP4 上传/完成、Unlisted 链接打开和线上视频播放验收 | 观看页 Topoo 登录桥接已部署但尚未完成真实浏览器验收；仍需完成评论往返、Public/Private 权限、撤销和续传验收，闭环前不标 Completed |
+| 66 | Quick Share、在线链接、私密链接和评论 | Not completed | 已部署独立 D1、R2、Worker、签名 Secret 和 `share.topoo.ai`；正式 Electron 已完成真实用户登录、加密会话重启恢复、MP4 上传/完成、Unlisted 播放；观看页同步 OAuth Popup 修复已上线，并在全新 Chrome Tab 完成 Topoo 登录、自动关窗和 7.70 秒视频播放，控制台无错误 | 仍需完成真实评论新增/读取/Resolve/Delete、Public 匿名播放、Private 未授权/授权、撤销和真实中断后续传验收，闭环前不标 Completed |
 | 67 | 提取原始录制文件 | Completed | 用户可一键提取 screen、系统音频、麦克风、Presenter、cursor/click sidecar 和真实 project sidecar | 受控 role/type 清单会去重并逐项记录分类、状态、大小和 SHA-256；缺失素材显式报告，代理不会冒充原始文件 |
 
 ## 8. 稳定性、运行时与验收
@@ -158,7 +158,7 @@
 
 > iPhone/iPad 屏幕录制 → 内置音乐、自动转录和字幕 → Save As / Recent Projects / 便携项目包 / Preset → GIF / 批量导出 / Quick Share / 原始素材提取 → 最终真实用户整链验收。
 
-当前已有 **69 项明确完成能力**，还有 **4 项** 保持 `Not completed`。Save As、GIF、批量导出和原始素材提取已合入并复验；Quick Share 的正式服务、真实账户登录、上传与播放已经完成，但尚缺观看页登录、评论、Public/Private、撤销和续传验收。其余缺口是 iPhone/iPad 真机录屏、自动转录真实语音端到端，以及最终真实用户整链验收。
+当前已有 **69 项明确完成能力**，还有 **4 项** 保持 `Not completed`。Save As、GIF、批量导出和原始素材提取已合入并复验；Quick Share 的正式服务、桌面端与观看页真实账户登录、上传和播放已经完成，但尚缺评论、Public/Private、撤销和真实断点续传验收。其余缺口是 iPhone/iPad 真机录屏、自动转录真实语音端到端，以及最终真实用户整链验收。
 
 ## 第一阶段建议顺序
 
