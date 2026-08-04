@@ -39,6 +39,7 @@ interface FrameRenderConfig {
   cursorOffset?: number;
   cursorMediaDurationMs?: number;
   presentationEffects?: PresentationEffectRegion[];
+  sourceTimeAtEffectiveTime?: (effectiveTimeMs: number) => number;
 }
 
 interface AnimationState {
@@ -494,13 +495,14 @@ export class FrameRenderer {
     // Apply layout only if config or video dimensions changed
     this.updateLayout();
 
-    const timeMs = this.currentVideoTime * 1000;
-    await this.seekPresentationMedia(timeMs);
+    const effectiveTimeMs = this.currentVideoTime * 1000;
+    const sourceInteractionTimeMs = this.config.sourceTimeAtEffectiveTime?.(effectiveTimeMs) ?? effectiveTimeMs;
+    await this.seekPresentationMedia(effectiveTimeMs);
     const TICKS_PER_FRAME = 1;
     
     let maxMotionIntensity = 0;
     for (let i = 0; i < TICKS_PER_FRAME; i++) {
-      const motionIntensity = this.updateAnimationState(timeMs);
+      const motionIntensity = this.updateAnimationState(sourceInteractionTimeMs);
       maxMotionIntensity = Math.max(maxMotionIntensity, motionIntensity);
     }
     
@@ -516,7 +518,7 @@ export class FrameRenderer {
       motionIntensity: maxMotionIntensity,
       isPlaying: true,
       motionBlurEnabled: this.config.motionBlurEnabled ?? true,
-      cameraMotion: sampleCameraMotion(this.config.zoomRegions, timeMs),
+      cameraMotion: sampleCameraMotion(this.config.zoomRegions, sourceInteractionTimeMs),
     });
 
     // Render the PixiJS stage to its canvas (video only, transparent background)
@@ -541,18 +543,18 @@ export class FrameRenderer {
         this.config.annotationRegions,
         this.config.width,
         this.config.height,
-        timeMs,
+        sourceInteractionTimeMs,
         scaleFactor
       );
     }
     if (this.compositeCtx && this.config.presentationEffects?.length) {
-      renderPresentationEffects(this.compositeCtx, this.config.presentationEffects, this.config.width, this.config.height, timeMs, this.presentationMedia);
+      renderPresentationEffects(this.compositeCtx, this.config.presentationEffects, this.config.width, this.config.height, effectiveTimeMs, this.presentationMedia);
     }
 
     // Render cursor on top of annotations
     if (this.compositeCtx && this.config.cursorData?.length) {
-      const ripple = clickProgress(this.cursorTrack, timeMs);
-      const clickEffect = activeClickEffect(this.config.presentationEffects ?? [], timeMs);
+      const ripple = clickProgress(this.cursorTrack, sourceInteractionTimeMs);
+      const clickEffect = activeClickEffect(this.config.presentationEffects ?? [], effectiveTimeMs);
       if (ripple && clickEffect) {
         const radius = (11 + ripple.progress * 36) * clickEffect.size;
         this.compositeCtx.save();
@@ -563,8 +565,8 @@ export class FrameRenderer {
         this.compositeCtx.restore();
       }
     }
-    if (this.config.showVectorCursor !== false && this.config.cursorData && this.config.cursorData.length > 0 && this.compositeCtx && !isCursorHiddenAt(this.config.presentationEffects ?? [], timeMs)) {
-      this.renderCursor(timeMs);
+    if (this.config.showVectorCursor !== false && this.config.cursorData && this.config.cursorData.length > 0 && this.compositeCtx && !isCursorHiddenAt(this.config.presentationEffects ?? [], effectiveTimeMs)) {
+      this.renderCursor(sourceInteractionTimeMs);
     }
   }
 

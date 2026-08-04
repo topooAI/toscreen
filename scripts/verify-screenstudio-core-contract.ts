@@ -65,7 +65,7 @@ const checks = [
       "cursorOffset",
       "mediaDurationMs: sourceDurationMs",
       "filter: showBlur ? 'blur(2px)' : 'none'",
-      "zoomRegionsRef.current,\n        projectTimeMs,\n        mappedCursorData,",
+      "zoomRegionsRef.current,\n        sourceInteractionTimeMs,\n        mappedCursorData,",
     ],
   },
   {
@@ -99,6 +99,7 @@ const checks = [
       "cursorStyle: this.config.cursorStyle",
       "cursorCustomImages: this.config.cursorCustomImages",
       "cursorOffset: this.config.cursorOffset",
+      "sourceTimeAtEffectiveTime: this.config.editingRenderPlan",
     ],
   },
   {
@@ -106,10 +107,11 @@ const checks = [
     file: "frameRenderer",
     needles: [
       "this.config.zoomRegions,\n      timeMs,\n      this.cursorTrack,",
+      "this.updateAnimationState(sourceInteractionTimeMs)",
       "applyZoomTransform({",
       "ctx.filter = 'blur(6px)'",
       "await renderAnnotations(",
-      "this.renderCursor(timeMs);",
+      "this.renderCursor(sourceInteractionTimeMs);",
       "const isVectorStyle = this.config.showVectorCursor !== false",
       "await this.setupCustomCursor()",
     ],

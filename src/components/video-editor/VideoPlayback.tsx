@@ -525,21 +525,24 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
       }
       const sourceTimeMs = (video?.currentTime || 0) * 1000;
       const mappedEffectiveMs = editingRenderPlan?.timeMap.mapSourceToEffective(sourceTimeMs);
-      const projectTimeMs = isPlayingRef.current && mappedEffectiveMs !== null && mappedEffectiveMs !== undefined
+      const effectiveTimeMs = isPlayingRef.current && mappedEffectiveMs !== null && mappedEffectiveMs !== undefined
         ? mappedEffectiveMs
         : currentTimeRef.current;
+      const sourceInteractionTimeMs = editingRenderPlan
+        ? editingRenderPlan.previewSample(effectiveTimeMs).sourceTimeMs
+        : sourceTimeMs;
       const sourceDurationMs = Number.isFinite(video?.duration)
         ? (video?.duration || 0) * 1000
         : 0;
       const mainTrackDurationMs = editingRenderPlan?.durationMs ?? sourceDurationMs;
-      const isPastSourceVideoEnd = mainTrackDurationMs > 0 && projectTimeMs >= mainTrackDurationMs - 50;
+      const isPastSourceVideoEnd = mainTrackDurationMs > 0 && effectiveTimeMs >= mainTrackDurationMs - 50;
       if (blackTailGraphicsRef.current) {
         blackTailGraphicsRef.current.visible = isPastSourceVideoEnd;
       }
 
       const { strength, focus, depth } = findInterpolatedTarget(
         zoomRegionsRef.current,
-        projectTimeMs,
+        sourceInteractionTimeMs,
         mappedCursorData,
       );
       
@@ -594,7 +597,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
         Math.abs(nextFocusY - prevFocusY)
       );
 
-      applyTransform(motionIntensity, projectTimeMs);
+      applyTransform(motionIntensity, sourceInteractionTimeMs);
     };
 
     app.ticker.add(ticker);

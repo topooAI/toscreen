@@ -115,6 +115,9 @@ export class VideoExporter {
         cursorOffset: this.config.cursorOffset,
         cursorMediaDurationMs: videoInfo.duration * 1000,
         presentationEffects: this.config.presentationEffects,
+        sourceTimeAtEffectiveTime: this.config.editingRenderPlan
+          ? (effectiveTimeMs) => this.config.editingRenderPlan!.exportSample(effectiveTimeMs).sourceTimeMs
+          : undefined,
       });
       await this.renderer.initialize();
 
