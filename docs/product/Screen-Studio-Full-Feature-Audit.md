@@ -108,7 +108,7 @@
 | 47 | 音量与音量包络 | Completed | 音频区域具有音量数据和包络编辑 | Preview/Export 音频设置验证通过 |
 | 48 | 麦克风与系统音频独立分轨 | Completed | 录制前可分别控制系统音频和麦克风，录制后生成具有明确 role 的独立素材与 Audio Region | Preview、Mixer、Project Model 和 Export 保留双轨语义 |
 | 49 | 内置背景音乐库 | Completed | 提供两首项目自有 CC0 WAV、授权与 SHA-256 清单、搜索、分类、试听和加入 Audio Track | 开发与打包资源解析、项目保存和音频混合契约已通过 |
-| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper 已是 arm64+x86_64 universal binary；语言/来源选择、进度、取消和错误处理已实现；当前 TCC 已允许 ToScreen 与 helper 使用 Speech Recognition | 权限修复和 helper 改动尚未提交，仍缺真实语音产生非空字幕，以及“识别 → 编辑 → 保存重开 → 预览 → 导出”端到端；还需验证正式签名和重装后的授权稳定性 |
+| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper 已是 arm64+x86_64 universal binary；语言/来源选择、进度、取消和错误处理已实现；真实 4.43 秒中文语音已确认 Speech Recognition 状态为 `authorized` | 当前真实识别返回 `Siri and Dictation are disabled`，需先在 macOS 打开听写；之后仍须生成非空字幕并完成“识别 → 编辑 → 保存重开 → 预览 → 导出”，以及正式签名/重装后的授权稳定性验收 |
 | 51 | 字幕编辑、样式与动画 | Completed | 独立 Subtitle 时间线行支持选择、拖动、左右 Resize 和删除；面板支持文本、时间、字体、字号、颜色、位置、对齐、Split/Merge 和 Fade/Pop | Timeline、Panel、Project Model、Preview、Export 共用字幕状态；三轮保存恢复幂等和 Preview/Export 契约通过 |
 
 ## 6. 项目、设置与预设
