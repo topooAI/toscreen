@@ -98,7 +98,6 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [shadowIntensity, setShadowIntensity] = useState(editorDefaults.shadowIntensity);
   const [showBlur, setShowBlur] = useState(false);
   const [motionBlurEnabled, setMotionBlurEnabled] = useState(editorDefaults.motionBlurEnabled);
-  const [autoFocusEnabled, setAutoFocusEnabled] = useState(true);
   const [borderRadius, setBorderRadius] = useState(editorDefaults.borderRadius);
   const [padding, setPadding] = useState(editorDefaults.padding);
   const [cropRegion, setCropRegion] = useState<CropRegion>(DEFAULT_CROP_REGION);
@@ -337,7 +336,6 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     exportQuality,
     editingDocument: editingSession.document,
     presentationEffects,
-    autoFocusEnabled,
   }), [
     videoPath,
     originalVideoPath,
@@ -705,7 +703,6 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         setShadowIntensity(restored.shadowIntensity);
         setShowBlur(restored.showBlur);
         if (restored.motionBlurEnabled !== undefined) setMotionBlurEnabled(restored.motionBlurEnabled);
-        if (restored.autoFocusEnabled !== undefined) setAutoFocusEnabled(restored.autoFocusEnabled);
         setBorderRadius(restored.borderRadius);
         setPadding(restored.padding);
         setAspectRatio(restored.aspectRatio);
@@ -1469,7 +1466,6 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
 
   const handleAutoZoom = useCallback(async () => {
-    if (!autoFocusEnabled) { toast.info('Auto Focus is disabled for this project.'); return; }
     if (!originalVideoPath) {
       toast.error("No original video path currently loaded.");
       return;
@@ -1513,7 +1509,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     } finally {
       setLoading(false);
     }
-  }, [autoFocusEnabled, originalVideoPath, recordingDurationMs]);
+  }, [originalVideoPath, recordingDurationMs]);
 
   // Check for available auto-zoom data when video loads
   useEffect(() => {
@@ -2182,8 +2178,6 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                   onSelectAudio={handleSelectAudio}
                   audioRegions={audioRegions}
                   onAutoZoom={handleAutoZoom}
-                  autoFocusEnabled={autoFocusEnabled}
-                  onAutoFocusEnabledChange={setAutoFocusEnabled}
                   isFullScreenBinding={isFullScreenBinding}
                   onFullScreenBindingChange={setIsFullScreenBinding}
                   isPlaying={isPlaying}

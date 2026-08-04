@@ -5,5 +5,5 @@ assert.equal(computeRegionStrength(instant, 100), 1); assert.equal(computeRegion
 const editor = fs.readFileSync('src/components/video-editor/VideoEditor.tsx', 'utf8'); const zoom = fs.readFileSync('src/components/video-editor/sidebar/ZoomControls.tsx', 'utf8'); const timeline = fs.readFileSync('src/components/video-editor/timeline/TimelineEditor.tsx', 'utf8'); const adapter = fs.readFileSync('src/components/video-editor/project/legacyAdapter.ts', 'utf8');
 assert.match(zoom, /\[1, 2, 3, 4, 5, 6\]/); assert.match(zoom, /Instant Zoom/); assert.match(zoom, /Copy/); assert.match(zoom, /Paste/);
 assert.match(editor, /toscreen:focus-clipboard/); assert.match(editor, /navigator\.clipboard/); assert.match(editor, /metaKey \|\| event\.ctrlKey/); assert.match(editor, /transition: data\.transition/);
-assert.match(timeline, /Project Auto Focus/); assert.match(adapter, /autoFocusEnabled/);
-console.log(JSON.stringify({ status: 'ok', audits: [30,31,32,33,34,35], focusDepths: 6, instant: true, portableClipboard: true, projectAutoFocus: true }));
+assert.match(timeline, /Generate Auto Focus/); assert.doesNotMatch(timeline, /Toggle Project Auto Focus/); assert.match(adapter, /autoFocusEnabled/);
+console.log(JSON.stringify({ status: 'ok', audits: [30,31,32,33,34,35], focusDepths: 6, instant: true, portableClipboard: true, projectAutoFocus: 'manual-generate-only' }));

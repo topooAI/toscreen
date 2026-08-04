@@ -130,8 +130,6 @@ interface TimelineEditorProps {
   onAudioVolumeKeyframesChange?: (id: string, keyframes: any[]) => void;
   onAudioVolumeChange?: (id: string, volume: number) => void;
   onAutoZoom?: () => void;
-  autoFocusEnabled?: boolean;
-  onAutoFocusEnabledChange?: (enabled: boolean) => void;
   isFullScreenBinding: boolean;
   onFullScreenBindingChange: (enabled: boolean) => void;
   isPlaying: boolean;
@@ -986,7 +984,6 @@ export default function TimelineEditor({
   onSelectAudio,
   onAudioVolumeKeyframesChange,
   onAutoZoom,
-  autoFocusEnabled = true, onAutoFocusEnabledChange,
   isFullScreenBinding,
   onFullScreenBindingChange,
   isPlaying,
@@ -1910,7 +1907,6 @@ export default function TimelineEditor({
               </Button>
             </TimelineToolTooltip>
           )}
-          <TimelineToolTooltip label={`Project Auto Focus: ${autoFocusEnabled ? 'On' : 'Off'}`}><Button variant="ghost" size="icon" aria-label="Toggle Project Auto Focus" aria-pressed={autoFocusEnabled} onClick={() => onAutoFocusEnabledChange?.(!autoFocusEnabled)} className={cn('h-7 w-7', autoFocusEnabled ? 'bg-[var(--ui-control)] text-[#7C5CFC]' : 'text-[var(--ui-text-tertiary)]')}><PiMagicWandBold className="h-3 w-3" /></Button></TimelineToolTooltip>
           <TimelineToolTooltip label="Remove Segment (T)">
             <Button
               onClick={handleAddTrim}
