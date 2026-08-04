@@ -15,6 +15,28 @@ export interface CursorTelemetryEvent {
   [key: string]: unknown
 }
 
+export const MAX_NATIVE_CURSOR_TIMESTAMP_DRIFT_MS = 1000
+
+export function selectNativeCursorSidecar(
+  mediaTimestamp: number,
+  fileNames: readonly string[],
+  maxDriftMs = MAX_NATIVE_CURSOR_TIMESTAMP_DRIFT_MS,
+): string | null {
+  if (!Number.isFinite(mediaTimestamp)) return null
+
+  return fileNames
+    .flatMap((fileName) => {
+      const match = fileName.match(/^temp_cursor_(\d{13})\.json$/)
+      if (!match) return []
+      const timestamp = Number(match[1])
+      const driftMs = Math.abs(timestamp - mediaTimestamp)
+      return Number.isFinite(timestamp) && driftMs <= maxDriftMs
+        ? [{ fileName, timestamp, driftMs }]
+        : []
+    })
+    .sort((left, right) => left.driftMs - right.driftMs || left.timestamp - right.timestamp)[0]?.fileName ?? null
+}
+
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value))
 }

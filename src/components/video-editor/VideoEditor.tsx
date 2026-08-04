@@ -90,6 +90,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [defaultPresetId, setDefaultPresetId] = useState('');
   const defaultPresetAppliedRef = useRef(false);
   const restoredSavedProjectRef = useRef(false);
+  const [initialProjectLoadComplete, setInitialProjectLoadComplete] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -790,6 +791,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
   useEffect(() => {
     async function loadVideo() {
+      setInitialProjectLoadComplete(false);
+      restoredSavedProjectRef.current = false;
       try {
         // 1. Try to get the "active" video path (e.g. just recorded)
         let result = await window.electronAPI.getCurrentVideoPath();
@@ -805,6 +808,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           setTrimRegions([]);
           setAnnotationRegions([]);
           setAudioRegions([]);
+          setCursorData([]);
           setSelectedZoomId(null);
           setSelectedTrimId(null);
           setSelectedAnnotationId(null);
@@ -889,6 +893,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       } catch (err) {
         setError('Error loading video: ' + String(err));
       } finally {
+        setInitialProjectLoadComplete(true);
         setLoading(false);
       }
     }
@@ -917,7 +922,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
   // Auto-save project debounced
   useEffect(() => {
-    if (!originalVideoPath) return;
+    if (!originalVideoPath || !initialProjectLoadComplete) return;
     const timeout = setTimeout(() => {
       setSaveStatus('saving');
       const projectModel = currentProjectModel;
@@ -938,6 +943,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     currentProjectModel,
     videoPath, originalVideoPath,
     audioRegions,
+    initialProjectLoadComplete,
   ]);
 
   const handleDurationChange = useCallback((dur: number) => {
@@ -1511,22 +1517,22 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
   // Check for available auto-zoom data when video loads
   useEffect(() => {
-    if (!originalVideoPath) return;
+    if (!originalVideoPath || !initialProjectLoadComplete) return;
 
     let mounted = true;
     const checkAutoZoomData = async () => {
       try {
         const result = await window.electronAPI.readClicksJson(originalVideoPath);
-        if (mounted && result.success && result.clicks && result.clicks.length > 0) {
+        if (mounted && result.success && result.clicks && result.clicks.length > 0 && !restoredSavedProjectRef.current) {
           console.log(`[AutoZoom] Found ${result.clicks.length} clicks, applying automatically.`);
           setCursorData(result.clicks); // Save actual cursor coordinates array
           setPresentationEffects((current) => current.length > 0 ? current : recordedShortcutEffects(result.clicks ?? []));
           // Loading telemetry must never overwrite a restored or manually edited timeline.
           // Auto-zoom generation is an explicit command through the sidebar button.
-        } else {
-          if (mounted) {
-            setCursorData([]);
-          }
+        } else if (mounted && !restoredSavedProjectRef.current) {
+          // A new recording without telemetry should start empty, but a missing
+          // external sidecar must never erase cursor points restored from the project.
+          setCursorData([]);
         }
       } catch (err) {
         console.error("Failed to check for auto-zoom data:", err);
@@ -1535,7 +1541,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
     checkAutoZoomData();
     return () => { mounted = false; };
-  }, [originalVideoPath]); 
+  }, [initialProjectLoadComplete, originalVideoPath]);
 
   const handleExport = useCallback(async (override?: { format?: 'mp4' | 'gif'; quality?: ExportQuality; gifOptions?: typeof gifOptions }) => {
     if (!videoPath) {
@@ -1870,11 +1876,14 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         }
 
         if (isVideo) {
+          setInitialProjectLoadComplete(false);
+          restoredSavedProjectRef.current = false;
           // Reset all regions and selection states on dropping new video
           setZoomRegions([]);
           setTrimRegions([]);
           setAnnotationRegions([]);
           setAudioRegions([]);
+          setCursorData([]);
           setSelectedZoomId(null);
           setSelectedTrimId(null);
           setSelectedAnnotationId(null);
@@ -1888,15 +1897,20 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           setError(null);
           
           // Try to load auto-saved project if any
-          const projectResult = await window.electronAPI.loadProject(path);
-          if (projectResult.success && projectResult.project) {
-            const restoredFrom = applyLoadedProject(projectResult.project);
-            console.info(`[ProjectModel] Drop-restored project via ${restoredFrom}`, {
-              projectPath: projectResult.projectPath,
-              companionAudioPath: projectResult.project?.projectModel
-                ? restoreLegacyEditorStateFromProjectModel(projectResult.project.projectModel).companionAudioPath
-                : null,
-            });
+          try {
+            const projectResult = await window.electronAPI.loadProject(path);
+            if (projectResult.success && projectResult.project) {
+              restoredSavedProjectRef.current = true;
+              const restoredFrom = applyLoadedProject(projectResult.project);
+              console.info(`[ProjectModel] Drop-restored project via ${restoredFrom}`, {
+                projectPath: projectResult.projectPath,
+                companionAudioPath: projectResult.project?.projectModel
+                  ? restoreLegacyEditorStateFromProjectModel(projectResult.project.projectModel).companionAudioPath
+                  : null,
+              });
+            }
+          } finally {
+            setInitialProjectLoadComplete(true);
           }
         } else if (isAudio) {
           toast.success("成功识别音频", {

@@ -21,6 +21,7 @@ import {
   normalizeNativeCursorEvents,
   rebaseCursorEventsToTimeline,
   resolveCursorTimelineStart,
+  selectNativeCursorSidecar,
 } from '../cursorTelemetry'
 import {
   companionAudioPathCandidatesForMediaPath,
@@ -52,10 +53,18 @@ let selectedSource: any = null
 let activeRecordingBounds: { x: number; y: number; width: number; height: number } | undefined
 let cursorSegments: Array<{ events: any[]; videoStartTime: number; durationMs: number }> = []
 
-function nativeCursorPathForMediaPath(mediaPath: string): string | null {
+async function nativeCursorPathForMediaPath(mediaPath: string): Promise<string | null> {
   const parsed = path.parse(mediaPath)
   const timestamp = parsed.name.match(/(?:^|[-_])(\d{13})$/)?.[1]
-  return timestamp ? path.join(parsed.dir, `temp_cursor_${timestamp}.json`) : null
+  if (!timestamp) return null
+
+  try {
+    const fileNames = await fs.readdir(parsed.dir)
+    const selected = selectNativeCursorSidecar(Number(timestamp), fileNames)
+    return selected ? path.join(parsed.dir, selected) : null
+  } catch {
+    return null
+  }
 }
 
 function hasPreciseEventClock(events: any[]): boolean {
@@ -170,7 +179,7 @@ export function registerIpcHandlers(
   ipcMain.handle('choose-batch-output-directory',async()=>{const result=await dialog.showOpenDialog({properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0];});
   ipcMain.handle('save-batch-output',async(_,data:ArrayBuffer,outputPath:string)=>{await fs.mkdir(path.dirname(outputPath),{recursive:true});await fs.writeFile(outputPath,Buffer.from(data));return{success:true,path:outputPath};});
   ipcMain.handle('encode-gif-to-path',async(event,id:string,data:ArrayBuffer,options,outputPath:string)=>{const controller=new AbortController();gifControllers.set(id,controller);try{return await encodeGif(data,options,outputPath,percentage=>event.sender.send('export-gif-progress',{id,percentage}),controller.signal);}finally{gifControllers.delete(id);}});
-  ipcMain.handle('extract-originals', (_, sources, manifest, originalPath?:string) => {const controlled=[...sources];if(originalPath){controlled.push({kind:'raw-cursor-sidecar',path:nativeCursorPathForMediaPath(originalPath),classification:'sidecar'});controlled.push({kind:'raw-click-sidecar',path:`${originalPath}.clicks.json`,classification:'sidecar'});controlled.push({kind:'project-sidecar',path:projectPathForMediaPath(originalPath),required:true,classification:'sidecar'});}return extractOriginals(controlled, manifest);});
+  ipcMain.handle('extract-originals', async (_, sources, manifest, originalPath?:string) => {const controlled=[...sources];if(originalPath){controlled.push({kind:'raw-cursor-sidecar',path:await nativeCursorPathForMediaPath(originalPath),classification:'sidecar'});controlled.push({kind:'raw-click-sidecar',path:`${originalPath}.clicks.json`,classification:'sidecar'});controlled.push({kind:'project-sidecar',path:projectPathForMediaPath(originalPath),required:true,classification:'sidecar'});}return extractOriginals(controlled, manifest);});
   ipcMain.handle('open-local-path', (_, target: string) => openLocalPath(target));
   ipcMain.handle('topoo-session', () => fetchTopooSession());
   ipcMain.handle('topoo-sign-in', async (event) => { const started=await beginTopooSignIn();await shell.openExternal(started.authorizeUrl);const session=await completeTopooSignIn(started);if(!event.sender.isDestroyed())event.sender.send('topoo-session-changed');return session; });
@@ -690,7 +699,7 @@ export function registerIpcHandlers(
       // Native cursor polling remains available for old recordings below.
     }
 
-    const nativeCursorPath = nativeCursorPathForMediaPath(normalizedPath)
+    const nativeCursorPath = await nativeCursorPathForMediaPath(normalizedPath)
     let nativeEvents: any[] = []
     if (nativeCursorPath) {
       try {

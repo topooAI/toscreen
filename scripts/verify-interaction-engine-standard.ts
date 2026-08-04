@@ -240,6 +240,7 @@ const mouseTracker = read("electron/mouseTracker.ts");
 const videoEditor = read("src/components/video-editor/VideoEditor.tsx");
 const videoPlayback = read("src/components/video-editor/VideoPlayback.tsx");
 const timelineEditor = read("src/components/video-editor/timeline/TimelineEditor.tsx");
+const timelineMediaAvailability = read("src/components/video-editor/timeline/timelineMediaAvailability.ts");
 const cursorTrackSource = read("src/components/video-editor/videoPlayback/cursorTrack.ts");
 const ipcHandlers = read("electron/ipc/handlers.ts");
 
@@ -251,8 +252,10 @@ const required = [
   [mouseTracker, "screen.getCursorScreenPoint()"],
   [mouseTracker, "captureNativeEventTime(e.time)"],
   [videoEditor, "Loading telemetry must never overwrite"],
-  [videoEditor, "clip.type === \"screen-recording\""],
+  [timelineMediaAvailability, "clip.type === 'screen-recording'"],
   [videoEditor, "persistedSourceDurationMs"],
+  [videoEditor, "!originalVideoPath || !initialProjectLoadComplete"],
+  [videoEditor, "!restoredSavedProjectRef.current"],
   [videoPlayback, "if (!blackTailGraphics.destroyed)"],
   [videoPlayback, "blackTailGraphicsRef.current === blackTailGraphics"],
   [videoPlayback, "if (!isPlayingRef.current) currentTimeRef.current = currentTime * 1000"],
@@ -266,7 +269,7 @@ const required = [
   [cursorRenderer, "cursorLayer.style.clipPath"],
   [cursorRenderer, "videoSprite.getBounds?.()"],
   [cursorRenderer, "sample.isPointerDown ? 0.86 : 1"],
-  [ipcHandlers, "temp_cursor_${timestamp}.json"],
+  [ipcHandlers, "selectNativeCursorSidecar"],
   [ipcHandlers, "source: 'native-cursor'"],
   [ipcHandlers, "'event-cursor-with-native-shapes'"],
   [cursorTrackSource, "point.isPointerDown"],

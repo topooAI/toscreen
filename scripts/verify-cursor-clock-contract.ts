@@ -1,10 +1,26 @@
 import assert from 'node:assert/strict';
 import { NativeInputClock, nativeInputTimeToMs } from '../shared/cursorClock';
+import { selectNativeCursorSidecar } from '../electron/cursorTelemetry';
 import { sampleCursorTrack } from '../src/components/video-editor/videoPlayback/cursorTrack';
 import type { CursorDataPoint } from '../src/components/video-editor/types';
 
 assert.equal(nativeInputTimeToMs(1_500_000_000, 'darwin'), 1500);
 assert.equal(nativeInputTimeToMs(1500, 'win32'), 1500);
+
+const mediaTimestamp = 1_785_791_721_929;
+assert.equal(
+  selectNativeCursorSidecar(mediaTimestamp, [
+    'temp_cursor_1785791721930.json',
+    'temp_cursor_1785791722929.json',
+  ]),
+  'temp_cursor_1785791721930.json',
+  'the nearest native cursor sidecar within the bounded drift must be restored',
+);
+assert.equal(
+  selectNativeCursorSidecar(mediaTimestamp, ['temp_cursor_1785791722930.json']),
+  null,
+  'a sidecar outside the bounded drift must not attach to another recording',
+);
 
 const clock = new NativeInputClock();
 const firstNativeTime = clock.observe(1_000_000_000, 6010, 'darwin');
