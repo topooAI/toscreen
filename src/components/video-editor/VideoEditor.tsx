@@ -1871,7 +1871,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           </div>
         </div>
       )}
-      <div className="h-10 flex-shrink-0 z-50 flex items-center gap-2 px-20 border-b border-[var(--ui-border)]" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+      <div className="h-10 flex-shrink-0 z-50 flex items-center gap-2 px-20" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
         <strong className="text-xs truncate max-w-48">{projectName}</strong>
         <span className={`text-[10px] ${saveStatus === 'error' ? 'text-red-500' : 'text-[var(--ui-text-secondary)]'}`}>{saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Save failed' : 'Saved'}</span>
         <div className="ml-auto flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
