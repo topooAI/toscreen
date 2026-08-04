@@ -4,7 +4,7 @@
 审计对象：当前工作区 `/Users/viosson/AITD/1_PROJECTS/P28_TOSCREEN`
 对标范围：Screen Studio 官方 Guide 与 Changelog 中公开的录制、编辑、视觉包装、音频、字幕、项目和导出能力。
 
-当前集成基线：`codex/phase1-integration@5413468`
+当前集成基线：`codex/phase1-integration@f047bf0`
 
 当前工作树说明：自动转录与 iOS 真机验收工具、Share 路由及生产生命周期验收、结构化用户签字 Runner、ToScreen 正式 Bundle ID 和 Recent Project 时间线恢复兼容均已提交并通过完整机器审计；本表的完成数量仍只按已提交、已合入和已验证的用户闭环统计。
 
@@ -143,7 +143,7 @@
 |---:|---|---|---|---|
 | 68 | TypeScript 静态检查 | Completed | 当前 `tsc --noEmit` 通过 | 不代表 GUI 和真实媒体路径全部通过 |
 | 69 | 项目、时间域、渲染和音频核心契约 | Completed | 多个 Project Model、Duration、Preview/Export、Audio 验证通过 | 这些主要是机器契约验证，不等于用户验收 |
-| 70 | 完整 Phase 1 审计 | Completed | `npm run audit:phase1` 在 `5413468` 完整返回退出码 0 | 2026-08-04 统一重跑覆盖 TypeScript、Project Model、Timeline、Recording、Preview/Export、音频字幕、转录验收安全合同、iOS 无设备路径、Share 路由/生产写入门禁、结构化用户验收和 Electron 发布身份契约；新增验收入口均使用无 IPC 的 `node --import tsx` |
+| 70 | 完整 Phase 1 审计 | Completed | `npm run audit:phase1` 在 `f047bf0` 完整返回退出码 0 | 2026-08-04 统一重跑覆盖 TypeScript、Project Model、Timeline、Recording、Preview/Export、音频字幕、真实系统听写转录、iOS 无设备路径、Share 路由/生产写入门禁、结构化用户验收和 Electron 发布身份契约；新增验收入口均使用无 IPC 的 `node --import tsx` |
 | 71 | Screen Studio 控件 Wiring 审计 | Completed | Zoom、Cursor、Background、Layout 与 Motion Blur 控件契约全部通过 | `audit:screenstudio-control-wiring` 返回 `status: ok` |
 | 72 | Electron Editor 直接启动契约 | Completed | 开发入口可以直接创建 Editor Window，并保留 Vite HMR、录制恢复和时间轴结构 | `audit:electron-editor-runtime` 返回 `status: ok` |
 | 73 | 完整真实用户验收 | Not completed | `npm run accept:phase1` 默认只读输出主审计表实时 Completed / Not completed 数量、UA-01 至 UA-08 的机器证据、真人动作和确认短语；没有 `accept-all`，机器结果不能自动变为 Accepted，UA-08 强制等待前七项逐项签字 | 当前仅 UA-02 为 Accepted，其余仍 Pending，阶段状态保持 `Not released`；尚未完成从录制、编辑、保存、重开到最终导出的整链路用户签字验收 |
