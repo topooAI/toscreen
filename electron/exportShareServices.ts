@@ -39,7 +39,7 @@ export async function storeTopooToken(token: string) {
   await fs.writeFile(tokenPath(), safeStorage.encryptString(token));
 }
 export async function readTopooToken() { try { return safeStorage.decryptString(await fs.readFile(tokenPath())); } catch { return null; } }
-export async function clearTopooToken() { await fs.rm(tokenPath(), { force: true }); }
+export async function clearTopooToken() { const token=await readTopooToken();if(token){await fetch(`${TOPOO_AUTH_BASE_URL}/logout`,{method:'POST',headers:{authorization:`Bearer ${token}`}}).catch(()=>{});}await fs.rm(tokenPath(), { force: true }); }
 
 export async function fetchTopooSession() {
   const token = await readTopooToken(); if (!token) return { state: 'signed-out' as const };
@@ -47,8 +47,9 @@ export async function fetchTopooSession() {
     const response = await fetch('https://auth.topoo.ai/api/auth/session', { headers: { authorization: `Bearer ${token}` } });
     if (response.status === 401) { await clearTopooToken(); return { state: 'expired' as const }; }
     if (!response.ok) throw new Error(`Topoo Auth ${response.status}`);
-    const raw = await response.json() as any; const user = raw.user ?? raw;
-    return { state: 'signed-in' as const, user: { id: user.id, email: user.email, displayName: user.displayName ?? user.nickname ?? user.email, nickname: user.nickname, avatarUrl: user.avatarUrl ?? user.avatar_url } };
+    const raw = await response.json() as any; const user = raw.user ?? raw.session ?? raw;const userId=user.id??user.userId;
+    if(!userId)throw new Error('Topoo Auth session is missing a user ID');
+    return { state: 'signed-in' as const, user: { id: userId, email: user.email, displayName: user.displayName ?? user.nickname ?? user.email, nickname: user.nickname, avatarUrl: user.avatarUrl ?? user.avatar_url } };
   } catch (error) { return { state: 'offline' as const, message: String(error) }; }
 }
 
