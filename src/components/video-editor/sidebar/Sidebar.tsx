@@ -77,6 +77,8 @@ interface SidebarProps {
     onCursorOffsetChange?: (offset: number) => void;
     selectedVideoId?: string | null;
     onSelectVideo?: (id: string | null) => void;
+    selectedVideoSpeed?: number | null;
+    onSelectedVideoSpeedChange?: (rate: number) => void;
     onSeparateAudio?: () => void;
     isOriginalAudioSelected?: boolean;
     onSelectAudio?: (id: string | null) => void;
@@ -229,17 +231,37 @@ export function Sidebar(props: SidebarProps) {
             isAudio ? 'Audio' : 'Video',
             <>
                 {!isAudio && (
-                    <section className="px-4 py-3">
-                        <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Source</h3>
-                        <Button
-                            onClick={() => setShowCropDropdown(true)}
-                            variant="outline"
-                            className="w-full justify-start gap-2 h-8 rounded-[5px] bg-[var(--ui-control)] text-[12px] text-[var(--ui-text-secondary)] border border-transparent shadow-none hover:border-[var(--ui-border)] hover:bg-[var(--ui-control-hover)]"
-                        >
-                            <Crop className="w-3.5 h-3.5" strokeWidth={1.6} />
-                            Crop
-                        </Button>
-                    </section>
+                    <>
+                        <section className="px-4 py-3">
+                            <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Playback</h3>
+                            <label className="flex items-center justify-between gap-3 text-[11px] text-[var(--ui-text-secondary)]">
+                                <span>Speed</span>
+                                <select
+                                    aria-label="Selected video speed"
+                                    className="h-8 min-w-[92px] rounded-[5px] border border-[var(--ui-border)] bg-[var(--ui-control)] px-2 text-[11px] text-[var(--ui-text-primary)]"
+                                    value={props.selectedVideoSpeed ?? 'mixed'}
+                                    onChange={(event) => props.onSelectedVideoSpeedChange?.(Number(event.target.value))}
+                                >
+                                    {props.selectedVideoSpeed === null && <option value="mixed" disabled>Mixed</option>}
+                                    {[0.5, 1, 1.5, 2, 4, 8].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
+                                </select>
+                            </label>
+                            <p className="mt-2 text-[10px] leading-4 text-[var(--ui-text-tertiary)]">
+                                Changes only this clip. The source video is never modified.
+                            </p>
+                        </section>
+                        <section className="border-t border-[var(--ui-border)] px-4 py-3">
+                            <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Source</h3>
+                            <Button
+                                onClick={() => setShowCropDropdown(true)}
+                                variant="outline"
+                                className="w-full justify-start gap-2 h-8 rounded-[5px] bg-[var(--ui-control)] text-[12px] text-[var(--ui-text-secondary)] border border-transparent shadow-none hover:border-[var(--ui-border)] hover:bg-[var(--ui-control-hover)]"
+                            >
+                                <Crop className="w-3.5 h-3.5" strokeWidth={1.6} />
+                                Crop
+                            </Button>
+                        </section>
+                    </>
                 )}
                 {props.hasOriginalAudio && props.onSeparateAudio && (
                     <section className={`px-4 py-3 ${isAudio ? '' : 'border-t border-[var(--ui-border)]'}`}>

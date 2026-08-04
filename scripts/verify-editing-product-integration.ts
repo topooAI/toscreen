@@ -6,6 +6,8 @@ import { createVideoEventHandlers } from '../src/components/video-editor/videoPl
 const read = (path: string) => fs.readFileSync(path, 'utf8');
 const videoEditor = read('src/components/video-editor/VideoEditor.tsx');
 const timeline = read('src/components/video-editor/timeline/TimelineEditor.tsx');
+const sidebar = read('src/components/video-editor/sidebar/Sidebar.tsx');
+const playbackControls = read('src/components/video-editor/PlaybackControls.tsx');
 const playback = read('src/components/video-editor/VideoPlayback.tsx');
 const videoEvents = read('src/components/video-editor/videoPlayback/videoEventHandlers.ts');
 const projectTypes = read('src/components/video-editor/project/types.ts');
@@ -17,7 +19,11 @@ const runtimeAudit = read('src/components/video-editor/timeline/EditingRuntimeAu
 
 for (const [content, needles] of [
   [videoEditor, ['useEditingSession(recordingDurationMs)', 'editingSession.restore(restored.editingDocument)', 'editingRenderPlan={editingRenderPlan}', 'editingSession={editingSession}', 'editingDocument: editingSession.document']],
-  [timeline, ['aria-label="Split Main Clip"', 'aria-label="Delete Main Clip"', 'aria-label="Add Speed Region"', 'aria-label="Selected Speed Region rate"', "type: 'reorder'", 'variant="speed"', "editingSession?.redo()", "editingSession?.undo()"]],
+  [timeline, ['aria-label="Split Main Clip"', 'aria-label="Delete Main Clip"', "type: 'reorder'", "editingSession?.redo()", "editingSession?.undo()"]],
+  [sidebar, ['aria-label="Selected video speed"', 'The source video is never modified.']],
+  [videoEditor, ['setCurrentTime(clipStartEffectiveSeconds)', 'videoPlaybackRef.current.video.currentTime = clipStartSourceSeconds']],
+  [timeline, ['current.end > activeDurationMs', 'return createInitialRange(activeDurationMs)']],
+  [playbackControls, ['formatTime(duration, true)']],
   [projectTypes, ['editingDocument?: EditingDocument']],
   [legacyAdapter, ['migrateLegacyTrimsToEditingDocument', 'editingDocument: input.editingDocument']],
   [playback, ['const resolvePlaybackRate = useCallback', 'vid.playbackRate = resolvePlaybackRate(vid.currentTime * 1000)', 'editingRenderPlan.timeMap.rateAtProjectTime', 'editingRenderPlan.timeMap.clips[clipIndex + 1]']],
@@ -31,7 +37,9 @@ for (const [content, needles] of [
 }
 
 assert.ok(videoEditor.includes("point.type === 'keydown'"));
-assert.ok(timeline.includes("section.origin === 'typing' ? 'Typing '") || timeline.includes("section.origin === 'typing'"));
+assert.ok(videoEditor.includes("type: 'replace-typing-speed'"));
+assert.ok(!timeline.includes('aria-label="Add Speed Region"'));
+assert.ok(!timeline.includes('aria-label="Selected Speed Region rate"'));
 assert.deepEqual(
   migrateLegacyTrimsToEditingDocument([{ id: 'legacy-cut', startMs: 2000, endMs: 4000 }], 6000).clips.map((clip) => [clip.sourceStartMs, clip.sourceEndMs]),
   [[0, 2000], [4000, 6000]],
@@ -67,9 +75,9 @@ globalThis.requestAnimationFrame = originalRequestAnimationFrame;
 
 console.log(JSON.stringify({ status: 'ok', checks: [
   'VideoEditor owns and restores Editing Session',
-  'Timeline exposes Split/Delete/Reorder/Speed and Undo/Redo controls',
+  'Timeline exposes Split/Delete/Reorder and Undo/Redo; Video Inspector owns Speed',
   'Project Model persists and migrates EditingDocument',
   'Preview/VideoExporter/AudioMixerExporter consume editing render plan',
   'Preview applies speed sections from the media playback clock',
-  'recorded keydown sidecar creates visible editable typing speed regions',
+  'recorded keydown sidecar remains available to the editing speed engine',
 ] }, null, 2));

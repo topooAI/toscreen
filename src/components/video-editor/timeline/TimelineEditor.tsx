@@ -46,7 +46,6 @@ import PlaybackControls from "../PlaybackControls";
 const ZOOM_ROW_ID = "row-zoom-0";
 const CAMERA_ROW_ID = "row-camera-0";
 const TRIM_ROW_ID = "row-trim";
-const SPEED_ROW_ID = "row-speed";
 const PRESENTATION_ROW_ID = "row-presentation";
 
 function TimelineToolTooltip({ label, children }: { label: string; children: ReactNode }) {
@@ -570,8 +569,6 @@ function Timeline({
   snapGuideMs,
   getVisualSnapSpan,
   getVisualResizeSnapSpan,
-  selectedSpeedId,
-  onSelectSpeed,
   selectedPresentationId,
   onSelectPresentation,
   onAddPresentation,
@@ -612,8 +609,6 @@ function Timeline({
   snapGuideMs?: number | null;
   getVisualSnapSpan?: (id: string, span: Span, snapThresholdMs: number) => Span;
   getVisualResizeSnapSpan?: (id: string, span: Span, snapThresholdMs: number) => Span;
-  selectedSpeedId?: string | null;
-  onSelectSpeed?: (id: string | null) => void;
   selectedPresentationId?: string | null;
   onSelectPresentation?: (id: string | null) => void;
   onAddPresentation?: () => void;
@@ -681,22 +676,6 @@ function Timeline({
           >
             {item.label}
           </Item>
-        ))}
-      </Row>
-
-      <Row id={SPEED_ROW_ID}>
-        {items.filter(item => item.rowId === SPEED_ROW_ID).map((item) => (
-          <Item
-            id={item.id}
-            key={item.id}
-            rowId={item.rowId}
-            span={item.span}
-            isSelected={item.id === selectedSpeedId}
-            onSelect={() => onSelectSpeed?.(item.id)}
-            variant="speed"
-            onDirectSpanChange={onItemSpanChange}
-            onDirectDragSpanChange={onItemSpanChange}
-          >{item.label}</Item>
         ))}
       </Row>
 
@@ -1017,17 +996,6 @@ export default function TimelineEditor({
     const sourceTimeMs = editingSession.timeMap.mapProjectToSource(projectTimeMs);
     editingSession.execute({ type: 'split', clipId: selectedMainClip.id, sourceTimeMs });
   }, [currentTimeMs, editingSession, mapEffectiveToProject, selectedMainClip]);
-  const addSpeedRegion = useCallback(() => {
-    if (!editingSession) return;
-    const projectStartMs = mapEffectiveToProject(currentTimeMs);
-    const projectEndMs = Math.min(editingSession.timeMap.projectDurationMs, projectStartMs + 1000);
-    if (projectEndMs > projectStartMs) {
-      const id = `speed-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      editingSession.execute({ type: 'set-speed', id, projectStartMs, projectEndMs, rate: 2 });
-      setSelectedSpeedId(id);
-    }
-  }, [currentTimeMs, editingSession, mapEffectiveToProject]);
-
   const timelineScale = useMemo(() => calculateTimelineScale(activeDurationMs / 1000), [activeDurationMs]);
   const safeMinDurationMs = useMemo(
     () => (activeDurationMs > 0 ? Math.min(timelineScale.minItemDurationMs, activeDurationMs) : timelineScale.minItemDurationMs),
@@ -1041,7 +1009,6 @@ export default function TimelineEditor({
   const [isTimelineResizing, setIsTimelineResizing] = useState(false);
   const [isMagneticSnapEnabled, setIsMagneticSnapEnabled] = useState(true);
   const [snapGuideMs, setSnapGuideMs] = useState<number | null>(null);
-  const [selectedSpeedId, setSelectedSpeedId] = useState<string | null>(null);
   useEffect(() => {
     if (!isMagneticSnapEnabled) {
       setSnapGuideMs(null);
@@ -1095,12 +1062,14 @@ export default function TimelineEditor({
 
   const hasInitializedRangeRef = useRef(activeDurationMs > 0);
   useEffect(() => {
-    if (hasInitializedRangeRef.current || activeDurationMs <= 0) {
-      return;
-    }
-
-    hasInitializedRangeRef.current = true;
-    setRange(createInitialRange(activeDurationMs));
+    if (activeDurationMs <= 0) return;
+    setRange((current) => {
+      if (!hasInitializedRangeRef.current || current.start >= activeDurationMs || current.end > activeDurationMs) {
+        hasInitializedRangeRef.current = true;
+        return createInitialRange(activeDurationMs);
+      }
+      return current;
+    });
   }, [activeDurationMs]);
 
   const hasOverlap = useCallback((newSpan: Span, excludeId?: string, targetRowId?: string): boolean => {
@@ -1568,17 +1537,6 @@ export default function TimelineEditor({
       volume: region.volume,
       volumeKeyframes: region.volumeKeyframes,
     }));
-    const speeds: TimelineRenderItem[] = (editingSession?.document.speedSections ?? []).map((section) => ({
-      id: section.id,
-      rowId: SPEED_ROW_ID,
-      span: {
-        start: editingSession!.timeMap.mapProjectToEffective(section.projectStartMs),
-        end: editingSession!.timeMap.mapProjectToEffective(section.projectEndMs),
-      },
-      label: `${section.origin === 'typing' ? 'Typing ' : ''}${section.rate}×`,
-      variant: 'speed',
-      speedRate: section.rate,
-    }));
     // Presentation effects are already stored in project time. Do not apply the source trim map again.
     const presentations: TimelineRenderItem[] = presentationEffects.map((region) => ({ id: region.id, rowId: PRESENTATION_ROW_ID, span: { start: region.startMs, end: region.endMs }, label: region.kind.replace('-', ' '), variant: 'presentation' }));
 
@@ -1614,7 +1572,7 @@ export default function TimelineEditor({
     }
 
     const videoItems = isTrimTrackVisible ? videos : mainClips;
-    return [...videoItems, ...speeds, ...zooms, ...trims, ...annotations, ...subtitles, ...presentations, ...audios];
+    return [...videoItems, ...zooms, ...trims, ...annotations, ...subtitles, ...presentations, ...audios];
   }, [
     isTrimTrackVisible, mapSourceToEffective, sourceTotalMs, zoomRegions,
     trimRegions, annotationRegions, subtitleRegions, presentationEffects, audioRegions, totalMs, waveformCache, videoPath, editingSession
@@ -1865,17 +1823,6 @@ export default function TimelineEditor({
           <TimelineToolTooltip label="Delete selected Main Clip">
             <Button onClick={() => { if (selectedMainClip) { editingSession?.execute({ type: 'delete', clipId: selectedMainClip.id }); onSelectVideo(null); } }} disabled={!selectedMainClip} variant="ghost" size="icon" className="h-7 w-7" aria-label="Delete Main Clip"><Trash2 className="h-3 w-3" /></Button>
           </TimelineToolTooltip>
-          <Button onClick={addSpeedRegion} variant="ghost" className="h-7 px-2 text-[10px]" aria-label="Add Speed Region">Speed</Button>
-          <select
-            aria-label="Selected Speed Region rate"
-            disabled={!selectedSpeedId}
-            className="h-7 rounded border border-[var(--ui-border)] bg-[var(--ui-control)] px-1 text-[11px]"
-            value={editingSession?.document.speedSections.find((section) => section.id === selectedSpeedId)?.rate ?? 1}
-            onChange={(event) => selectedSpeedId && editingSession?.execute({ type: 'update-speed', id: selectedSpeedId, rate: Number(event.target.value) })}
-          >
-            {[0.5, 1, 1.5, 2, 4, 8].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
-          </select>
-          <Button onClick={() => { if (selectedSpeedId) { editingSession?.execute({ type: 'delete-speed', id: selectedSpeedId }); setSelectedSpeedId(null); } }} disabled={!selectedSpeedId} variant="ghost" size="icon" className="h-7 w-7" aria-label="Delete Speed Region"><Trash2 className="h-3 w-3" /></Button>
           <TimelineToolTooltip label="Add Focus (Z)">
             <Button
               onClick={handleAddZoom}
@@ -2049,8 +1996,6 @@ export default function TimelineEditor({
             snapGuideMs={snapGuideMs}
             getVisualSnapSpan={isMagneticSnapEnabled ? getVisualMagneticSnapSpan : undefined}
             getVisualResizeSnapSpan={isMagneticSnapEnabled ? getVisualResizeMagneticSnapSpan : undefined}
-            selectedSpeedId={selectedSpeedId}
-            onSelectSpeed={setSelectedSpeedId}
           />
         </TimelineWrapper>
       </div>

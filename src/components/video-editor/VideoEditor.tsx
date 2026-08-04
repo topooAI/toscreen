@@ -654,6 +654,42 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   });
 
   const videoPlaybackRef = useRef<VideoPlaybackRef>(null);
+  const selectedVideoSpeed = useMemo<number | null>(() => {
+    if (!selectedVideoId) return 1;
+    const span = editingSession.timeMap.clipProjectSpans.find((item) => item.clipId === selectedVideoId);
+    if (!span) return 1;
+    const boundaries = [
+      span.projectStartMs,
+      ...editingSession.document.speedSections.flatMap((section) => [section.projectStartMs, section.projectEndMs])
+        .filter((time) => time > span.projectStartMs && time < span.projectEndMs),
+      span.projectEndMs,
+    ].sort((a, b) => a - b);
+    const rates = new Set(boundaries.slice(0, -1).map((start, index) => {
+      const end = boundaries[index + 1];
+      return editingSession.timeMap.rateAtProjectTime(start + (end - start) / 2);
+    }));
+    return rates.size === 1 ? [...rates][0] : null;
+  }, [editingSession.document.speedSections, editingSession.timeMap, selectedVideoId]);
+  const handleSelectedVideoSpeedChange = useCallback((rate: number) => {
+    if (!selectedVideoId || !Number.isFinite(rate) || rate <= 0) return;
+    const span = editingSession.timeMap.clipProjectSpans.find((item) => item.clipId === selectedVideoId);
+    if (!span || span.projectEndMs <= span.projectStartMs) return;
+    videoPlaybackRef.current?.pause();
+    setIsPlaying(false);
+    const clipStartEffectiveSeconds = editingSession.timeMap.mapProjectToEffective(span.projectStartMs) / 1000;
+    const clipStartSourceSeconds = editingSession.timeMap.mapProjectToSource(span.projectStartMs) / 1000;
+    setCurrentTime(clipStartEffectiveSeconds);
+    if (videoPlaybackRef.current?.video) {
+      videoPlaybackRef.current.video.currentTime = clipStartSourceSeconds;
+    }
+    editingSession.execute({
+      type: 'set-speed',
+      id: `clip-speed-${selectedVideoId}`,
+      projectStartMs: span.projectStartMs,
+      projectEndMs: span.projectEndMs,
+      rate,
+    });
+  }, [editingSession, selectedVideoId]);
   // Stable ref to the underlying <video> element for direct DOM reads (perf: bypasses React state)
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const nextZoomIdRef = useRef(1);
@@ -1782,6 +1818,8 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
             onCursorOffsetChange={setCursorOffset}
             selectedVideoId={selectedVideoId}
             onSelectVideo={setSelectedVideoId}
+            selectedVideoSpeed={selectedVideoSpeed}
+            onSelectedVideoSpeedChange={handleSelectedVideoSpeedChange}
             isOriginalAudioSelected={audioRegions.some(r => r.id === selectedAudioId && r.isOriginal && !r.isDetached)}
             onSelectAudio={handleSelectAudio}
             onSeparateAudio={handleSeparateAudio}
@@ -1812,12 +1850,12 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           wallpaper, zoomRegions, selectedZoomId, selectedTrimId, shadowIntensity,
           showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, aspectRatio,
           exportQuality, selectedAnnotationId, annotationRegions, cursorSize,
-          cursorSmoothing, showVectorCursor, cursorStyle, cursorCustomImages, cursorOffset, selectedVideoId, selectedAudioId, audioRegions, presentationEffects, selectedPresentationId, currentTime, showMediaFeatures,
+          cursorSmoothing, showVectorCursor, cursorStyle, cursorCustomImages, cursorOffset, selectedVideoId, selectedVideoSpeed, selectedAudioId, audioRegions, presentationEffects, selectedPresentationId, currentTime, showMediaFeatures,
           presets, selectedPresetId, defaultPresetId,
           handleZoomDepthChange, handleZoomDelete, handleCameraMotionChange, handleTrimDelete, copySelectedFocus, pasteFocus,
           handleAnnotationContentChange, handleAnnotationTypeChange,
           handleAnnotationStyleChange, handleAnnotationFigureDataChange, handleAnnotationDelete,
-          videoPlaybackRef.current?.video, handleSeparateAudio, handleSelectAudio, handleCursorStyleChange, handleCursorCustomImagesChange, updatePresentationEffect, deletePresentationEffect,
+          videoPlaybackRef.current?.video, handleSeparateAudio, handleSelectAudio, handleSelectedVideoSpeedChange, handleCursorStyleChange, handleCursorCustomImagesChange, updatePresentationEffect, deletePresentationEffect,
           handleCreatePreset, handleApplyPreset, handleUpdatePreset, handleDeletePreset, handleSetDefaultPreset, handleImportPreset, handleExportPreset
         ]);
 

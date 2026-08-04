@@ -21,10 +21,10 @@ export default function PlaybackControls({
   onTogglePlayPause,
   onSeek,
 }: PlaybackControlsProps) {
-  function formatTime(seconds: number) {
+  function formatTime(seconds: number, showMinimumSecond = false) {
     if (!isFinite(seconds) || isNaN(seconds) || seconds < 0) return '0:00';
     const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+    const secs = showMinimumSecond && seconds > 0 && seconds < 1 ? 1 : Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
@@ -85,7 +85,7 @@ export default function PlaybackControls({
       
       {/* Total Duration */}
       <span className="text-xs font-medium text-[var(--ui-text-secondary)] tabular-nums min-w-[40px] text-left">
-        {formatTime(duration)}
+        {formatTime(duration, true)}
       </span>
     </div>
   );
