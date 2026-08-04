@@ -30,7 +30,7 @@ export function applyEditingCommand(document: EditingDocument, command: EditingC
     }
     case 'set-speed': {
       const section: SpeedSection = {
-        id: nextId('speed'),
+        id: command.id ?? nextId('speed'),
         projectStartMs: command.projectStartMs,
         projectEndMs: command.projectEndMs,
         rate: command.rate,

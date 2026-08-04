@@ -1021,7 +1021,11 @@ export default function TimelineEditor({
     if (!editingSession) return;
     const projectStartMs = mapEffectiveToProject(currentTimeMs);
     const projectEndMs = Math.min(editingSession.timeMap.projectDurationMs, projectStartMs + 1000);
-    if (projectEndMs > projectStartMs) editingSession.execute({ type: 'set-speed', projectStartMs, projectEndMs, rate: 2 });
+    if (projectEndMs > projectStartMs) {
+      const id = `speed-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      editingSession.execute({ type: 'set-speed', id, projectStartMs, projectEndMs, rate: 2 });
+      setSelectedSpeedId(id);
+    }
   }, [currentTimeMs, editingSession, mapEffectiveToProject]);
 
   const timelineScale = useMemo(() => calculateTimelineScale(activeDurationMs / 1000), [activeDurationMs]);

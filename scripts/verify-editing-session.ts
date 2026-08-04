@@ -20,7 +20,8 @@ history = executeEditingCommand(history, { type: 'delete', clipId: history.prese
 history = executeEditingCommand(history, { type: 'reorder', clipId: history.present.clips[1].id, toIndex: 0 }, sourceDurationMs);
 assert.deepEqual(history.present.clips.map((clip) => [clip.sourceStartMs, clip.sourceEndMs]), [[7_000, 10_000], [0, 2_000]]);
 
-history = executeEditingCommand(history, { type: 'set-speed', projectStartMs: 1_000, projectEndMs: 3_000, rate: 2 }, sourceDurationMs);
+history = executeEditingCommand(history, { type: 'set-speed', id: 'manual-speed-selection', projectStartMs: 1_000, projectEndMs: 3_000, rate: 2 }, sourceDurationMs);
+assert.ok(history.present.speedSections.some((section) => section.id === 'manual-speed-selection'));
 history = executeEditingCommand(history, {
   type: 'replace-typing-speed',
   events: [
