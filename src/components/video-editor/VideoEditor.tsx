@@ -1513,7 +1513,6 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     }
 
     try {
-      setLoading(true);
       // Prefer whichever persisted telemetry source can actually produce a
       // camera plan. Portable/restored projects may retain their cursor points
       // even when the external clicks sidecar is no longer available.
@@ -1562,8 +1561,6 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
         id: "auto-focus-result",
         description: "Check the console for details."
       });
-    } finally {
-      setLoading(false);
     }
   }, [cursorData, originalVideoPath, recordingDurationMs]);
 

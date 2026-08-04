@@ -3,9 +3,11 @@ import { computeRegionStrength } from '../src/components/video-editor/videoPlayb
 const instant: ZoomRegion = { id: 'instant', startMs: 100, endMs: 500, depth: 6, focus: { cx: .5, cy: .5 }, transition: 'instant' };
 assert.equal(computeRegionStrength(instant, 100), 1); assert.equal(computeRegionStrength({ ...instant, transition: 'smooth' }, 100), 0);
 const editor = fs.readFileSync('src/components/video-editor/VideoEditor.tsx', 'utf8'); const zoom = fs.readFileSync('src/components/video-editor/sidebar/ZoomControls.tsx', 'utf8'); const timeline = fs.readFileSync('src/components/video-editor/timeline/TimelineEditor.tsx', 'utf8'); const adapter = fs.readFileSync('src/components/video-editor/project/legacyAdapter.ts', 'utf8');
+const autoFocusHandler = editor.slice(editor.indexOf('const handleAutoZoom'), editor.indexOf('// Check for available auto-zoom data'));
 assert.match(zoom, /\[1, 2, 3, 4, 5, 6\]/); assert.match(zoom, /Instant Zoom/); assert.match(zoom, /Copy/); assert.match(zoom, /Paste/);
 assert.match(editor, /toscreen:focus-clipboard/); assert.match(editor, /navigator\.clipboard/); assert.match(editor, /metaKey \|\| event\.ctrlKey/); assert.match(editor, /transition: data\.transition/);
 assert.match(editor, /source: "saved project", events: Array\.isArray\(cursorData\)/); assert.match(editor, /sidecarCandidate\.regions\.length > 0/); assert.match(editor, /: projectCandidate/); assert.match(editor, /Auto Focus is unavailable for this recording/); assert.match(editor, /automatic focus cannot be reconstructed/);
 assert.match(editor, /工程已自动恢复", \{ id: "project-auto-restored" \}/); assert.match(editor, /toast\.dismiss\("project-auto-restored"\)/); assert.match(editor, /id: "auto-focus-result"/);
+assert.doesNotMatch(autoFocusHandler, /setLoading\(/);
 assert.match(timeline, /Generate Auto Focus/); assert.doesNotMatch(timeline, /Toggle Project Auto Focus/); assert.match(adapter, /autoFocusEnabled/);
-console.log(JSON.stringify({ status: 'ok', audits: [30,31,32,33,34,35], focusDepths: 6, instant: true, portableClipboard: true, projectAutoFocus: 'manual-generate-only', telemetryFallback: 'sidecar-authoritative-project-recovery', autoFocusNotice: 'front-layer-deduplicated' }));
+console.log(JSON.stringify({ status: 'ok', audits: [30,31,32,33,34,35], focusDepths: 6, instant: true, portableClipboard: true, projectAutoFocus: 'manual-generate-only', telemetryFallback: 'sidecar-authoritative-project-recovery', autoFocusNotice: 'front-layer-deduplicated', autoFocusLoading: 'inline-no-shell-unmount' }));
