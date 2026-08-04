@@ -348,6 +348,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:phase1-acceptance-state"],
   },
   {
+    id: "phase1-acceptance-runner",
+    command: npmCommand,
+    args: ["run", "audit:phase1-acceptance-runner"],
+  },
+  {
     id: "phase1-user-acceptance-doc",
     command: npmCommand,
     args: ["run", "audit:phase1-user-acceptance-doc"],
@@ -398,6 +403,11 @@ const steps: AuditStep[] = [
     args: ["run", "audit:audio-captions"],
   },
   {
+    id: "transcription-acceptance-contract",
+    command: npmCommand,
+    args: ["run", "audit:transcription-acceptance-contract"],
+  },
+  {
     id: "projects-presets",
     command: npmCommand,
     args: ["run", "audit:projects-presets"],
@@ -416,6 +426,11 @@ const steps: AuditStep[] = [
     id: "share-worker",
     command: npmCommand,
     args: ["run", "audit:share-worker"],
+  },
+  {
+    id: "share-production-lifecycle-contract",
+    command: npmCommand,
+    args: ["run", "audit:share-production-lifecycle-contract"],
   },
 ];
 

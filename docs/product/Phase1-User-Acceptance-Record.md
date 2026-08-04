@@ -9,12 +9,12 @@ This document records hands-on user acceptance for Phase 1. Machine gates only p
    Run the machine gate first: `npm run audit:phase1`.
 2. 再启动真实 Electron 编辑器并打开最新真实录制项目。
    Then start the real Electron editor and open the latest real recording project.
-3. 按下面 8 个用户验收项逐项测试，并把 `[ ]` 改成 `[x]`。
-   Test the 8 user checkpoints below and change `[ ]` to `[x]`.
+3. 按下面 8 个用户验收项逐项测试，并在明确签字后使用 `npm run accept:phase1 -- --accept ...` 逐项记录；不要手工或批量修改勾选状态。
+   Test the 8 user checkpoints below and record each one with `npm run accept:phase1 -- --accept ...` only after explicit sign-off; do not manually or bulk-edit checklist states.
 4. 只有全部通过后，Phase 1 才能进入阶段放行。
    Phase 1 can move to release only after every item passes.
-5. UA-01 到 UA-08 全部改为 `[x]` 后，将阶段结论改为 `Released / 已放行`；此时 `npm run audit:phase1-readiness` 才应输出 `phaseComplete: true`。
-   After UA-01 through UA-08 are all changed to `[x]`, change the phase conclusion to `Released / 已放行`; only then should `npm run audit:phase1-readiness` output `phaseComplete: true`.
+5. UA-01 到 UA-07 全部通过并签字后，再用 UA-08 的独立放行短语执行 Runner；Runner 会原子更新阶段结论，此时 `npm run audit:phase1-readiness` 才应输出 `phaseComplete: true`。
+   After UA-01 through UA-07 pass with explicit sign-off, run the Runner for UA-08 with its separate release phrase; the Runner atomically updates the phase conclusion, and only then should `npm run audit:phase1-readiness` output `phaseComplete: true`.
 
 ### 1.1 当前对照入口 / Current Checklist Entry
 
@@ -128,6 +128,8 @@ Use this table for step-by-step execution and review: each row states what Codex
 
 先运行 `npm run audit:phase1-handoff`，确认它输出 `status: "ready"`、最新录制路径、ProjectModel 恢复摘要、ProjectModel 本地素材文件检查 `assetFiles`、`editorRuntime`、UA-01 到 UA-08 的待验收列表，以及 `acceptancePlan` 里的逐项状态、机器证据、实机步骤和失败记录。然后启动 `npm run dev:editor`，用同一个真实录制项目逐项验证。
 Run `npm run audit:phase1-handoff` first and confirm it reports `status: "ready"`, the latest recording path, ProjectModel restore summary, ProjectModel local asset-file check `assetFiles`, `editorRuntime`, pending UA-01 through UA-08, and per-item status, machine evidence, hands-on steps, and failure notes in `acceptancePlan`. Then start `npm run dev:editor` and use the same real recording for the checks below.
+
+验收状态通过 `npm run accept:phase1` 只读查看；用户完成实机动作并提供逐项签字后，才使用 `Phase1-Acceptance-Runner.md` 中的显式更新命令。机器证据不能自动修改 `Accepted`，也不能代替用户签字。
 
 | ID | 实机步骤 / Hands-On Step | 失败记录 / Failure Note |
 |---|---|---|

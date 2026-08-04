@@ -24,12 +24,14 @@ import {
   auditProjectAssetFiles,
   summarizeMissingAssetFiles,
 } from "./recordingAssetFiles";
+import { parseProductAuditTotals } from './phase1ProductAuditState';
 
 type HandoffStatus = "ready" | "blocked";
 
 const repoRoot = process.cwd();
 const acceptanceDocPath = path.join(repoRoot, "docs", "product", "Phase1-User-Acceptance-Record.md");
 const packageJsonPath = path.join(repoRoot, "package.json");
+const productAuditPath = path.join(repoRoot, 'docs/product/Screen-Studio-Full-Feature-Audit.md');
 const recordingsDir = process.argv[2] || path.join(
   os.homedir(),
   "Library/Application Support/toscreen/recordings",
@@ -51,6 +53,7 @@ async function buildHandoffPacket(directory: string) {
     return "";
   });
   const acceptance = parsePhase1AcceptanceState(acceptanceContent);
+  const productAudit = parseProductAuditTotals(await fs.readFile(productAuditPath, 'utf8'));
   const handsOnSteps = parseHandsOnSteps(acceptanceContent);
   const missingHandsOnStepIds = phase1AcceptanceItems
     .map((item) => item.id)
@@ -92,6 +95,7 @@ async function buildHandoffPacket(directory: string) {
   return {
     status,
     purpose: "Phase 1 hands-on acceptance handoff packet",
+    productAudit: { ...productAudit, source: 'docs/product/Screen-Studio-Full-Feature-Audit.md' },
     commands: {
       machineGate: "npm run audit:phase1",
       startEditor: "npm run dev:editor",

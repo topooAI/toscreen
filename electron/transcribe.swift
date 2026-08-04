@@ -2,6 +2,15 @@ import Foundation
 import AppKit
 import Speech
 
+if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--authorization-status" {
+  let raw = SFSpeechRecognizer.authorizationStatus().rawValue
+  let labels = [0: "not_determined", 1: "denied", 2: "restricted", 3: "authorized"]
+  let payload: [String: Any] = ["type": "authorization", "rawValue": raw, "status": labels[raw] ?? "unknown"]
+  let data = try! JSONSerialization.data(withJSONObject: payload)
+  try! data.write(to: URL(fileURLWithPath: CommandLine.arguments[2]), options: .atomic)
+  exit(0)
+}
+
 guard CommandLine.arguments.count >= 3 else {
   fputs("usage: transcribe <audio> <locale>\n", stderr)
   exit(2)

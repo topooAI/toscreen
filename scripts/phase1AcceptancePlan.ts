@@ -53,6 +53,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:screenstudio-core-contract",
     "npm run audit:screenstudio-control-wiring",
     "npm run audit:electron-editor-runtime",
+    "npm run audit:transcription-acceptance-contract",
   ],
   "UA-05": [
     "npm run audit:preview-export-contract",
@@ -61,6 +62,7 @@ export const machineEvidenceByAcceptanceId: Record<string, string[]> = {
     "npm run audit:export-background-parity",
     "npm run audit:export-duration-render-settings",
     "npm run audit:export-black-tail-rendering",
+    "npm run audit:share-production-lifecycle-contract",
   ],
   "UA-06": [
     "npm run audit:project-model-camera",

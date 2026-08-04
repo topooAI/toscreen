@@ -81,6 +81,8 @@
     "audit:phase1-ownership-list": "tsx scripts/verify-phase1-ownership-list.ts",
     "audit:phase1-readiness": "tsx scripts/verify-phase1-readiness.ts",
     "audit:phase1-acceptance-state": "tsx scripts/verify-phase1-acceptance-state.ts",
+    "accept:phase1": "tsx scripts/phase1AcceptanceRunner.ts",
+    "audit:phase1-acceptance-runner": "tsx scripts/verify-phase1-acceptance-runner.ts",
     "audit:phase1-user-acceptance-doc": "tsx scripts/verify-phase1-user-acceptance-doc.ts",
     "audit:phase1-user-review-packet": "tsx scripts/verify-phase1-user-review-packet.ts",
     "audit:timeline-acceptance-doc": "tsx scripts/verify-timeline-acceptance-doc.ts",
@@ -97,11 +99,16 @@
     "audit:audio-captions": "tsx scripts/test-audio-captions.ts",
     "audit:projects-presets": "tsx scripts/verify-projects-presets.ts",
     "build:transcriber-helper": "bash scripts/build-transcriber-helper.sh",
+    "accept:transcription": "node --import tsx scripts/accept-transcription-e2e.ts",
+    "test:transcription-acceptance": "node --import tsx scripts/test-transcription-acceptance.ts",
+    "audit:transcription-acceptance-contract": "node --import tsx scripts/test-transcription-acceptance.ts",
     "build:ios-device-helper": "bash scripts/build-ios-device-capture-helper.sh",
     "audit:ios-device-capture": "tsx scripts/test-ios-device-capture.ts",
     "accept:ios-device": "node --import tsx scripts/accept-ios-device-hardware.ts",
     "audit:export-share": "tsx scripts/verify-export-share.ts",
-    "audit:share-worker": "tsx services/share-worker/test.ts"
+    "audit:share-worker": "tsx services/share-worker/test.ts",
+    "audit:share-production-lifecycle-contract": "tsx scripts/verify-share-production-lifecycle-contract.ts",
+    "acceptance:share-production-lifecycle": "tsx scripts/verify-share-production-lifecycle.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

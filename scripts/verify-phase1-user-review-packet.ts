@@ -21,6 +21,7 @@ import {
   auditProjectAssetFiles,
   summarizeMissingAssetFiles,
 } from "./recordingAssetFiles";
+import { parseProductAuditTotals } from './phase1ProductAuditState';
 
 const repoRoot = process.cwd();
 const recordingsDir = process.argv[2] || path.join(
@@ -47,6 +48,7 @@ const architectureDocPath = path.join(
   "product",
   "Product-and-Editor-Architecture.md",
 );
+const productAuditPath = path.join(repoRoot, 'docs/product/Screen-Studio-Full-Feature-Audit.md');
 
 const requiredCapabilityPhrases = [
   "Screen recording",
@@ -73,6 +75,7 @@ const packageJson = JSON.parse(await fs.readFile(packageJsonPath, "utf8")) as {
 const acceptanceDoc = await fs.readFile(acceptanceDocPath, "utf8");
 const reviewPacket = await fs.readFile(reviewPacketPath, "utf8");
 const architectureDoc = await fs.readFile(architectureDocPath, "utf8");
+const productAudit = parseProductAuditTotals(await fs.readFile(productAuditPath, 'utf8'));
 const packageScripts = packageJson.scripts ?? {};
 
 const acceptanceState = parsePhase1AcceptanceState(acceptanceDoc);
@@ -108,6 +111,7 @@ const status = errors.length > 0 ? "failed" : "ready";
 console.log(JSON.stringify({
   status,
   purpose: "Phase 1 user review packet",
+  productAudit: { ...productAudit, source: 'docs/product/Screen-Studio-Full-Feature-Audit.md' },
   phaseComplete: acceptanceState.phaseReleased,
   releaseBoundary: acceptanceState.phaseReleased
     ? "The acceptance record is marked released."

@@ -76,6 +76,7 @@ const requiredAuditScripts = [
   "audit:phase1-ownership-list",
   "audit:phase1-readiness",
   "audit:phase1-acceptance-state",
+  "audit:phase1-acceptance-runner",
   "audit:phase1-user-acceptance-doc",
   "audit:phase1-user-review-packet",
   "audit:timeline-acceptance-doc",
@@ -86,10 +87,12 @@ const requiredAuditScripts = [
   "audit:export-audio-render-settings",
   "audit:preview-audio-render-settings",
   "audit:audio-captions",
+  "audit:transcription-acceptance-contract",
   "audit:projects-presets",
   "audit:ios-device-capture",
   "audit:export-share",
   "audit:share-worker",
+  "audit:share-production-lifecycle-contract",
   "audit:phase1-registry",
 ];
 
