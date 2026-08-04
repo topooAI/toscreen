@@ -4,9 +4,9 @@
 审计对象：当前工作区 `/Users/viosson/AITD/1_PROJECTS/P28_TOSCREEN`
 对标范围：Screen Studio 官方 Guide 与 Changelog 中公开的录制、编辑、视觉包装、音频、字幕、项目和导出能力。
 
-当前集成基线：`codex/phase1-integration@8b9b70c`
+当前集成基线：`codex/phase1-integration@0bf7276`
 
-当前工作树说明：自动转录稳定化、iOS 真机验收工具、Share 路由级验收和 ToScreen 正式 Bundle ID 已提交并通过完整机器审计；本表的完成数量仍只按已提交、已合入和已验证的用户闭环统计。
+当前工作树说明：自动转录稳定化、iOS 真机验收工具、Share 路由级验收、ToScreen 正式 Bundle ID 和 Recent Project 时间线恢复兼容已提交并通过完整机器审计；本表的完成数量仍只按已提交、已合入和已验证的用户闭环统计。
 
 实时更新规则：只有功能已合入集成分支，并由统筹 Session 完成独立验证后，才把对应行更新为 `Completed`；仅在执行 Agent 分支中完成、尚未合入或尚未验证的功能继续保持 `Not completed`。
 
@@ -29,9 +29,9 @@
 | 视觉包装 | 8 | 0 | Mask、Highlight、快捷键卡片和 Presenter 摄像头已进入预览与导出 |
 | 音频与字幕 | 7 | 1 | 双轨、内置音乐与完整字幕编辑已完成；自动转录等待真实语音端到端验收 |
 | 项目与预设 | 7 | 0 | Save As、Recent Projects、便携包与 Preset 均已完成并通过实际文件验收 |
-| 导出与分享 | 8 | 1 | MP4、GIF、批量队列与原始素材提取已完成；在线分享仍待正式服务部署 |
+| 导出与分享 | 8 | 1 | MP4、GIF、批量队列、原始素材提取和正式分享服务已完成；在线评论、权限与撤销生命周期仍待线上验收 |
 | 稳定性与验收 | 5 | 1 | 完整机器审计、控件 Wiring 与 Electron 直接启动契约已恢复绿色；真实用户整链验收仍待完成 |
-| **合计** | **69** | **4** | **本地产品主链已基本完成；剩余为真机录屏、自动转录端到端、在线分享部署和最终验收** |
+| **合计** | **69** | **4** | **本地产品主链已基本完成；剩余为真机录屏、自动转录端到端、在线分享生命周期验收和最终验收** |
 
 功能数量只是审计索引，不代表每项工作量相等。例如“字幕系统”明显比“增加一个导出选项”更大。
 
@@ -119,7 +119,7 @@
 | 53 | 项目模型保存与恢复 | Completed | Focus、Trim、Annotation、Audio、Canvas、Cursor 等可以 roundtrip | 模型 smoke、restore 和 roundtrip 检查通过 |
 | 54 | 项目数据校验与兼容结构 | Completed | 有独立 validator、资产、轨道、Clip 与 Scene 模型 | 一部分第二阶段字段仅属于结构预留，不代表功能完成 |
 | 55 | Save As 和项目命名 | Completed | 使用 macOS 系统保存对话框选择名称与目录，保存后标题、当前项目路径、自动保存和显式保存均切换到新文件 | 已实际验证覆盖确认、取消不切换路径、旧文件不再写入、退出后从 Recent 重开并恢复真实 MOV 与最新设置 |
-| 56 | Recent Projects 项目首页 | Completed | Electron 启动进入 Projects 首页，支持搜索、名称/时间/时长排序、打开、移除、确认删除、缺失/损坏/备份恢复状态和 Relink | 实际 Package Import 后关闭并从 Recent 重开成功；打开项目会恢复包内媒体，不沿用旧全局路径 |
+| 56 | Recent Projects 项目首页 | Completed | Electron 启动进入 Projects 首页，支持搜索、名称/时间/时长排序、打开、移除、确认删除、缺失/损坏/备份恢复状态和 Relink；旧 Sidecar 的空编辑文档会兼容迁移，新版显式空 Main Track 仍按用户删除结果保留 | `0bf7276` 重新打包后实际打开 Recent Project，初始与稳定加载 4 秒后均保留 `Main Track / Main Clip / 0:07`，未再出现 `No Video Loaded`；项目模型、恢复、Roundtrip、Schema 和 Sidecar parity 回归通过 |
 | 57 | 可移植项目包 | Completed | `.toscreenpkg` 包含 Project Model、用户素材、相对清单、SHA-256 与版本；导入先校验并通过临时目录原子迁移 | 实际 MOV 包导入后恢复 screen、proxy、系统音频、麦克风与 Presenter；拒绝 POSIX、Windows drive、UNC 和正反斜杠穿越 |
 | 58 | 创建、应用和分享 Preset | Completed | 可创建、更新、删除、应用和设为默认，并支持 `.toscreenpreset` 导入/导出 | Preset 只保存 Canvas、Export、Focus、Cursor、Click、Presentation、Caption 与 Layout 样式，不携带媒体和时间线；合入后 `audit:projects-presets` 通过 |
 
@@ -143,7 +143,7 @@
 |---:|---|---|---|---|
 | 68 | TypeScript 静态检查 | Completed | 当前 `tsc --noEmit` 通过 | 不代表 GUI 和真实媒体路径全部通过 |
 | 69 | 项目、时间域、渲染和音频核心契约 | Completed | 多个 Project Model、Duration、Preview/Export、Audio 验证通过 | 这些主要是机器契约验证，不等于用户验收 |
-| 70 | 完整 Phase 1 审计 | Completed | `npm run audit:phase1` 在 `8b9b70c` 完整返回退出码 0 | 2026-08-04 统一重跑覆盖 TypeScript、Project Model、Timeline、Recording、Preview/Export、音频字幕、iOS 无设备路径、Share 路由和 Electron 发布身份契约 |
+| 70 | 完整 Phase 1 审计 | Completed | `npm run audit:phase1` 在 `0bf7276` 完整返回退出码 0 | 2026-08-04 在 Recent Project 时间线恢复修复后统一重跑，覆盖 TypeScript、Project Model、Timeline、Recording、Preview/Export、音频字幕、iOS 无设备路径、Share 路由和 Electron 发布身份契约 |
 | 71 | Screen Studio 控件 Wiring 审计 | Completed | Zoom、Cursor、Background、Layout 与 Motion Blur 控件契约全部通过 | `audit:screenstudio-control-wiring` 返回 `status: ok` |
 | 72 | Electron Editor 直接启动契约 | Completed | 开发入口可以直接创建 Editor Window，并保留 Vite HMR、录制恢复和时间轴结构 | `audit:electron-editor-runtime` 返回 `status: ok` |
 | 73 | 完整真实用户验收 | Not completed | 已有录制素材、项目 sidecar 和机器审计记录 | 尚未完成从录制、编辑、保存、重开到最终导出的整链路用户签字验收 |
