@@ -1850,22 +1850,20 @@ export default function TimelineEditor({
 
   return (
     <div className="flex-1 flex flex-col bg-transparent overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-[var(--ui-border)] bg-transparent px-2 py-1.5">
-        <div className="custom-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden">
+      <div className="flex items-center gap-2 p-2 border-b border-[var(--ui-border)] bg-transparent relative">
+        <div className="flex items-center gap-1">
           <TimelineToolTooltip label="Undo (Cmd/Ctrl+Z)">
             <Button onClick={editingSession?.undo} disabled={!editingSession?.canUndo} variant="ghost" size="icon" className="h-7 w-7" aria-label="Undo edit"><Undo2 className="h-3 w-3" /></Button>
           </TimelineToolTooltip>
           <TimelineToolTooltip label="Redo (Shift+Cmd/Ctrl+Z)">
             <Button onClick={editingSession?.redo} disabled={!editingSession?.canRedo} variant="ghost" size="icon" className="h-7 w-7" aria-label="Redo edit"><Redo2 className="h-3 w-3" /></Button>
           </TimelineToolTooltip>
-          <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
           <TimelineToolTooltip label="Split selected Main Clip at playhead">
             <Button onClick={splitSelectedMainClip} disabled={!selectedMainClip} variant="ghost" size="icon" className="h-7 w-7" aria-label="Split Main Clip"><PiScissorsBold className="h-3 w-3" /></Button>
           </TimelineToolTooltip>
           <TimelineToolTooltip label="Delete selected Main Clip">
             <Button onClick={() => { if (selectedMainClip) { editingSession?.execute({ type: 'delete', clipId: selectedMainClip.id }); onSelectVideo(null); } }} disabled={!selectedMainClip} variant="ghost" size="icon" className="h-7 w-7" aria-label="Delete Main Clip"><Trash2 className="h-3 w-3" /></Button>
           </TimelineToolTooltip>
-          <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
           <Button onClick={addSpeedRegion} variant="ghost" className="h-7 px-2 text-[10px]" aria-label="Add Speed Region">Speed</Button>
           <select
             aria-label="Selected Speed Region rate"
@@ -1877,7 +1875,6 @@ export default function TimelineEditor({
             {[0.5, 1, 1.5, 2, 4, 8].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
           </select>
           <Button onClick={() => { if (selectedSpeedId) { editingSession?.execute({ type: 'delete-speed', id: selectedSpeedId }); setSelectedSpeedId(null); } }} disabled={!selectedSpeedId} variant="ghost" size="icon" className="h-7 w-7" aria-label="Delete Speed Region"><Trash2 className="h-3 w-3" /></Button>
-          <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
           <TimelineToolTooltip label="Add Focus (Z)">
             <Button
               onClick={handleAddZoom}
@@ -1914,7 +1911,6 @@ export default function TimelineEditor({
             </TimelineToolTooltip>
           )}
           <TimelineToolTooltip label={`Project Auto Focus: ${autoFocusEnabled ? 'On' : 'Off'}`}><Button variant="ghost" size="icon" aria-label="Toggle Project Auto Focus" aria-pressed={autoFocusEnabled} onClick={() => onAutoFocusEnabledChange?.(!autoFocusEnabled)} className={cn('h-7 w-7', autoFocusEnabled ? 'bg-[var(--ui-control)] text-[#7C5CFC]' : 'text-[var(--ui-text-tertiary)]')}><PiMagicWandBold className="h-3 w-3" /></Button></TimelineToolTooltip>
-          <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
           <TimelineToolTooltip label="Remove Segment (T)">
             <Button
               onClick={handleAddTrim}
@@ -1937,7 +1933,6 @@ export default function TimelineEditor({
               <PiTextTBold className="h-3 w-3" />
             </Button>
           </TimelineToolTooltip>
-          <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-[var(--ui-border)]" />
           <TimelineToolTooltip label={`Snap to Edges: ${isMagneticSnapEnabled ? "On" : "Off"}`}>
             <Button
               onClick={() => setIsMagneticSnapEnabled((enabled) => !enabled)}
@@ -1975,7 +1970,7 @@ export default function TimelineEditor({
             </Button>
           </TimelineToolTooltip>
         </div>
-        <div className="shrink-0 border-l border-[var(--ui-border)] pl-2">
+        <div className="absolute left-1/2 -translate-x-1/2 z-10">
           <PlaybackControls
             isPlaying={isPlaying}
             currentTime={currentTime}
@@ -1984,6 +1979,7 @@ export default function TimelineEditor({
             onSeek={onSeek || (() => {})}
           />
         </div>
+        <div className="flex-1" />
       </div>
       <div className="flex-1 overflow-hidden bg-transparent relative"
         onClick={() => setSelectedKeyframeId(null)}
