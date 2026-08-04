@@ -37,14 +37,14 @@ export default function PlaybackControls({
   };
 
   return (
-    <div className="flex items-center gap-10 bg-transparent select-none">
+    <div className="flex items-center gap-2 bg-transparent select-none">
       {/* Current Time */}
       <span className="text-xs font-medium text-[var(--ui-text-secondary)] tabular-nums min-w-[40px] text-right">
         {formatTime(currentTime)}
       </span>
       
       {/* Controls Button Group */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-1">
         {/* Previous Frame / Skip Back */}
         <Button
           onClick={handlePrevFrame}

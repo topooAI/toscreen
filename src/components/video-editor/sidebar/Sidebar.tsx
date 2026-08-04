@@ -28,7 +28,6 @@ import { CursorControls } from "./CursorControls";
 import { CameraMotionControls } from "./CameraMotionControls";
 import type { PresentationEffectRegion } from "../presentation/types";
 import { PresentationSettingsPanel } from "../presentation/PresentationSettingsPanel";
-import { TopooUserPill } from '../TopooUserPill';
 
 interface SidebarProps {
     selected: string;
@@ -92,6 +91,7 @@ interface SidebarProps {
     playheadMs?: number;
     mediaFeaturesOpen?: boolean;
     onOpenMediaFeatures?: () => void;
+    presetControls?: ReactNode;
 }
 
 const ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1', '4:3', '4:5'];
@@ -119,7 +119,7 @@ export function Sidebar(props: SidebarProps) {
                 >
                     <Music2 className="h-3.5 w-3.5" strokeWidth={1.7} />
                 </Button>
-                <TopooUserPill/><Button
+                <Button
                 type="button"
                 onClick={props.onExport}
                 className="h-[26px] rounded-[5px] bg-[#0D99FF] px-3 text-[12px] font-semibold text-white shadow-none hover:bg-[#0B87E3] active:bg-[#0878CC] transition-colors"
@@ -362,6 +362,7 @@ export function Sidebar(props: SidebarProps) {
                     </DropdownMenu>
                 </div>
             </section>
+            {props.presetControls}
             {cursorInspector}
             <section className="border-t border-[var(--ui-border)] px-4 py-3">
                 <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Background</h3>

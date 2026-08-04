@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -7,7 +7,15 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import VideoPlayback, { type VideoPlaybackRef } from "./VideoPlayback";
 import TimelineEditor from "./timeline/TimelineEditor";
 import { Sidebar } from "./sidebar/Sidebar";
+import { PresetControls } from "./sidebar/PresetControls";
 import { ExportDialog } from "./ExportDialog";
+import { TopooUserPill } from "./TopooUserPill";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import type { Span } from "dnd-timeline";
 import { useAudioMixer } from "./hooks/useAudioMixer";
@@ -377,6 +385,13 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   useEffect(() => { void refreshPresets() }, [refreshPresets]);
 
   const saveSnapshot = useCallback(() => createProjectAutosaveSnapshot(currentProjectModel, audioRegions), [currentProjectModel, audioRegions]);
+  const handleSaveProject = useCallback(async () => {
+    if (!originalVideoPath) return;
+    setSaveStatus('saving');
+    const result = await window.electronAPI.saveProject(originalVideoPath, saveSnapshot());
+    setSaveStatus(result.success ? 'saved' : 'error');
+    if (!result.success) toast.error('Save failed', { description: result.error || result.message });
+  }, [originalVideoPath, saveSnapshot]);
   const handleSaveAsProject = useCallback(async () => {
     setSaveStatus('saving');
     try {
@@ -392,6 +407,39 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     const result = await window.electronAPI.savePreset(name, currentProjectModel);
     if (result.success) { setSelectedPresetId(result.preset.id); await refreshPresets(); toast.success('Preset saved'); }
   }, [currentProjectModel, refreshPresets]);
+  const handleUpdatePreset = useCallback(async () => {
+    const selected = presets.find((preset) => preset.id === selectedPresetId);
+    if (!selected) return;
+    await window.electronAPI.savePreset(selected.name, currentProjectModel, selected.id);
+    await refreshPresets();
+    toast.success('Preset updated');
+  }, [currentProjectModel, presets, refreshPresets, selectedPresetId]);
+  const handleDeletePreset = useCallback(async () => {
+    if (!selectedPresetId || !window.confirm('Delete this preset?')) return;
+    await window.electronAPI.deletePreset(selectedPresetId);
+    setSelectedPresetId('');
+    await refreshPresets();
+  }, [refreshPresets, selectedPresetId]);
+  const handleSetDefaultPreset = useCallback(async () => {
+    if (!selectedPresetId) return;
+    await window.electronAPI.setDefaultPreset(selectedPresetId);
+    setDefaultPresetId(selectedPresetId);
+    toast.success('Default preset updated');
+  }, [selectedPresetId]);
+  const handleImportPreset = useCallback(async () => {
+    const result = await window.electronAPI.importPreset();
+    if (result.success) {
+      setSelectedPresetId(result.preset.id);
+      await refreshPresets();
+    } else if (!result.cancelled) {
+      toast.error(result.error || 'Preset import failed');
+    }
+  }, [refreshPresets]);
+  const handleExportPreset = useCallback(async () => {
+    if (!selectedPresetId) return;
+    const result = await window.electronAPI.exportPreset(selectedPresetId);
+    if (result.success) toast.success('Preset exported');
+  }, [selectedPresetId]);
 
 
   const runtimeAudioRegions = useMemo(
@@ -402,6 +450,9 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const currentTimeStateRef = useRef(currentTime);
   const timelineResizeLockRef = useRef(0);
   const verticalEditorSplitRef = useRef<HTMLDivElement | null>(null);
+  const canvasWorkspaceRef = useRef<HTMLDivElement | null>(null);
+  const canvasFrameRef = useRef<HTMLDivElement | null>(null);
+  const [presentationToolbarPlacement, setPresentationToolbarPlacement] = useState<'right' | 'top'>('right');
   const verticalSplitCleanupRef = useRef<(() => void) | null>(null);
   const panelLayoutResizeRef = useRef(false);
   const windowLayoutResizeRef = useRef(false);
@@ -412,6 +463,26 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
   useEffect(() => {
     currentTimeStateRef.current = currentTime;
   }, [currentTime]);
+
+  useEffect(() => {
+    const workspace = canvasWorkspaceRef.current;
+    const frame = canvasFrameRef.current;
+    if (!workspace || !frame) return;
+
+    const updatePlacement = () => {
+      const workspaceRect = workspace.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      const horizontalSpace = Math.max(0, (workspaceRect.width - frameRect.width) / 2);
+      const verticalSpace = Math.max(0, (workspaceRect.height - frameRect.height) / 2);
+      setPresentationToolbarPlacement(horizontalSpace >= 44 || verticalSpace < 36 ? 'right' : 'top');
+    };
+
+    const observer = new ResizeObserver(updatePlacement);
+    observer.observe(workspace);
+    observer.observe(frame);
+    updatePlacement();
+    return () => observer.disconnect();
+  }, [aspectRatio, loading]);
 
   const handleTimelineResizeStart = useCallback(() => {
     timelineResizeLockRef.current += 1;
@@ -1719,16 +1790,33 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
             playheadMs={Math.round(currentTime * 1000)}
             mediaFeaturesOpen={showMediaFeatures}
             onOpenMediaFeatures={() => setShowMediaFeatures(true)}
+            presetControls={(
+              <PresetControls
+                presets={presets}
+                selectedPresetId={selectedPresetId}
+                defaultPresetId={defaultPresetId}
+                onSelectedPresetChange={setSelectedPresetId}
+                onCreate={() => void handleCreatePreset()}
+                onApply={() => void handleApplyPreset()}
+                onUpdate={() => void handleUpdatePreset()}
+                onDelete={() => void handleDeletePreset()}
+                onSetDefault={() => void handleSetDefaultPreset()}
+                onImport={() => void handleImportPreset()}
+                onExport={() => void handleExportPreset()}
+              />
+            )}
           />
         ), [
           wallpaper, zoomRegions, selectedZoomId, selectedTrimId, shadowIntensity,
           showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, aspectRatio,
           exportQuality, selectedAnnotationId, annotationRegions, cursorSize,
           cursorSmoothing, showVectorCursor, cursorStyle, cursorCustomImages, cursorOffset, selectedVideoId, selectedAudioId, audioRegions, presentationEffects, selectedPresentationId, currentTime, showMediaFeatures,
+          presets, selectedPresetId, defaultPresetId,
           handleZoomDepthChange, handleZoomDelete, handleCameraMotionChange, handleTrimDelete, copySelectedFocus, pasteFocus,
           handleAnnotationContentChange, handleAnnotationTypeChange,
           handleAnnotationStyleChange, handleAnnotationFigureDataChange, handleAnnotationDelete,
-          videoPlaybackRef.current?.video, handleSeparateAudio, handleSelectAudio, handleCursorStyleChange, handleCursorCustomImagesChange, updatePresentationEffect, deletePresentationEffect
+          videoPlaybackRef.current?.video, handleSeparateAudio, handleSelectAudio, handleCursorStyleChange, handleCursorCustomImagesChange, updatePresentationEffect, deletePresentationEffect,
+          handleCreatePreset, handleApplyPreset, handleUpdatePreset, handleDeletePreset, handleSetDefaultPreset, handleImportPreset, handleExportPreset
         ]);
 
   if (loading) {
@@ -1871,21 +1959,32 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           </div>
         </div>
       )}
-      <div className="h-10 flex-shrink-0 z-50 flex items-center gap-2 px-20" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
-        <strong className="text-xs truncate max-w-48">{projectName}</strong>
+      <div className="h-10 flex-shrink-0 z-50 flex items-center gap-2 pl-20 pr-3" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+        <strong className="max-w-48 truncate text-xs">{projectName}</strong>
         <span className={`text-[10px] ${saveStatus === 'error' ? 'text-red-500' : 'text-[var(--ui-text-secondary)]'}`}>{saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Save failed' : 'Saved'}</span>
-        <div className="ml-auto flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={async () => { if (!originalVideoPath) return; setSaveStatus('saving'); const result = await window.electronAPI.saveProject(originalVideoPath, saveSnapshot()); setSaveStatus(result.success ? 'saved' : 'error'); if (!result.success) toast.error('Save failed', { description: result.error || result.message }); }}>Save</button>
-          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={() => void handleSaveAsProject()}>Save As…</button>
-          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={async () => { const result = await window.electronAPI.exportProjectPackage(); if (result.success) toast.success(`Package exported with ${result.assetCount} assets`); else if (!result.cancelled) toast.error(result.error || 'Package export failed'); }}>Package…</button>
-          <select aria-label="Style preset" value={selectedPresetId} onChange={event => setSelectedPresetId(event.target.value)} className="text-[11px] bg-transparent border border-[var(--ui-border)] rounded px-1 py-1"><option value="">Preset</option>{presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select>
-          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={() => void handleCreatePreset()}>New preset</button>
-          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={() => void handleApplyPreset()}>Apply</button>
-          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={async () => { const selected = presets.find(item => item.id === selectedPresetId); if (!selected) return; await window.electronAPI.savePreset(selected.name, currentProjectModel, selected.id); await refreshPresets(); toast.success('Preset updated'); }}>Update</button>
-          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={async () => { if (!selectedPresetId || !window.confirm('Delete this preset?')) return; await window.electronAPI.deletePreset(selectedPresetId); setSelectedPresetId(''); await refreshPresets(); }}>Delete</button>
-          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={async () => { await window.electronAPI.setDefaultPreset(selectedPresetId); setDefaultPresetId(selectedPresetId); toast.success('Default preset updated'); }}>Default</button>
-          <button className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)]" onClick={async () => { const result = await window.electronAPI.importPreset(); if (result.success) { setSelectedPresetId(result.preset.id); await refreshPresets(); } else if (!result.cancelled) toast.error(result.error || 'Preset import failed'); }}>Import preset</button>
-          <button disabled={!selectedPresetId} className="px-2 py-1 text-[11px] rounded border border-[var(--ui-border)] disabled:opacity-40" onClick={async () => { const result = await window.electronAPI.exportPreset(selectedPresetId); if (result.success) toast.success('Preset exported'); }}>Export preset</button>
+        <div className="ml-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex h-7 items-center gap-1 rounded-[5px] px-2 text-[11px] text-[var(--ui-text-secondary)] hover:bg-[var(--ui-control-hover)] hover:text-[var(--ui-text-primary)]">
+                Project
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="toscreen-dropdown-menu z-[220] min-w-44 rounded-[8px] border-0 p-1.5">
+              <DropdownMenuItem disabled={!originalVideoPath} onSelect={() => void handleSaveProject()} className="h-8 rounded-[5px] text-[11px]">
+                Save
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void handleSaveAsProject()} className="h-8 rounded-[5px] text-[11px]">
+                Save As…
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={async () => { const result = await window.electronAPI.exportProjectPackage(); if (result.success) toast.success(`Package exported with ${result.assetCount} assets`); else if (!result.cancelled) toast.error(result.error || 'Package export failed'); }} className="h-8 rounded-[5px] text-[11px]">
+                Export project package…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="ml-auto flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <TopooUserPill />
         </div>
       </div>
 
@@ -1910,10 +2009,12 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
               <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden">
                 {/* Video preview */}
                 <div
-                  className="w-full h-full p-1.5 flex items-center justify-center overflow-hidden"
+                  ref={canvasWorkspaceRef}
+                  className="relative w-full h-full p-1.5 flex items-center justify-center overflow-hidden"
                   style={{ containerType: 'size' }}
                 >
                   <div
+                    ref={canvasFrameRef}
                     className="relative shrink-0"
                     style={{
                       width: `min(100cqw, calc(100cqh * ${getAspectRatioValue(currentRenderSettings.canvas.aspectRatio)}))`,
@@ -2000,14 +2101,15 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
                         else updatePresentationEffect(id, { bounds } as Partial<PresentationEffectRegion>);
                       }}
                     />
-                    <PresentationToolbar
-                      timeMs={Math.round(currentTime * 1000)}
-                      durationMs={Math.round(projectDuration * 1000)}
-                      effects={presentationEffects}
-                      onAdd={(effect) => { setPresentationEffects((current) => [...current, effect]); handleSelectPresentation(effect.id); }}
-                      onRemove={deletePresentationEffect}
-                    />
                   </div>
+                  <PresentationToolbar
+                    timeMs={Math.round(currentTime * 1000)}
+                    durationMs={Math.round(projectDuration * 1000)}
+                    effects={presentationEffects}
+                    placement={presentationToolbarPlacement}
+                    onAdd={(effect) => { setPresentationEffects((current) => [...current, effect]); handleSelectPresentation(effect.id); }}
+                    onRemove={deletePresentationEffect}
+                  />
                 </div>
               </div>
             </div>
