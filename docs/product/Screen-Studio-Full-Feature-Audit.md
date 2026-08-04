@@ -27,11 +27,11 @@
 | 基础剪辑 | 10 | 0 | Split、删除、重排、变速、自动加速和 Undo/Redo 已进入统一时间映射 |
 | Focus 与光标 | 13 | 0 | Focus、光标可见性与点击演示效果已形成完整编辑闭环 |
 | 视觉包装 | 8 | 0 | Mask、Highlight、快捷键卡片和 Presenter 摄像头已进入预览与导出 |
-| 音频与字幕 | 7 | 1 | 双轨、内置音乐与完整字幕编辑已完成；自动转录等待真实语音端到端验收 |
+| 音频与字幕 | 8 | 0 | 双轨、内置音乐、真实本地自动转录与完整字幕编辑均已完成 |
 | 项目与预设 | 7 | 0 | Save As、Recent Projects、便携包与 Preset 均已完成并通过实际文件验收 |
 | 导出与分享 | 8 | 1 | MP4、GIF、批量队列、原始素材提取和正式分享服务已完成；在线评论、权限与撤销生命周期仍待线上验收 |
 | 稳定性与验收 | 5 | 1 | 完整机器审计、控件 Wiring 与 Electron 直接启动契约已恢复绿色；真实用户整链验收仍待完成 |
-| **合计** | **69** | **4** | **本地产品主链已基本完成；剩余为真机录屏、自动转录端到端、在线分享生命周期验收和最终验收** |
+| **合计** | **70** | **3** | **本地产品主链已基本完成；剩余为真机录屏、在线分享生命周期验收和最终用户验收** |
 
 功能数量只是审计索引，不代表每项工作量相等。例如“字幕系统”明显比“增加一个导出选项”更大。
 
@@ -108,7 +108,7 @@
 | 47 | 音量与音量包络 | Completed | 音频区域具有音量数据和包络编辑 | Preview/Export 音频设置验证通过 |
 | 48 | 麦克风与系统音频独立分轨 | Completed | 录制前可分别控制系统音频和麦克风，录制后生成具有明确 role 的独立素材与 Audio Region | Preview、Mixer、Project Model 和 Export 保留双轨语义 |
 | 49 | 内置背景音乐库 | Completed | 提供两首项目自有 CC0 WAV、授权与 SHA-256 清单、搜索、分类、试听和加入 Audio Track | 开发与打包资源解析、项目保存和音频混合契约已通过 |
-| 50 | 自动语音转录 | Not completed | 本地 macOS Speech helper 已是 arm64+x86_64 universal、独立 ad-hoc 签名应用；语言/来源选择、进度、取消和错误处理已合入；`npm run accept:transcription` 使用与产品一致的 App Bundle/TCC 身份，可生成隔离语音、要求非空 segments，并验证字幕编辑、项目保存重开和 Preview/Export 共用数据合同 | 2026-08-04 统筹实跑仍结构化返回 `siri_and_dictation_disabled`；开启系统听写后须重新得到真实非空字幕，并完成最终预览/导出观感及正式发行签名、重装授权稳定性验收 |
+| 50 | 自动语音转录 | Completed | 本地 macOS Speech helper 是 arm64+x86_64 universal、独立 ad-hoc 签名应用；语言/来源选择、进度、取消和错误处理已合入；`npm run accept:transcription` 使用与产品一致的 App Bundle/TCC 身份 | 2026-08-04 开启系统听写后统筹实跑为 `completed`：Speech Recognition `authorized`，得到 8 个非空分段，并完成字幕编辑、项目保存重开及 Preview/Export 共用数据合同；真实用户项目观感和正式签名重装稳定性继续归入 #73 最终验收 |
 | 51 | 字幕编辑、样式与动画 | Completed | 独立 Subtitle 时间线行支持选择、拖动、左右 Resize 和删除；面板支持文本、时间、字体、字号、颜色、位置、对齐、Split/Merge 和 Fade/Pop | Timeline、Panel、Project Model、Preview、Export 共用字幕状态；三轮保存恢复幂等和 Preview/Export 契约通过 |
 
 ## 6. 项目、设置与预设
@@ -146,7 +146,7 @@
 | 70 | 完整 Phase 1 审计 | Completed | `npm run audit:phase1` 在 `5413468` 完整返回退出码 0 | 2026-08-04 统一重跑覆盖 TypeScript、Project Model、Timeline、Recording、Preview/Export、音频字幕、转录验收安全合同、iOS 无设备路径、Share 路由/生产写入门禁、结构化用户验收和 Electron 发布身份契约；新增验收入口均使用无 IPC 的 `node --import tsx` |
 | 71 | Screen Studio 控件 Wiring 审计 | Completed | Zoom、Cursor、Background、Layout 与 Motion Blur 控件契约全部通过 | `audit:screenstudio-control-wiring` 返回 `status: ok` |
 | 72 | Electron Editor 直接启动契约 | Completed | 开发入口可以直接创建 Editor Window，并保留 Vite HMR、录制恢复和时间轴结构 | `audit:electron-editor-runtime` 返回 `status: ok` |
-| 73 | 完整真实用户验收 | Not completed | `npm run accept:phase1` 默认只读输出主审计表实时 `69 Completed / 4 Not completed`、UA-01 至 UA-08 的机器证据、真人动作和确认短语；没有 `accept-all`，机器结果不能自动变为 Accepted，UA-08 强制等待前七项逐项签字 | 当前仅 UA-02 为 Accepted，其余仍 Pending，阶段状态保持 `Not released`；尚未完成从录制、编辑、保存、重开到最终导出的整链路用户签字验收 |
+| 73 | 完整真实用户验收 | Not completed | `npm run accept:phase1` 默认只读输出主审计表实时 Completed / Not completed 数量、UA-01 至 UA-08 的机器证据、真人动作和确认短语；没有 `accept-all`，机器结果不能自动变为 Accepted，UA-08 强制等待前七项逐项签字 | 当前仅 UA-02 为 Accepted，其余仍 Pending，阶段状态保持 `Not released`；尚未完成从录制、编辑、保存、重开到最终导出的整链路用户签字验收 |
 
 ## 当前产品边界
 
@@ -156,9 +156,9 @@
 
 当前仍需完成的真实闭环：
 
-> iPhone/iPad 真机录制 → 启用系统听写后的自动转录端到端 → 授权后的线上分享生命周期 → 最终真实用户整链签字验收。
+> iPhone/iPad 真机录制 → 授权后的线上分享生命周期 → 最终真实用户整链签字验收。
 
-当前已有 **69 项明确完成能力**，还有 **4 项** 保持 `Not completed`。Save As、GIF、批量导出和原始素材提取已合入并复验；Quick Share 的正式服务、桌面端与观看页真实账户登录、上传和播放已经完成，但尚缺评论、Public/Private、撤销和真实断点续传验收。其余缺口是 iPhone/iPad 真机录屏、自动转录真实语音端到端，以及最终真实用户整链验收。
+当前已有 **70 项明确完成能力**，还有 **3 项** 保持 `Not completed`。自动转录已在真实 Speech Helper 中得到非空分段并完成字幕保存恢复合同；Quick Share 的正式服务、桌面端与观看页真实账户登录、上传和播放已经完成，但尚缺评论、Public/Private、撤销和真实断点续传验收。其余缺口是 iPhone/iPad 真机录屏，以及最终真实用户整链验收。
 
 ## 第一阶段建议顺序
 

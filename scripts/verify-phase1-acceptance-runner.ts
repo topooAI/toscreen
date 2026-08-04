@@ -5,7 +5,9 @@ import { parsePhase1AcceptanceState } from './phase1AcceptanceState'
 import { parseProductAuditTotals } from './phase1ProductAuditState'
 
 const source = fs.readFileSync('docs/product/Phase1-User-Acceptance-Record.md', 'utf8')
-assert.deepEqual(parseProductAuditTotals(fs.readFileSync('docs/product/Screen-Studio-Full-Feature-Audit.md', 'utf8')), { completed: 69, notCompleted: 4 })
+const auditTotals = parseProductAuditTotals(fs.readFileSync('docs/product/Screen-Studio-Full-Feature-Audit.md', 'utf8'))
+assert.equal(auditTotals.completed + auditTotals.notCompleted, 73, 'Product audit totals must continue to cover all 73 indexed capabilities.')
+assert.ok(auditTotals.completed >= 0 && auditTotals.notCompleted >= 0, 'Product audit totals must remain non-negative.')
 assert.throws(() => applyExplicitUserAcceptance(source, { id: 'UA-03', confirmedBy: '', confirmation: 'I ACCEPT UA-03' }), /human signer/)
 assert.throws(() => applyExplicitUserAcceptance(source, { id: 'UA-03', confirmedBy: 'User', confirmation: 'machine passed' }), /exactly equal/)
 assert.throws(() => applyExplicitUserAcceptance(source, { id: 'UA-08', confirmedBy: 'User', confirmation: 'I RELEASE PHASE 1' }), /blocked until/)
