@@ -1509,32 +1509,41 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
     try {
       setLoading(true);
-      // Read the clicks.json associated with this video
+      // Prefer whichever persisted telemetry source can actually produce a
+      // camera plan. Portable/restored projects may retain their cursor points
+      // even when the external clicks sidecar is no longer available.
       const result = await window.electronAPI.readClicksJson(originalVideoPath);
       console.log("[AutoZoom] Read clicks result:", result);
 
-      if (!result.success || !result.clicks || result.clicks.length === 0) {
-        toast.warning("No mouse tracking data found.", {
-          description: "Check if the clicks.json exists next to your video.",
-          duration: 6000,
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Generate zoom regions
-      const newRegions = generateAutoZooms(result.clicks, {
-        totalDurationMs: recordingDurationMs,
+      const telemetryCandidates = [
+        { source: "recording sidecar", events: result.success && Array.isArray(result.clicks) ? result.clicks : [] },
+        { source: "saved project", events: Array.isArray(cursorData) ? cursorData : [] },
+      ].map((candidate) => ({
+        ...candidate,
+        regions: generateAutoZooms(candidate.events, {
+          totalDurationMs: recordingDurationMs,
+        }),
+      }));
+      const bestCandidate = telemetryCandidates.reduce((best, candidate) => {
+        if (candidate.regions.length !== best.regions.length) {
+          return candidate.regions.length > best.regions.length ? candidate : best;
+        }
+        return candidate.events.length > best.events.length ? candidate : best;
       });
+      const newRegions = bestCandidate.regions;
 
       if (newRegions.length === 0) {
-        toast.info("No zoom regions generated.", {
-          description: "Try adjusting the debounce settings or recording more distinct clicks.",
+        const availableEventCount = Math.max(...telemetryCandidates.map((candidate) => candidate.events.length));
+        toast.error("Auto Focus is unavailable for this recording.", {
+          description: availableEventCount > 0
+            ? `This project has ${availableEventCount} cursor sample${availableEventCount === 1 ? "" : "s"}, but no usable clicks, drags, or typing. Use Add Focus to place one manually.`
+            : "This recording has no mouse tracking data, so automatic focus cannot be reconstructed. Use Add Focus to place one manually.",
+          duration: 10000,
         });
       } else {
         setZoomRegions(newRegions);
         toast.success(`Generated ${newRegions.length} auto-zoom regions!`, {
-          description: "You can adjust or delete them in the timeline."
+          description: `Generated from the ${bestCandidate.source}; you can adjust or delete them in the timeline.`
         });
       }
     } catch (err) {
@@ -1545,7 +1554,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
     } finally {
       setLoading(false);
     }
-  }, [originalVideoPath, recordingDurationMs]);
+  }, [cursorData, originalVideoPath, recordingDurationMs]);
 
   // Check for available auto-zoom data when video loads
   useEffect(() => {
