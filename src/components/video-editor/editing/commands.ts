@@ -104,6 +104,7 @@ function replaceSpeedRange(sections: SpeedSection[], replacement: SpeedSection):
 
 export function cloneDocument(document: EditingDocument): EditingDocument {
   return {
+    schemaVersion: 1,
     clips: document.clips.map((clip) => ({ ...clip })),
     speedSections: document.speedSections.map((section) => ({ ...section })),
   };

@@ -25,6 +25,7 @@ function finite(value: number, fallback = 0) {
 export function createInitialEditingDocument(sourceDurationMs: number): EditingDocument {
   const end = Math.max(0, finite(sourceDurationMs));
   return {
+    schemaVersion: 1,
     clips: end > 0 ? [{ id: 'main-clip-1', sourceStartMs: 0, sourceEndMs: end }] : [],
     speedSections: [],
   };

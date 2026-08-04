@@ -702,6 +702,9 @@ function validateEditingDocument(value: unknown, errors: string[]) {
     errors.push('Project editingDocument must contain clips and speedSections arrays.');
     return;
   }
+  if (value.schemaVersion !== undefined && value.schemaVersion !== 1) {
+    errors.push('Project editingDocument schemaVersion must be 1 when present.');
+  }
   const ids = new Set<string>();
   value.clips.forEach((clip, index) => {
     if (!isRecord(clip) || typeof clip.id !== 'string' || !isFiniteNumber(clip.sourceStartMs) || !isFiniteNumber(clip.sourceEndMs) || clip.sourceEndMs <= clip.sourceStartMs) {

@@ -136,6 +136,7 @@ const originalInput: LegacyEditorProjectInput = {
 
 const firstProject = createProjectFromLegacyEditorState(originalInput);
 assertValidProject(firstProject, "firstProject");
+if (firstProject.editingDocument?.schemaVersion !== 1) throw new Error('New EditingDocument must be authoritative schemaVersion 1.');
 
 const firstSettings = getProjectRenderSettings(firstProject);
 const restored = restoreLegacyEditorStateFromProjectModel(firstProject);

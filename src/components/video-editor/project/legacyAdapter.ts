@@ -444,7 +444,7 @@ export function createProjectFromLegacyEditorState(input: LegacyEditorProjectInp
     exportSettings: {
       quality: input.exportQuality,
     },
-    editingDocument: input.editingDocument,
+    editingDocument: input.editingDocument ? { ...input.editingDocument, schemaVersion: 1 } : undefined,
     legacyState: {
       trimRegions: input.trimRegions,
       motionBlurEnabled: input.motionBlurEnabled,
@@ -483,8 +483,13 @@ export function restoreLegacyEditorStateFromProjectModel(project: VideoEditorPro
   const persistedTrimRegions = screenClip?.type === 'screen-recording'
     ? screenClip.props.trimRegions || legacyTrimRegions
     : legacyTrimRegions;
-  const editingDocument = project.editingDocument
-    ?? migrateLegacyTrimsToEditingDocument(persistedTrimRegions, sourceDurationMs);
+  // Early projects could autosave an empty editing document while the media
+  // clip still had a valid source range. Restoring that late would erase the
+  // Main Clip initialized from metadata. Treat an empty persisted document as
+  // absent and rebuild it from the source clip / legacy trims.
+  const editingDocument = project.editingDocument?.schemaVersion === 1 || project.editingDocument?.clips?.length
+    ? project.editingDocument
+    : migrateLegacyTrimsToEditingDocument(persistedTrimRegions, sourceDurationMs);
   const legacyMotionBlurEnabled = typeof project.legacyState?.motionBlurEnabled === "boolean"
     ? project.legacyState.motionBlurEnabled
     : undefined;
@@ -568,7 +573,7 @@ export function migrateLegacyTrimsToEditingDocument(trimRegions: TrimRegion[], s
     cursor = Math.max(cursor, trim.endMs);
   });
   if (cursor < sourceDurationMs) clips.push({ id: 'legacy-main-final', sourceStartMs: cursor, sourceEndMs: sourceDurationMs });
-  return { clips, speedSections: [] };
+  return { schemaVersion: 1, clips, speedSections: [] };
 }
 
 function audioAssetId(region: AudioRegion) {

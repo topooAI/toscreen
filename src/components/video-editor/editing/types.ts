@@ -13,6 +13,8 @@ export interface SpeedSection {
 }
 
 export interface EditingDocument {
+  /** Version 1 marks the document authoritative, including an intentionally empty Main Track. */
+  schemaVersion?: 1;
   clips: MainTrackClip[];
   speedSections: SpeedSection[];
 }

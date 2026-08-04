@@ -6,7 +6,7 @@ import {
   applyPreset, atomicWriteJson, collectProjectAssetPaths, createPortablePackage, createPreset, hydrateCurrentProjectMedia, importPortablePackage, readJsonWithBackup,
   transitionProjectDocument,
 } from '../electron/projectLibrary'
-import { createProjectFromLegacyEditorState } from '../src/components/video-editor/project/legacyAdapter'
+import { createProjectFromLegacyEditorState, restoreLegacyEditorStateFromProjectModel } from '../src/components/video-editor/project/legacyAdapter'
 import { resolveSourceDurationSeconds, restoredSourceDurationSeconds, timelineMediaIsAvailable } from '../src/components/video-editor/timeline/timelineMediaAvailability'
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'toscreen-projects-'))
@@ -50,6 +50,12 @@ try {
       { id: 'mic', startMs: 0, endMs: 7000, sourceUrl: `file://${microphone}`, path: microphone, volume: 0.8, role: 'microphone' },
     ],
   })
+  const realRecentSidecarShape = structuredClone(model)
+  realRecentSidecarShape.editingDocument = { clips: [], speedSections: [] }
+  const lateRestored = restoreLegacyEditorStateFromProjectModel(realRecentSidecarShape)
+  assert.deepEqual(lateRestored.editingDocument.clips, [{ id: 'main-clip-1', sourceStartMs: 0, sourceEndMs: 7000 }], 'late restore of an unversioned empty legacy editing document must rebuild the Main Track from the valid screen source clip')
+  realRecentSidecarShape.editingDocument = { schemaVersion: 1, clips: [], speedSections: [] }
+  assert.deepEqual(restoreLegacyEditorStateFromProjectModel(realRecentSidecarShape).editingDocument.clips, [], 'a versioned empty editing document is an authoritative user deletion')
   const project = { projectModel: model, wallpaper: '/wallpapers/wallpaper1.jpg', music: 'toscreen://music/builtin.mp3' }
   await atomicWriteJson(projectPath, project)
   assert.deepEqual(new Set(collectProjectAssetPaths(project)), new Set([media, proxy, systemAudio, microphone, camera]), 'all user media and no built-ins are portable')
