@@ -40,6 +40,10 @@ assert.ok(videoEditor.includes("point.type === 'keydown'"));
 assert.ok(videoEditor.includes("type: 'replace-typing-speed'"));
 assert.ok(!timeline.includes('aria-label="Add Speed Region"'));
 assert.ok(!timeline.includes('aria-label="Selected Speed Region rate"'));
+assert.ok(sidebar.includes("return inspector(\n            'Canvas',"));
+assert.ok(sidebar.includes('data-inspector-section="video-playback"'));
+assert.ok(sidebar.includes('{canvasInspector}'));
+assert.ok(sidebar.indexOf('const canvasInspector = (') < sidebar.indexOf('data-inspector-section="video-playback"'));
 assert.deepEqual(
   migrateLegacyTrimsToEditingDocument([{ id: 'legacy-cut', startMs: 2000, endMs: 4000 }], 6000).clips.map((clip) => [clip.sourceStartMs, clip.sourceEndMs]),
   [[0, 2000], [4000, 6000]],
