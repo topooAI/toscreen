@@ -5,7 +5,7 @@ import path from 'node:path'
 import { RECORDINGS_DIR } from '../main'
 import { mouseTracker } from '../mouseTracker'
 import { mergeSegmentEvents } from '../recordingTimeline'
-import { beginTopooSignIn, chooseGifPath, clearTopooToken, encodeGif, extractOriginals, fetchTopooSession, openLocalPath, quickShare,shareApi } from '../exportShareServices'
+import { beginTopooSignIn, chooseGifPath, clearTopooToken, completeTopooSignIn, encodeGif, extractOriginals, fetchTopooSession, openLocalPath, quickShare,shareApi } from '../exportShareServices'
 
 import {
   isNativeRecordingAvailable,
@@ -173,7 +173,7 @@ export function registerIpcHandlers(
   ipcMain.handle('extract-originals', (_, sources, manifest, originalPath?:string) => {const controlled=[...sources];if(originalPath){controlled.push({kind:'raw-cursor-sidecar',path:nativeCursorPathForMediaPath(originalPath),classification:'sidecar'});controlled.push({kind:'raw-click-sidecar',path:`${originalPath}.clicks.json`,classification:'sidecar'});controlled.push({kind:'project-sidecar',path:projectPathForMediaPath(originalPath),required:true,classification:'sidecar'});}return extractOriginals(controlled, manifest);});
   ipcMain.handle('open-local-path', (_, target: string) => openLocalPath(target));
   ipcMain.handle('topoo-session', () => fetchTopooSession());
-  ipcMain.handle('topoo-sign-in', async () => { await shell.openExternal(await beginTopooSignIn()); return { state: 'pending' }; });
+  ipcMain.handle('topoo-sign-in', async (event) => { const started=await beginTopooSignIn();await shell.openExternal(started.authorizeUrl);const session=await completeTopooSignIn(started);if(!event.sender.isDestroyed())event.sender.send('topoo-session-changed');return session; });
   ipcMain.handle('topoo-sign-out', async () => { await clearTopooToken(); return { state: 'signed-out' }; });
   ipcMain.handle('quick-share', async (event, id:string,filePath:string,input) => {const controller=new AbortController();shareControllers.set(id,controller);try{return await quickShare(filePath,{...input,onProgress:(percentage:number)=>event.sender.send('quick-share-progress',{id,percentage})},controller.signal);}finally{shareControllers.delete(id);}});
   ipcMain.handle('cancel-quick-share',(_,id:string)=>{shareControllers.get(id)?.abort();return{success:true};});

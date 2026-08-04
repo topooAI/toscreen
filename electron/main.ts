@@ -23,7 +23,6 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { registerPreferenceIpcHandlers } from './preferences'
 import { registerTranscriptionHandlers } from './transcription'
 import { registerIOSDeviceCaptureHandlers } from './iosDeviceCapture'
-import { consumeTopooCallback } from './exportShareServices'
 
 // Electron 30 + macOS Metal/ANGLE can intermittently lose the GPU context after
 // ScreenCaptureKit recording. Prefer the GL ANGLE backend in development so the
@@ -95,7 +94,6 @@ let selectedSourceName = ''
 let mainWindowMode: 'home' | 'hud' | 'editor' | null = null
 let isQuitting = false
 app.setAsDefaultProtocolClient('toscreen')
-app.on('open-url', (event, rawUrl) => { event.preventDefault(); void consumeTopooCallback(rawUrl).then(() => mainWindow?.webContents.send('topoo-session-changed')).catch(error=>console.error('Invalid Topoo auth callback',error)); });
 
 // Tray Icons
 const defaultTrayIcon = getTrayIcon('openscreen.png');

@@ -6,13 +6,34 @@ import path from 'node:path';
 import os from 'node:os';
 import { copyOriginalSources, type OriginalSource } from './originalExtraction';
 import { encodeGifFromFile, type GifEncodeOptions } from './gifEncoderCore';
-import {validateTopooCallback} from '../shared/topooAuthState';
-
-
 const tokenPath = () => path.join(app.getPath('userData'), 'topoo-session.bin');
-const authStatePath = () => path.join(app.getPath('userData'),'topoo-auth-state.json');
-export async function beginTopooSignIn(){const state=crypto.randomBytes(24).toString('hex');await fs.writeFile(authStatePath(),JSON.stringify({state,expiresAt:Date.now()+10*60_000}),{mode:0o600});const redirect=`toscreen://auth/callback?state=${state}`;return `https://auth.topoo.ai/api/auth/github/start?redirect=${encodeURIComponent(redirect)}&entrance=toscreen`;}
-export async function consumeTopooCallback(rawUrl:string){let expected:any;try{expected=JSON.parse(await fs.readFile(authStatePath(),'utf8'));}catch{throw new Error('No pending Topoo sign-in');}await fs.rm(authStatePath(),{force:true});await storeTopooToken(validateTopooCallback(rawUrl,expected));}
+const TOPOO_AUTH_BASE_URL = 'https://auth.topoo.ai/api/auth';
+type TopooOAuthStart = { provider: 'github'; stateToken: string; authorizeUrl: string };
+export async function beginTopooSignIn(): Promise<TopooOAuthStart> {
+  const response = await fetch(`${TOPOO_AUTH_BASE_URL}/github/start?entranceType=desktop&responseMode=json`);
+  if (!response.ok) throw new Error(`Topoo Auth start ${response.status}`);
+  const raw = await response.json() as any;
+  const authorizeUrl = new URL(String(raw.authorizeUrl || ''));
+  const stateToken = String(raw.stateToken || '');
+  if (authorizeUrl.origin !== 'https://github.com' || !stateToken) throw new Error('Invalid Topoo OAuth start response');
+  return { provider: 'github', stateToken, authorizeUrl: authorizeUrl.toString() };
+}
+export async function completeTopooSignIn(start: TopooOAuthStart) {
+  const deadline = Date.now() + 10 * 60_000;
+  while (Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const response = await fetch(`${TOPOO_AUTH_BASE_URL}/oauth/result?provider=${encodeURIComponent(start.provider)}&state=${encodeURIComponent(start.stateToken)}`);
+    if (!response.ok) throw new Error(`Topoo Auth result ${response.status}`);
+    const result = await response.json() as any;
+    if (result.status === 'pending') continue;
+    if (result.status === 'completed' && typeof result.token === 'string' && result.token) {
+      await storeTopooToken(result.token);
+      return fetchTopooSession();
+    }
+    throw new Error(String(result.error || `Topoo sign-in ${result.status || 'failed'}`));
+  }
+  throw new Error('Topoo sign-in timed out');
+}
 export async function storeTopooToken(token: string) {
   if (!safeStorage.isEncryptionAvailable()) throw new Error('OS protected storage is unavailable');
   await fs.writeFile(tokenPath(), safeStorage.encryptString(token));
