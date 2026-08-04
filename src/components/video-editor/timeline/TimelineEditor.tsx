@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "../../../lib/utils";
 import { useTimeMap } from "../hooks/useTimeMap";
+import { timelineMediaIsAvailable } from "./timelineMediaAvailability";
 import TimelineWrapper from "./TimelineWrapper";
 import Row from "./Row";
 import Item from "./Item";
@@ -1833,7 +1834,7 @@ export default function TimelineEditor({
     }
   }, [editingSession, handleItemSpanChange, isTrimTrackVisible, mapEffectiveToProject, mapEffectiveToSource, onZoomSpanChange, sourceTotalMs, zoomRegions]);
 
-  if (!videoDuration || videoDuration === 0) {
+  if (!timelineMediaIsAvailable(videoPath, videoDuration)) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center rounded-lg bg-transparent gap-3">
         <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">

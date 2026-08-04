@@ -60,6 +60,7 @@ import { recordedShortcutEffects } from './presentation/presentationEffects';
 import { expandPendingPresenterDuration, presenterEffectFromCameraPath } from './project/presenterContract';
 import { MediaFeaturesPanel } from './MediaFeaturesPanel';
 import { deleteSubtitle, updateSubtitleSpan, type SubtitleRegion } from './mediaFeatures';
+import { restoredSourceDurationSeconds } from './timeline/timelineMediaAvailability';
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -607,12 +608,12 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       if (validation.valid) {
         setProjectName(project.projectModel.name || 'Untitled Project');
         const restored = restoreLegacyEditorStateFromProjectModel(project.projectModel);
-        const screenClip = project.projectModel.clips.find(
-          (clip: { type?: string }) => clip.type === "screen-recording",
-        );
-        const persistedSourceDurationMs = screenClip
-          ? Math.max(0, Number(screenClip.sourceEndMs) - Number(screenClip.sourceStartMs))
-          : 0;
+        const persistedSourceDurationSeconds = restoredSourceDurationSeconds(project.projectModel);
+        const persistedSourceDurationMs = persistedSourceDurationSeconds * 1000;
+        // Recent and portable projects hydrate their media path before the
+        // hidden video element reports metadata. Seed the source clock from
+        // the validated clip; loadedmetadata remains authoritative.
+        if (persistedSourceDurationSeconds > 0) setDuration(persistedSourceDurationSeconds);
         setZoomRegions(
           clampZoomRegionsToRecordingDuration(
             restored.zoomRegions,

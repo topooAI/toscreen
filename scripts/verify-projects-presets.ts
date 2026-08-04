@@ -7,9 +7,16 @@ import {
   transitionProjectDocument,
 } from '../electron/projectLibrary'
 import { createProjectFromLegacyEditorState } from '../src/components/video-editor/project/legacyAdapter'
+import { restoredSourceDurationSeconds, timelineMediaIsAvailable } from '../src/components/video-editor/timeline/timelineMediaAvailability'
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'toscreen-projects-'))
 try {
+  const restoredPreviewProject = { clips: [{ id: 'screen', type: 'screen-recording', sourceStartMs: 500, sourceEndMs: 12_500 }] }
+  const restoredDuration = restoredSourceDurationSeconds(restoredPreviewProject)
+  assert.equal(restoredDuration, 12)
+  assert.equal(timelineMediaIsAvailable('file:///project/media.mov', restoredDuration), true, 'A restored Preview source must make its Timeline available before media metadata fires')
+  assert.equal(timelineMediaIsAvailable(undefined, restoredDuration), false, 'Persisted duration without hydrated media must not hide the missing-video state')
+  assert.equal(timelineMediaIsAvailable('file:///project/media.mov', 0), false, 'A path without a valid duration is not a usable Timeline source')
   const handlersSource = await fs.readFile(path.join(process.cwd(), 'electron/ipc/handlers.ts'), 'utf8')
   assert.match(handlersSource, /project-open[\s\S]*?const media = hydrateMedia\(project\)/, 'Recent open hydrates all current media')
   assert.match(handlersSource, /project-import-package[\s\S]*?const media = hydrateMedia\(imported\.project\)/, 'package import hydrates package-local media before Editor')
