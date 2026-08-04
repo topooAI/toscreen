@@ -191,6 +191,11 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
     videoSpriteRef,
     maskGraphicsRef,
     blurFilterRef,
+    resolvePlaybackRate: (sourceTimeMs) => {
+      if (!editingRenderPlan) return 1;
+      const projectTimeMs = editingRenderPlan.timeMap.mapSourceToProject(sourceTimeMs);
+      return projectTimeMs === null ? 1 : editingRenderPlan.timeMap.rateAtProjectTime(projectTimeMs);
+    },
   });
 
   // Map RawClickEvent to CursorDataPoint
@@ -509,8 +514,6 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(({
         const clipIndex = editingRenderPlan.timeMap.clips.findIndex((clip) => sourceMs >= clip.sourceStartMs - 2 && sourceMs <= clip.sourceEndMs + 2);
         const clip = editingRenderPlan.timeMap.clips[clipIndex];
         if (clip) {
-          const projectMs = editingRenderPlan.timeMap.mapSourceToProject(Math.min(sourceMs, clip.sourceEndMs)) ?? 0;
-          video.playbackRate = editingRenderPlan.timeMap.rateAtProjectTime(projectMs);
           if (sourceMs >= clip.sourceEndMs - 16) {
             const next = editingRenderPlan.timeMap.clips[clipIndex + 1];
             if (next) video.currentTime = next.sourceStartMs / 1000;

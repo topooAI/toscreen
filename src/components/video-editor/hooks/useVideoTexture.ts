@@ -22,6 +22,7 @@ interface UseVideoTextureProps {
   videoSpriteRef: React.MutableRefObject<Sprite | null>;
   maskGraphicsRef: React.MutableRefObject<Graphics | null>;
   blurFilterRef: React.MutableRefObject<BlurFilter | null>;
+  resolvePlaybackRate?: (sourceTimeMs: number) => number;
 }
 
 export function useVideoTexture({
@@ -42,6 +43,7 @@ export function useVideoTexture({
   videoSpriteRef,
   maskGraphicsRef,
   blurFilterRef,
+  resolvePlaybackRate,
 }: UseVideoTextureProps) {
   const videoReadyRafRef = useRef<number | null>(null);
   const isPlayingRef = useRef(false);
@@ -69,7 +71,8 @@ export function useVideoTexture({
     onPlayStateChange, 
     onDurationChange, 
     onLoadedMetadata,
-    onVideoError 
+    onVideoError,
+    resolvePlaybackRate,
   });
   
   useEffect(() => {
@@ -78,9 +81,10 @@ export function useVideoTexture({
       onPlayStateChange, 
       onDurationChange, 
       onLoadedMetadata,
-      onVideoError 
+      onVideoError,
+      resolvePlaybackRate,
     };
-  }, [onTimeUpdate, onPlayStateChange, onDurationChange, onLoadedMetadata, onVideoError]);
+  }, [onTimeUpdate, onPlayStateChange, onDurationChange, onLoadedMetadata, onVideoError, resolvePlaybackRate]);
 
   const layoutVideoContentRef = useRef(layoutVideoContent);
   useEffect(() => {
@@ -105,6 +109,7 @@ export function useVideoTexture({
       trimRegionsRef: trimRegionsRef as React.MutableRefObject<TrimRegion[]>,
       isSkippingRef,
       immuneUntilRef,
+      resolvePlaybackRate: (sourceTimeMs) => callbacksRef.current.resolvePlaybackRate?.(sourceTimeMs) ?? 1,
     });
 
     video.addEventListener('play', handlePlay);

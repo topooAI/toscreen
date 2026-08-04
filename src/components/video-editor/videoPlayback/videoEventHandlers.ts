@@ -13,6 +13,7 @@ interface VideoEventHandlersParams {
   trimRegionsRef: React.MutableRefObject<TrimRegion[]>;
   isSkippingRef: React.MutableRefObject<boolean>;
   immuneUntilRef: React.MutableRefObject<number>;
+  resolvePlaybackRate?: (sourceTimeMs: number) => number;
 }
 
 export function createVideoEventHandlers(params: VideoEventHandlersParams) {
@@ -28,7 +29,14 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
     trimRegionsRef,
     isSkippingRef,
     immuneUntilRef,
+    resolvePlaybackRate,
   } = params;
+
+  const syncPlaybackRate = (sourceTimeMs: number) => {
+    const resolved = resolvePlaybackRate?.(sourceTimeMs) ?? 1;
+    const rate = Number.isFinite(resolved) && resolved > 0 ? resolved : 1;
+    if (Math.abs(video.playbackRate - rate) > 0.001) video.playbackRate = rate;
+  };
 
   // Fast path: always update the ref at 60fps for PIXI/audio
   const updateRef = (timeValue: number) => {
@@ -56,6 +64,7 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
     
     const now = performance.now();
     const currentTimeMs = video.currentTime * 1000;
+    syncPlaybackRate(currentTimeMs);
     const activeTrimRegion = findActiveTrimRegion(currentTimeMs);
     
     // If we're in a trim region during playback, skip to the end of it
@@ -113,6 +122,7 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
       return;
     }
 
+    syncPlaybackRate(video.currentTime * 1000);
     isPlayingRef.current = true;
     onPlayStateChange(true);
     if (timeUpdateAnimationRef.current) {
