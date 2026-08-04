@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 source_file="$repo_root/electron/transcribe.swift"
 bundle_dir="$repo_root/public/transcriber/ToScreenTranscriber.app"
+info_plist="$bundle_dir/Contents/Info.plist"
 output_file="$bundle_dir/Contents/MacOS/ToScreenTranscriber"
 build_dir="$(mktemp -d -t toscreen-transcriber-build)"
 export CLANG_MODULE_CACHE_PATH="$build_dir/clang-module-cache"
@@ -18,12 +19,18 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$bundle_dir/Contents/MacOS"
-xcrun swiftc -O -target arm64-apple-macosx11.0 "$source_file" -o "$build_dir/ToScreenTranscriber-arm64"
-xcrun swiftc -O -target x86_64-apple-macosx11.0 "$source_file" -o "$build_dir/ToScreenTranscriber-x86_64"
+xcrun swiftc -O -target arm64-apple-macosx11.0 "$source_file" \
+  -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$info_plist" \
+  -o "$build_dir/ToScreenTranscriber-arm64"
+xcrun swiftc -O -target x86_64-apple-macosx11.0 "$source_file" \
+  -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$info_plist" \
+  -o "$build_dir/ToScreenTranscriber-x86_64"
 xcrun lipo -create \
   "$build_dir/ToScreenTranscriber-arm64" \
   "$build_dir/ToScreenTranscriber-x86_64" \
   -output "$output_file"
 chmod 755 "$output_file"
 xcrun lipo "$output_file" -verify_arch arm64 x86_64
+codesign --force --deep --sign - "$bundle_dir"
+codesign --verify --deep --strict "$bundle_dir"
 file "$output_file"

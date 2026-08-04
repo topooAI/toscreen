@@ -95,6 +95,7 @@ interface Window {
     loadProject: (videoPath: string) => Promise<{ success: boolean; project?: any; projectPath?: string; message?: string }>;
     transcribeAudio: (input: { paths: string[]; language: string }) => Promise<{ success: boolean; segments?: Array<{ startMs: number; endMs: number; text: string }>; error?: string; cancelled?: boolean }>
     cancelTranscription: () => Promise<boolean>
+    openDictationSettings: () => Promise<boolean>
     onTranscriptionProgress: (callback: (event: unknown) => void) => () => void
     saveProjectAs: (projectData: unknown) => Promise<any>;
     getCurrentProject: () => Promise<{ projectPath: string | null }>;

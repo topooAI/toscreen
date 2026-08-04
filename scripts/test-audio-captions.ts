@@ -8,8 +8,12 @@ import { createProjectFromLegacyEditorState, restoreLegacyEditorStateFromProject
 import { getProjectRenderSettings } from '../src/components/video-editor/project/renderSettings'
 import { bundledMusicToAudioRegion, deleteSubtitle, mergeSubtitles, splitSubtitle, subtitleToAnnotation, transcriptToSubtitles, updateSubtitleSpan, defaultSubtitleStyle } from '../src/components/video-editor/mediaFeatures'
 import { cleanupTranscriptionMix, transcriptionHelperPath, transcriptionMixPath } from '../electron/transcriptionRuntime'
+import { isDictationDisabledError, transcriptionErrorMessage } from '../src/components/video-editor/transcriptionErrors'
 
 const manifest = JSON.parse(fs.readFileSync('public/music/LICENSES.json','utf8'))
+assert.equal(isDictationDisabledError('Siri and Dictation are disabled'), true)
+assert.equal(isDictationDisabledError('Speech recognition permission was not granted'), false)
+assert.match(transcriptionErrorMessage('Siri and Dictation are disabled'), /系统设置.*键盘.*听写/)
 const helperFile='public/transcriber/ToScreenTranscriber.app/Contents/MacOS/ToScreenTranscriber', helperBytes=fs.readFileSync(helperFile)
 assert.equal(helperBytes.readUInt32BE(0),0xcafebabe); const architectureCount=helperBytes.readUInt32BE(4), architectures=new Set<number>(); for(let index=0;index<architectureCount;index++) architectures.add(helperBytes.readUInt32BE(8+index*20)); assert.deepEqual(architectures,new Set([0x01000007,0x0100000c]))
 if(process.platform==='darwin'){ const helperLaunch=spawnSync(helperFile,[],{encoding:'utf8'}); assert.equal(helperLaunch.status,2); assert.match(helperLaunch.stderr,/usage: transcribe/); assert.equal(helperLaunch.signal,null); for(const architecture of ['-arm64','-x86_64']) { const launched=spawnSync('arch',[architecture,helperFile],{encoding:'utf8'}); assert.equal(launched.status,2,`${architecture} helper did not start`); assert.match(launched.stderr,/usage: transcribe/); assert.equal(launched.signal,null) } }
@@ -37,7 +41,13 @@ assert.deepEqual(restoreLegacyEditorStateFromProjectModel(withoutLegacy).subtitl
 const afterDelete=createProjectFromLegacyEditorState({...baseInput,subtitleRegions:generated.filter(item=>item.id!=='edited')}); const deletedState=restoreLegacyEditorStateFromProjectModel(afterDelete); assert.equal(deletedState.subtitleRegions?.some(item=>item.id==='edited'),false); assert.equal(afterDelete.clips.some(clip=>clip.id==='edited'),false); assert.equal(getProjectRenderSettings(afterDelete).timeline.annotationRegions.some(item=>item.id==='edited'),false)
 const preview=fs.readFileSync('src/components/video-editor/VideoPlayback.tsx','utf8'), exporter=fs.readFileSync('src/lib/exporter/annotationRenderer.ts','utf8'), panel=fs.readFileSync('src/components/video-editor/MediaFeaturesPanel.tsx','utf8')
 const timeline=fs.readFileSync('src/components/video-editor/timeline/TimelineEditor.tsx','utf8'), editor=fs.readFileSync('src/components/video-editor/VideoEditor.tsx','utf8'), row=fs.readFileSync('src/components/video-editor/timeline/Row.tsx','utf8')
+const transcriptionMain=fs.readFileSync('electron/transcription.ts','utf8'), preload=fs.readFileSync('electron/preload.ts','utf8')
+assert.ok(transcriptionMain.includes("ipcMain.handle('transcription-open-dictation-settings'"))
+assert.ok(transcriptionMain.includes('x-apple.systempreferences:com.apple.Keyboard-Settings.extension?Dictation'))
+assert.ok(transcriptionMain.includes('x-apple.systempreferences:com.apple.preference.keyboard?Dictation'))
+assert.ok(preload.includes("ipcRenderer.invoke('transcription-open-dictation-settings')"))
 for(const token of ["animation === 'fade'","animation === 'pop'"]){ assert.ok(preview.includes(token)); assert.ok(exporter.includes(token)) }
 for(const token of ['Add to Audio Track','Transcribe','Split','Merge next','Delete','fontFamily','backgroundColor']) assert.ok(panel.includes(token))
+for(const token of ['打开听写设置','openDictationSettings','isDictationDisabledError']) assert.ok(panel.includes(token))
 for(const token of ['subtitleRegions?: SubtitleRegion[]','rowId: \'row-subtitle\'','onSubtitleSpanChange?.(id, targetSpan)','deleteSelectedSubtitle()']) assert.ok(timeline.includes(token)); assert.ok(row.includes('"row-subtitle": { label: "Subtitles" }')); for(const token of ['subtitleRegions={subtitleRegions}','onSubtitleSpanChange={handleSubtitleSpanChange}','onSubtitleDelete={handleSubtitleDelete}','selectedSubtitleId={selectedSubtitleId}']) assert.ok(editor.includes(token))
 console.log('Audio/captions executable audit passed: CC0 assets, transcription protection, subtitle operations, project roundtrip, timeline UI, preview/export parity.')

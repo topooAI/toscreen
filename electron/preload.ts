@@ -165,6 +165,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }
   ,transcribeAudio: (input: { paths: string[]; language: string }) => ipcRenderer.invoke('transcription-start', input),
   cancelTranscription: () => ipcRenderer.invoke('transcription-cancel'),
+  openDictationSettings: () => ipcRenderer.invoke('transcription-open-dictation-settings'),
   onTranscriptionProgress: (callback: (event: unknown) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, value: unknown) => callback(value)
     ipcRenderer.on('transcription-progress', listener)
