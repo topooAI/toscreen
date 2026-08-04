@@ -1717,12 +1717,14 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
             onPresentationChange={updatePresentationEffect}
             onPresentationDelete={deletePresentationEffect}
             playheadMs={Math.round(currentTime * 1000)}
+            mediaFeaturesOpen={showMediaFeatures}
+            onOpenMediaFeatures={() => setShowMediaFeatures(true)}
           />
         ), [
           wallpaper, zoomRegions, selectedZoomId, selectedTrimId, shadowIntensity,
           showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, aspectRatio,
           exportQuality, selectedAnnotationId, annotationRegions, cursorSize,
-          cursorSmoothing, showVectorCursor, cursorStyle, cursorCustomImages, cursorOffset, selectedVideoId, selectedAudioId, audioRegions, presentationEffects, selectedPresentationId, currentTime,
+          cursorSmoothing, showVectorCursor, cursorStyle, cursorCustomImages, cursorOffset, selectedVideoId, selectedAudioId, audioRegions, presentationEffects, selectedPresentationId, currentTime, showMediaFeatures,
           handleZoomDepthChange, handleZoomDelete, handleCameraMotionChange, handleTrimDelete, copySelectedFocus, pasteFocus,
           handleAnnotationContentChange, handleAnnotationTypeChange,
           handleAnnotationStyleChange, handleAnnotationFigureDataChange, handleAnnotationDelete,
@@ -2096,15 +2098,24 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           <Panel defaultSize={22} minSize={18} maxSize={36}>
             {/* Right section: Sidebar */}
             <div className="h-full min-w-0">
-              {memoizedSidebar}
+              {showMediaFeatures ? (
+                <MediaFeaturesPanel
+                  currentTimeMs={Math.round(currentTime * 1000)}
+                  audioRegions={audioRegions}
+                  onAddAudio={handleAudioAdded}
+                  subtitles={subtitleRegions}
+                  onChangeSubtitles={setSubtitleRegions}
+                  selectedSubtitleId={selectedSubtitleId}
+                  onSelectSubtitle={handleSelectSubtitle}
+                  onClose={() => setShowMediaFeatures(false)}
+                />
+              ) : memoizedSidebar}
             </div>
           </Panel>
         </PanelGroup>
       </div>
 
       <Toaster theme={theme} className="pointer-events-auto" />
-      <button className="absolute right-3 top-3 z-50 rounded bg-zinc-900 px-3 py-2 text-xs" onClick={() => setShowMediaFeatures(value => !value)}>Music & Subtitles</button>
-      {showMediaFeatures && <div className="absolute right-0 top-12 bottom-0 z-40"><MediaFeaturesPanel currentTimeMs={Math.round(currentTime * 1000)} audioRegions={audioRegions} onAddAudio={handleAudioAdded} subtitles={subtitleRegions} onChangeSubtitles={setSubtitleRegions} selectedSubtitleId={selectedSubtitleId} onSelectSubtitle={handleSelectSubtitle} /></div>}
 
       <ExportDialog
         isOpen={showExportDialog}

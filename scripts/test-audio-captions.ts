@@ -49,5 +49,11 @@ assert.ok(preload.includes("ipcRenderer.invoke('transcription-open-dictation-set
 for(const token of ["animation === 'fade'","animation === 'pop'"]){ assert.ok(preview.includes(token)); assert.ok(exporter.includes(token)) }
 for(const token of ['Add to Audio Track','Transcribe','Split','Merge next','Delete','fontFamily','backgroundColor']) assert.ok(panel.includes(token))
 for(const token of ['打开听写设置','openDictationSettings','isDictationDisabledError']) assert.ok(panel.includes(token))
+const sidebar=fs.readFileSync('src/components/video-editor/sidebar/Sidebar.tsx','utf8')
+for(const token of ['onOpenMediaFeatures','Music2','aria-label="Open music and subtitles"']) assert.ok(sidebar.includes(token))
+for(const token of ['showMediaFeatures ? (','onClose={() => setShowMediaFeatures(false)}']) assert.ok(editor.includes(token))
+assert.ok(panel.includes('bg-[var(--ui-inspector-surface)]'))
+assert.ok(!panel.includes('bg-zinc-950'))
+assert.ok(!editor.includes('absolute right-3 top-3 z-50 rounded bg-zinc-900'))
 for(const token of ['subtitleRegions?: SubtitleRegion[]','rowId: \'row-subtitle\'','onSubtitleSpanChange?.(id, targetSpan)','deleteSelectedSubtitle()']) assert.ok(timeline.includes(token)); assert.ok(row.includes('"row-subtitle": { label: "Subtitles" }')); for(const token of ['subtitleRegions={subtitleRegions}','onSubtitleSpanChange={handleSubtitleSpanChange}','onSubtitleDelete={handleSubtitleDelete}','selectedSubtitleId={selectedSubtitleId}']) assert.ok(editor.includes(token))
 console.log('Audio/captions executable audit passed: CC0 assets, transcription protection, subtitle operations, project roundtrip, timeline UI, preview/export parity.')

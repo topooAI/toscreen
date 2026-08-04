@@ -6,6 +6,7 @@ import {
     Check,
     ChevronDown,
     Crop,
+    Music2,
     Scissors,
     X,
 } from "lucide-react";
@@ -89,6 +90,8 @@ interface SidebarProps {
     onPresentationChange?: (id: string, patch: Partial<PresentationEffectRegion>) => void;
     onPresentationDelete?: (id: string) => void;
     playheadMs?: number;
+    mediaFeaturesOpen?: boolean;
+    onOpenMediaFeatures?: () => void;
 }
 
 const ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1', '4:3', '4:5'];
@@ -103,7 +106,20 @@ export function Sidebar(props: SidebarProps) {
     const header = (title: string) => (
         <div className="h-11 shrink-0 flex items-center justify-between px-3 border-b border-[var(--ui-border)]">
             <span className="text-[12px] font-semibold text-[var(--ui-text-primary)]">{title}</span>
-            <div className="flex items-center gap-2"><TopooUserPill/><Button
+            <div className="flex items-center gap-2">
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Open music and subtitles"
+                    aria-pressed={props.mediaFeaturesOpen}
+                    title="Music & Subtitles"
+                    onClick={props.onOpenMediaFeatures}
+                    className={`h-[26px] w-[26px] rounded-[5px] border border-transparent p-0 text-[var(--ui-text-secondary)] shadow-none hover:border-[var(--ui-border)] hover:bg-[var(--ui-control-hover)] hover:text-[var(--ui-text-primary)] ${props.mediaFeaturesOpen ? 'bg-[var(--ui-control)] text-[#0D99FF]' : ''}`}
+                >
+                    <Music2 className="h-3.5 w-3.5" strokeWidth={1.7} />
+                </Button>
+                <TopooUserPill/><Button
                 type="button"
                 onClick={props.onExport}
                 className="h-[26px] rounded-[5px] bg-[#0D99FF] px-3 text-[12px] font-semibold text-white shadow-none hover:bg-[#0B87E3] active:bg-[#0878CC] transition-colors"
