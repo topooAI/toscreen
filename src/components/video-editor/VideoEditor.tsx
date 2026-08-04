@@ -864,7 +864,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           if (projectResult.success && projectResult.project) {
             restoredSavedProjectRef.current = true;
             const restoredFrom = applyLoadedProject(projectResult.project);
-            toast.success("工程已自动恢复");
+            toast.success("工程已自动恢复", { id: "project-auto-restored" });
             console.info(`[ProjectModel] Auto-restored project via ${restoredFrom}`, {
               projectPath: projectResult.projectPath,
               companionAudioPath: projectResult.project?.projectModel
@@ -1502,8 +1502,13 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
 
 
   const handleAutoZoom = useCallback(async () => {
+    // A restored project can emit this notice more than once while its media
+    // finishes hydrating. Do not let a stacked restore toast hide the Auto
+    // Focus result behind Sonner's intentionally transparent back layer.
+    toast.dismiss("project-auto-restored");
+
     if (!originalVideoPath) {
-      toast.error("No original video path currently loaded.");
+      toast.error("No original video path currently loaded.", { id: "auto-focus-result" });
       return;
     }
 
@@ -1538,6 +1543,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       if (newRegions.length === 0) {
         const availableEventCount = Math.max(...telemetryCandidates.map((candidate) => candidate.events.length));
         toast.error("Auto Focus is unavailable for this recording.", {
+          id: "auto-focus-result",
           description: availableEventCount > 0
             ? `This project has ${availableEventCount} cursor sample${availableEventCount === 1 ? "" : "s"}, but no usable clicks, drags, or typing. Use Add Focus to place one manually.`
             : "This recording has no mouse tracking data, so automatic focus cannot be reconstructed. Use Add Focus to place one manually.",
@@ -1546,12 +1552,14 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
       } else {
         setZoomRegions(newRegions);
         toast.success(`Generated ${newRegions.length} auto-zoom regions!`, {
+          id: "auto-focus-result",
           description: `Generated from the ${bestCandidate.source}; you can adjust or delete them in the timeline.`
         });
       }
     } catch (err) {
       console.error("Auto-zoom generation failed:", err);
       toast.error("Failed to generate auto-zooms.", {
+        id: "auto-focus-result",
         description: "Check the console for details."
       });
     } finally {
