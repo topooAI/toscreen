@@ -20,7 +20,7 @@ const runtimeAudit = read('src/components/video-editor/timeline/EditingRuntimeAu
 for (const [content, needles] of [
   [videoEditor, ['useEditingSession(recordingDurationMs)', 'editingSession.restore(restored.editingDocument)', 'editingRenderPlan={editingRenderPlan}', 'editingSession={editingSession}', 'editingDocument: editingSession.document']],
   [timeline, ['aria-label="Split Main Clip"', 'aria-label="Delete Main Clip"', "type: 'reorder'", "editingSession?.redo()", "editingSession?.undo()"]],
-  [sidebar, ['aria-label="Selected video speed"', 'The source video is never modified.']],
+  [sidebar, ['aria-label="Selected video speed"']],
   [videoEditor, ['setCurrentTime(clipStartEffectiveSeconds)', 'videoPlaybackRef.current.video.currentTime = clipStartSourceSeconds']],
   [timeline, ['current.end > activeDurationMs', 'return createInitialRange(activeDurationMs)']],
   [playbackControls, ['formatTime(duration, true)']],
@@ -44,6 +44,15 @@ assert.ok(sidebar.includes("return inspector(\n            'Canvas',"));
 assert.ok(sidebar.includes('data-inspector-section="video-playback"'));
 assert.ok(sidebar.includes('{canvasInspector}'));
 assert.ok(sidebar.indexOf('const canvasInspector = (') < sidebar.indexOf('data-inspector-section="video-playback"'));
+assert.ok(!sidebar.includes('Changes only this clip.'), 'Speed Inspector should not show explanatory copy below the control.');
+assert.ok(
+  sidebar.includes('border border-transparent bg-[var(--ui-control)]') && sidebar.includes('hover:border-[var(--ui-border)] focus:border-[#0D99FF]'),
+  'Speed Inspector Mixed control should share the transparent-border treatment used by the other selects.',
+);
+assert.ok(
+  timeline.includes('isAssociatedAudioSelected ? 122 : 104'),
+  'Main Track must contain the attached-audio accordion at both collapsed and expanded heights.',
+);
 const blankTimelineClickHandler = timeline.slice(
   timeline.indexOf('const handleTimelineClick'),
   timeline.indexOf('return (', timeline.indexOf('const handleTimelineClick')),
@@ -102,5 +111,7 @@ console.log(JSON.stringify({ status: 'ok', checks: [
   'Preview/VideoExporter/AudioMixerExporter consume editing render plan',
   'Preview applies speed sections from the media playback clock',
   'Timeline blank space clears Main Clip and other Inspector selections',
+  'Main Track contains attached audio without visual overflow',
+  'Speed Inspector keeps the Mixed control visually consistent without explanatory copy',
   'recorded keydown sidecar remains available to the editing speed engine',
 ] }, null, 2));

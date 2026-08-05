@@ -617,7 +617,12 @@ function Timeline({
   const trackRenderer = useMemo(() => {
     const hasAssociatedAudio = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio);
     const isAssociatedAudioSelected = items.some(item => item.rowId === VIDEO_ROW_ID && item.associatedAudio?.id === selectedAudioId);
-    const videoRowHeight = isAssociatedAudioSelected ? 112 : (hasAssociatedAudio ? 96 : 82);
+    // The attached-audio accordion is rendered inside the Main Track item.
+    // Leave enough room for its 92px collapsed / 110px expanded content plus
+    // the item's 3px top and bottom breathing margins so it stays contained.
+    const videoRowHeight = hasAssociatedAudio
+      ? (isAssociatedAudioSelected ? 122 : 104)
+      : 82;
 
     return (
        <>

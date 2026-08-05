@@ -366,7 +366,7 @@ export function Sidebar(props: SidebarProps) {
                                 <span>Speed</span>
                                 <select
                                     aria-label="Selected video speed"
-                                    className="h-8 min-w-[92px] rounded-[5px] border border-[var(--ui-border)] bg-[var(--ui-control)] px-2 text-[11px] text-[var(--ui-text-primary)]"
+                                    className="h-8 min-w-[92px] rounded-[5px] border border-transparent bg-[var(--ui-control)] px-2 text-[11px] text-[var(--ui-text-primary)] outline-none hover:border-[var(--ui-border)] focus:border-[#0D99FF]"
                                     value={props.selectedVideoSpeed ?? 'mixed'}
                                     onChange={(event) => props.onSelectedVideoSpeedChange?.(Number(event.target.value))}
                                 >
@@ -374,9 +374,6 @@ export function Sidebar(props: SidebarProps) {
                                     {[0.5, 1, 1.5, 2, 4, 8].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
                                 </select>
                             </label>
-                            <p className="mt-2 text-[10px] leading-4 text-[var(--ui-text-tertiary)]">
-                                Changes only this clip. The source video is never modified.
-                            </p>
                         </section>
                         <section className="border-t border-[var(--ui-border)] px-4 py-3">
                             <h3 className="text-[12px] font-semibold text-[var(--ui-text-primary)] mb-2">Source</h3>

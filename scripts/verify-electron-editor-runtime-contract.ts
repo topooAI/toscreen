@@ -127,7 +127,8 @@ const checks = [
     area: "main-clip-compressed-height",
     file: "timelineEditor",
     needles: [
-      "const videoRowHeight = isAssociatedAudioSelected ? 112 : (hasAssociatedAudio ? 96 : 82)",
+      "const videoRowHeight = hasAssociatedAudio",
+      "isAssociatedAudioSelected ? 122 : 104",
     ],
   },
   {
