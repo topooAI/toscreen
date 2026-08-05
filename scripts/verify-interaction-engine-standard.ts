@@ -123,12 +123,28 @@ if (
 
 const separatedZoom: ZoomRegion = {
   ...secondZoom,
-  startMs: 1720,
-  endMs: 3120,
+  startMs: 5_220,
+  endMs: 6_620,
 };
 const separatedGap = findInterpolatedTarget([firstZoom, separatedZoom], 1560);
 if (separatedGap.strength !== 0 || separatedGap.region !== null) {
-  throw new Error("Separated Focus clips must close to the base view instead of panning across the gap.");
+  throw new Error("Long-idle Focus clips must close to the base view instead of panning across the gap.");
+}
+
+const bridgedZoom: ZoomRegion = {
+  ...secondZoom,
+  startMs: 2_600,
+  endMs: 4_000,
+};
+const bridgedGap = findInterpolatedTarget([firstZoom, bridgedZoom], 2_000);
+if (
+  bridgedGap.strength !== 1
+  || (bridgedGap.depth ?? 0) <= firstZoom.depth
+  || (bridgedGap.depth ?? 0) >= bridgedZoom.depth
+  || (bridgedGap.focus?.cx ?? 0) <= firstZoom.focus.cx
+  || (bridgedGap.focus?.cx ?? 0) >= bridgedZoom.focus.cx
+) {
+  throw new Error("Short Focus gaps must bridge camera targets without returning to the base view.");
 }
 
 const autoFocus: ZoomRegion = {

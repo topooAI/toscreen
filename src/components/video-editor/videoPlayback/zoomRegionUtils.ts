@@ -3,6 +3,11 @@ import { TRANSITION_WINDOW_MS } from "./constants";
 import { sampleCursorTrack } from "./cursorTrack";
 
 const CONNECTED_ZOOM_GAP_MS = 16;
+// A short period of inactivity is still part of the same camera sentence.
+// Bridge it directly from the previous Focus to the next one instead of
+// snapping to the base view and zooming in again. Longer idle periods remain
+// intentionally unzoomed.
+const BRIDGED_ZOOM_GAP_MS = 2_800;
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
@@ -60,10 +65,14 @@ function resolveFocus(
   return sample ? { cx: sample.x, cy: sample.y } : region.focus;
 }
 
-function isConnected(left: ZoomRegion | undefined, right: ZoomRegion | undefined): boolean {
-  if (!left || !right) return false;
-  const gapMs = right.startMs - left.endMs;
-  return gapMs >= -2 && gapMs <= CONNECTED_ZOOM_GAP_MS;
+function getGapMs(left: ZoomRegion | undefined, right: ZoomRegion | undefined): number | null {
+  if (!left || !right) return null;
+  return right.startMs - left.endMs;
+}
+
+function isContinuouslyFramed(left: ZoomRegion | undefined, right: ZoomRegion | undefined): boolean {
+  const gapMs = getGapMs(left, right);
+  return gapMs !== null && gapMs >= -2 && gapMs <= BRIDGED_ZOOM_GAP_MS;
 }
 
 export function findInterpolatedTarget(
@@ -78,10 +87,13 @@ export function findInterpolatedTarget(
   for (let index = 0; index < ordered.length - 1; index += 1) {
     const current = ordered[index];
     const next = ordered[index + 1];
-    if (!isConnected(current, next)) continue;
+    if (!isContinuouslyFramed(current, next)) continue;
 
     const transitionStart = current.endMs;
-    const transitionEnd = Math.min(next.endMs, next.startMs + TRANSITION_WINDOW_MS);
+    const gapMs = getGapMs(current, next) ?? 0;
+    const transitionEnd = gapMs > CONNECTED_ZOOM_GAP_MS
+      ? next.startMs
+      : Math.min(next.endMs, next.startMs + TRANSITION_WINDOW_MS);
     if (timeMs < transitionStart || timeMs > transitionEnd) continue;
 
     const progress = easeOut(
@@ -116,8 +128,8 @@ export function findInterpolatedTarget(
   const previous = ordered[activeIndex - 1];
   const next = ordered[activeIndex + 1];
   const transitionMs = getTransitionDuration(region);
-  const previousIsConnected = isConnected(previous, region);
-  const nextIsConnected = isConnected(region, next);
+  const previousIsConnected = isContinuouslyFramed(previous, region);
+  const nextIsConnected = isContinuouslyFramed(region, next);
 
   let strength = 1;
   if (!previousIsConnected && transitionMs > 0 && timeMs < region.startMs + transitionMs) {
