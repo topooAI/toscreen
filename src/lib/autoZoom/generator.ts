@@ -33,7 +33,10 @@ export const DEFAULT_AUTO_ZOOM_OPTIONS: AutoZoomOptions = {
     maxRegionMs: 4800,
     spatialSplitDistance: 0.22,
     maxFocusSpan: 0.34,
-    connectedGapMs: 1400,
+    // Keep medium pauses in one camera sentence. The renderer uses the same
+    // boundary for a continuous pan, so generated timeline clips do not show
+    // a misleading empty Focus gap.
+    connectedGapMs: 2800,
     focusPadding: 0.1,
     minRegionMs: 900,
     tailBaseViewMs: 0,
