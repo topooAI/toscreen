@@ -154,9 +154,9 @@
 }
 
 .card {
-  --scene-roll: -2deg;
+  --scene-roll: 2deg;
   --scene-pitch: 9deg;
-  --scene-yaw: -32deg;
+  --scene-yaw: 32deg;
   --focus-x: 50%;
   --focus-y: 44%;
   position: relative;
@@ -172,17 +172,17 @@
 }
 
 .card[data-camera='1'] {
-  --scene-roll: -1.5deg;
+  --scene-roll: 1.5deg;
   --scene-pitch: 8deg;
-  --scene-yaw: -28deg;
+  --scene-yaw: 28deg;
   --focus-x: 52%;
   --focus-y: 42%;
 }
 
 .card[data-camera='2'] {
-  --scene-roll: -2.5deg;
+  --scene-roll: 2.5deg;
   --scene-pitch: 10deg;
-  --scene-yaw: -36deg;
+  --scene-yaw: 36deg;
   --focus-x: 63%;
   --focus-y: 50%;
 }
@@ -221,7 +221,7 @@
   inset: 0;
   overflow: hidden;
   perspective: 460px;
-  perspective-origin: 28% 46%;
+  perspective-origin: 72% 46%;
   background:
     radial-gradient(circle at 72% 22%, rgba(255, 255, 255, .96), rgba(242, 242, 240, .72) 40%, transparent 68%),
     repeating-linear-gradient(125deg, rgba(255, 255, 255, .55) 0 1px, rgba(226, 226, 223, .18) 1px 3px),
@@ -233,7 +233,7 @@
   inset: -48% -42%;
   display: block;
   transform: rotateX(var(--scene-pitch)) rotateY(var(--scene-yaw)) rotateZ(var(--scene-roll)) scale(1.22);
-  transform-origin: 30% 52%;
+  transform-origin: 70% 52%;
   transform-style: preserve-3d;
   backface-visibility: hidden;
 }
@@ -275,33 +275,33 @@
 .coverDepthStrong::before {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
+  top: 0;
+  bottom: 0;
   background: rgba(255, 255, 255, .001);
 }
 
 .coverDepthSoft::before,
 .coverDepthMedium::before,
 .coverDepthStrong::before {
-  top: 0;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
+  left: 0;
+  -webkit-mask-image: linear-gradient(100deg, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
+  mask-image: linear-gradient(100deg, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
 }
 
 .coverDepthSoft::before {
-  height: 36%;
+  width: 46%;
   -webkit-backdrop-filter: blur(.7px);
   backdrop-filter: blur(.7px);
 }
 
 .coverDepthMedium::before {
-  height: 27%;
+  width: 32%;
   -webkit-backdrop-filter: blur(1.5px);
   backdrop-filter: blur(1.5px);
 }
 
 .coverDepthStrong::before {
-  height: 17%;
+  width: 18%;
   -webkit-backdrop-filter: blur(2.8px);
   backdrop-filter: blur(2.8px);
 }
