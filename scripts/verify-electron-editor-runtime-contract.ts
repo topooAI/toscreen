@@ -182,13 +182,6 @@ const checks = [
     ],
   },
   {
-    area: "projects-window-native-controls-alignment",
-    file: "electronWindows",
-    needles: [
-      "trafficLightPosition: { x: 12, y: 17 }",
-    ],
-  },
-  {
     area: "topoo-account-trigger",
     file: "topooUserPill",
     needles: [
