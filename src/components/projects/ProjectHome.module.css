@@ -154,6 +154,9 @@
 }
 
 .card {
+  --camera-start: perspective(760px) rotateX(4deg) rotateY(-8deg) rotateZ(-1.8deg) translate3d(-1.5%, 0, 0) scale(.96);
+  --camera-end: perspective(760px) rotateX(1deg) rotateY(2deg) rotateZ(.5deg) translate3d(3%, -2%, 28px) scale(1.04);
+  --backdrop-end: translate3d(-2%, -1%, 0) scale(1.16);
   position: relative;
   overflow: hidden;
   min-height: 198px;
@@ -164,6 +167,18 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02), 0 10px 24px rgba(0, 0, 0, 0.035);
   isolation: isolate;
   transform: translateZ(0);
+}
+
+.card[data-camera='1'] {
+  --camera-start: perspective(760px) rotateX(4deg) rotateY(8deg) rotateZ(1.8deg) translate3d(1.5%, 0, 0) scale(.96);
+  --camera-end: perspective(760px) rotateX(1deg) rotateY(-2deg) rotateZ(-.45deg) translate3d(-3%, -2%, 28px) scale(1.04);
+  --backdrop-end: translate3d(2%, -1%, 0) scale(1.16);
+}
+
+.card[data-camera='2'] {
+  --camera-start: perspective(760px) rotateX(6deg) rotateY(-5deg) rotateZ(-1.15deg) translate3d(0, 1%, 0) scale(.96);
+  --camera-end: perspective(760px) rotateX(0deg) rotateY(2deg) rotateZ(.35deg) translate3d(1%, -3%, 30px) scale(1.05);
+  --backdrop-end: translate3d(1%, 2%, 0) scale(1.17);
 }
 
 .card:hover {
@@ -195,17 +210,57 @@
   cursor: pointer;
 }
 
-.preview img {
+.coverStage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #d9d9d7;
+  perspective: 760px;
+}
+
+.coverBackdrop {
+  position: absolute;
+  inset: -12%;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(14px) saturate(.72) brightness(.82);
+  opacity: .82;
+  transform: scale(1.1);
+  transition: transform 4.8s cubic-bezier(.2, .65, .25, 1), filter .45s ease;
+}
+
+.coverFrame {
+  position: absolute;
+  top: 8%;
+  left: 9%;
+  display: block;
+  width: 82%;
+  height: 70%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .55);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 36px rgba(15, 15, 15, .28), 0 3px 8px rgba(15, 15, 15, .12);
+  transform: var(--camera-start);
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.coverFrame img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scale(1.01);
-  transition: transform .55s cubic-bezier(.2, .8, .2, 1), filter .3s ease;
+  transform: scale(1.025);
 }
 
-.card:hover .preview img {
-  transform: scale(1.045);
-  filter: saturate(1.03);
+.card:hover .coverFrame {
+  animation: cinematic-camera-drift 4.8s cubic-bezier(.2, .65, .25, 1) infinite alternate;
+}
+
+.card:hover .coverBackdrop {
+  filter: blur(16px) saturate(.8) brightness(.76);
+  transform: var(--backdrop-end);
 }
 
 .preview::after {
@@ -222,6 +277,16 @@
   height: 100%;
   place-items: center;
   color: rgba(255, 255, 255, .82);
+}
+
+@keyframes cinematic-camera-drift {
+  from { transform: var(--camera-start); }
+  to { transform: var(--camera-end); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card:hover .coverFrame { animation: none; }
+  .coverBackdrop { transition: none; }
 }
 
 .duration {

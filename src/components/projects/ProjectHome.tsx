@@ -74,10 +74,13 @@ export function ProjectHome() {
           </SelectContent>
         </Select>
       </div>
-      {visible.length === 0 ? <div className={styles.empty}><FolderOpen/><h2>No projects yet</h2><p>Record your screen or import a portable ToScreen package.</p></div> : <div className={styles.grid}>{visible.map(project => <article key={project.projectPath} className={styles.card} data-status={project.assetStatus} data-has-cover={project.thumbnailPath ? 'true' : 'false'}>
+      {visible.length === 0 ? <div className={styles.empty}><FolderOpen/><h2>No projects yet</h2><p>Record your screen or import a portable ToScreen package.</p></div> : <div className={styles.grid}>{visible.map(project => <article key={project.projectPath} className={styles.card} data-status={project.assetStatus} data-has-cover={project.thumbnailPath ? 'true' : 'false'} data-camera={getCameraDirection(project.id)}>
         <button className={styles.preview} onClick={() => void open(project.projectPath)}>
           {project.thumbnailPath
-            ? <img src={toFileUrl(project.thumbnailPath)} alt="" />
+            ? <div className={styles.coverStage}>
+                <img className={styles.coverBackdrop} src={toFileUrl(project.thumbnailPath)} alt="" />
+                <span className={styles.coverFrame}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
+              </div>
             : <div className={styles.coverFallback} style={{ background: getMorandiGradient(project.name) }}><Video size={31} /></div>}
           <span className={styles.duration}>{formatDuration(project.durationMs)}</span>
         </button>
@@ -101,6 +104,7 @@ export function ProjectHome() {
 }
 function formatDuration(ms: number) { const total = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}` }
 function toFileUrl(filePath: string) { return encodeURI(`file://${filePath}`) }
+function getCameraDirection(id: string) { let hash = 0; for (const character of id) hash = ((hash << 5) - hash) + character.charCodeAt(0); return String(Math.abs(hash) % 3) }
 
 const morandiPalettes = [
   { from: '#e0c3fc', to: '#8ec5fc' }, // 粉紫-冰蓝
