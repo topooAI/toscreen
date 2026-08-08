@@ -6,7 +6,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { TopooUserPill } from '@/components/video-editor/TopooUserPill'
 import { ImportVideoMorphIcon, ImportPackageMorphIcon, NewRecordingMorphIcon } from '@/components/common/MorphIcon'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { getProjectCoverDetailScale } from './projectCoverScale'
+import { locateProjectCoverImage, type ProjectCoverFocus } from './projectCoverFocus'
+import { getProjectCoverDetailScale, getProjectCoverImagePlacement } from './projectCoverScale'
 import styles from './ProjectHome.module.css'
 
 interface RecentProject {
@@ -18,6 +19,7 @@ interface RecentProject {
 export function ProjectHome() {
   const [hoveredButton, setHoveredButton] = useState<'video' | 'package' | 'record' | null>(null)
   const [projects, setProjects] = useState<RecentProject[]>([])
+  const [coverFocus, setCoverFocus] = useState<Record<string, ProjectCoverFocus>>({})
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'updated' | 'name' | 'duration'>('updated')
   const refresh = useCallback(async () => { const result = await window.electronAPI.listRecentProjects(); if (result.success) setProjects(result.projects) }, [])
@@ -79,11 +81,14 @@ export function ProjectHome() {
       {visible.length === 0 ? <div className={styles.empty}><FolderOpen/><h2>No projects yet</h2><p>Record your screen or import a portable ToScreen package.</p></div> : <div className={styles.grid}>{visible.map(project => <article key={project.projectPath} className={styles.card} data-status={project.assetStatus} data-has-cover={project.thumbnailPath ? 'true' : 'false'} data-camera={getCameraDirection(project.id)}>
         <button className={styles.preview} onClick={() => void open(project.projectPath)}>
           {project.thumbnailPath
-            ? <div className={styles.coverStage} style={{ '--detail-scale': getProjectCoverDetailScale(project.thumbnailSourceWidth) } as CSSProperties}>
+            ? <div className={styles.coverStage} style={getProjectCoverStyle(project, coverFocus[project.id])}>
                 <span className={styles.coverScene}>
-                  <span className={`${styles.coverPlane} ${styles.coverLensFocus}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
-                  <span className={`${styles.coverPlane} ${styles.coverLensBlur} ${styles.coverLensBlurLeft}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
-                  <span className={`${styles.coverPlane} ${styles.coverLensBlur} ${styles.coverLensBlurRight}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
+                  <span className={`${styles.coverPlane} ${styles.coverLensFocus}`}><img src={toFileUrl(project.thumbnailPath)} alt="" onLoad={event => {
+                    if (!project.thumbnailSourceWidth || !project.thumbnailSourceHeight) return
+                    const focus = locateProjectCoverImage(event.currentTarget, getFallbackCoverFocus(project.id))
+                    if (focus) setCoverFocus(previous => ({ ...previous, [project.id]: focus }))
+                  }} /></span>
+                  <span className={`${styles.coverPlane} ${styles.coverLensBlur}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
                 </span>
               </div>
             : <div className={styles.coverFallback} style={{ background: getMorandiGradient(project.name) }}><Video size={31} /></div>}
@@ -110,6 +115,19 @@ export function ProjectHome() {
 function formatDuration(ms: number) { const total = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}` }
 function toFileUrl(filePath: string) { return encodeURI(`file://${filePath}`) }
 function getCameraDirection(id: string) { let hash = 0; for (const character of id) hash = ((hash << 5) - hash) + character.charCodeAt(0); return String(Math.abs(hash) % 3) }
+function getFallbackCoverFocus(id: string): ProjectCoverFocus { const direction = getCameraDirection(id); return direction === '1' ? { x: 52, y: 42 } : direction === '2' ? { x: 63, y: 50 } : { x: 50, y: 44 } }
+function getProjectCoverStyle(project: RecentProject, detectedFocus?: ProjectCoverFocus): CSSProperties {
+  const focus = detectedFocus || getFallbackCoverFocus(project.id)
+  const scale = getProjectCoverDetailScale(project.thumbnailSourceWidth)
+  const placement = getProjectCoverImagePlacement(scale, focus)
+  return {
+    '--focus-x': `${focus.x}%`,
+    '--focus-y': `${focus.y}%`,
+    '--cover-image-size': `${placement.sizePercent}%`,
+    '--cover-image-left': `${placement.leftPercent}%`,
+    '--cover-image-top': `${placement.topPercent}%`,
+  } as CSSProperties
+}
 
 const morandiPalettes = [
   { from: '#e0c3fc', to: '#8ec5fc' }, // 粉紫-冰蓝
