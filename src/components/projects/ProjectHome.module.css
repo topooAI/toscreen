@@ -154,8 +154,9 @@
 }
 
 .card {
-  --cover-angle: -7deg;
-  --cover-front-x: 1%;
+  --scene-angle: -11deg;
+  --focus-x: 50%;
+  --focus-y: 44%;
   position: relative;
   overflow: hidden;
   min-height: 198px;
@@ -169,13 +170,15 @@
 }
 
 .card[data-camera='1'] {
-  --cover-angle: -5.5deg;
-  --cover-front-x: 3%;
+  --scene-angle: -9deg;
+  --focus-x: 52%;
+  --focus-y: 42%;
 }
 
 .card[data-camera='2'] {
-  --cover-angle: -8.5deg;
-  --cover-front-x: -1%;
+  --scene-angle: -13deg;
+  --focus-x: 63%;
+  --focus-y: 50%;
 }
 
 .card:hover {
@@ -215,61 +218,58 @@
     radial-gradient(circle at 72% 22%, rgba(255, 255, 255, .96), rgba(242, 242, 240, .72) 40%, transparent 68%),
     repeating-linear-gradient(125deg, rgba(255, 255, 255, .55) 0 1px, rgba(226, 226, 223, .18) 1px 3px),
     #eeeeec;
-  perspective: 900px;
+}
+
+.coverStage::before,
+.coverStage::after {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  content: '';
+  pointer-events: none;
+}
+
+.coverStage::before {
+  background: radial-gradient(ellipse 48% 48% at var(--focus-x) var(--focus-y), transparent 45%, rgba(250, 250, 248, .13) 100%);
+}
+
+.coverStage::after {
+  background: linear-gradient(122deg, rgba(255, 255, 255, .1), transparent 34% 76%, rgba(225, 225, 222, .12));
+}
+
+.coverScene {
+  position: absolute;
+  inset: -34% -24%;
+  display: block;
+  transform: rotateX(26deg) rotateZ(var(--scene-angle)) scale(1.08);
+  transform-origin: var(--focus-x) var(--focus-y);
 }
 
 .coverPlane {
   position: absolute;
+  inset: -8%;
   display: block;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, .82);
-  border-radius: 9px;
-  background: #fafafa;
-  transform-origin: center;
+  background: transparent;
 }
 
 .coverPlane img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: var(--focus-x) var(--focus-y);
+  transform: scale(1.36);
 }
 
-.coverPlaneBack {
-  top: -23%;
-  right: -16%;
-  width: 92%;
-  height: 60%;
-  opacity: .34;
-  filter: saturate(.35) brightness(1.24) blur(.45px);
-  transform: perspective(900px) rotateX(3deg) rotateZ(var(--cover-angle));
+.coverLensBlur {
+  filter: blur(2.8px) saturate(.68) brightness(1.03);
 }
 
-.coverPlaneMiddle {
-  bottom: -24%;
-  left: -24%;
-  width: 98%;
-  height: 64%;
-  opacity: .24;
-  filter: saturate(.3) brightness(1.3) blur(.65px);
-  transform: perspective(900px) rotateX(3deg) rotateZ(var(--cover-angle));
-}
-
-.coverPlaneFront {
-  top: 13%;
-  left: var(--cover-front-x);
+.coverLensFocus {
   z-index: 1;
-  width: 98%;
-  height: 70%;
-  box-shadow: 0 18px 34px rgba(65, 65, 60, .16), 0 3px 8px rgba(65, 65, 60, .09);
-  transform: perspective(900px) rotateX(3deg) rotateY(-1.5deg) rotateZ(var(--cover-angle));
-}
-
-.preview::after {
-  position: absolute;
-  inset: 34% 0 0;
-  background: linear-gradient(180deg, transparent 0%, rgba(250, 250, 249, .1) 28%, rgba(250, 250, 249, .94) 100%);
-  content: '';
-  pointer-events: none;
+  filter: contrast(1.1) saturate(.86) brightness(.98);
+  -webkit-mask-image: radial-gradient(ellipse 46% 50% at var(--focus-x) var(--focus-y), #000 0 56%, rgba(0, 0, 0, .9) 68%, transparent 92%);
+  mask-image: radial-gradient(ellipse 46% 50% at var(--focus-x) var(--focus-y), #000 0 56%, rgba(0, 0, 0, .9) 68%, transparent 92%);
 }
 
 .coverFallback {

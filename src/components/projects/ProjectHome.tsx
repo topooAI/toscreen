@@ -78,9 +78,10 @@ export function ProjectHome() {
         <button className={styles.preview} onClick={() => void open(project.projectPath)}>
           {project.thumbnailPath
             ? <div className={styles.coverStage}>
-                <span className={`${styles.coverPlane} ${styles.coverPlaneBack}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
-                <span className={`${styles.coverPlane} ${styles.coverPlaneMiddle}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
-                <span className={`${styles.coverPlane} ${styles.coverPlaneFront}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
+                <span className={styles.coverScene}>
+                  <span className={`${styles.coverPlane} ${styles.coverLensBlur}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
+                  <span className={`${styles.coverPlane} ${styles.coverLensFocus}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
+                </span>
               </div>
             : <div className={styles.coverFallback} style={{ background: getMorandiGradient(project.name) }}><Video size={31} /></div>}
           <span className={styles.duration}>{formatDuration(project.durationMs)}</span>
