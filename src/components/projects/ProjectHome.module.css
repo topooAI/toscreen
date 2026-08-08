@@ -154,7 +154,7 @@
 }
 
 .card {
-  --scene-angle: -4deg;
+  --scene-angle: -6.5deg;
   --focus-x: 50%;
   --focus-y: 44%;
   position: relative;
@@ -170,13 +170,13 @@
 }
 
 .card[data-camera='1'] {
-  --scene-angle: -3deg;
+  --scene-angle: -5.5deg;
   --focus-x: 52%;
   --focus-y: 42%;
 }
 
 .card[data-camera='2'] {
-  --scene-angle: -5deg;
+  --scene-angle: -7.5deg;
   --focus-x: 63%;
   --focus-y: 50%;
 }
@@ -261,11 +261,8 @@
 }
 
 .coverDepthSoft::before,
-.coverDepthSoft::after,
 .coverDepthMedium::before,
-.coverDepthMedium::after,
-.coverDepthStrong::before,
-.coverDepthStrong::after {
+.coverDepthStrong::before {
   content: '';
   position: absolute;
   left: 0;
@@ -281,30 +278,19 @@
   mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
 }
 
-.coverDepthSoft::after,
-.coverDepthMedium::after,
-.coverDepthStrong::after {
-  bottom: 0;
-  -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
-}
-
-.coverDepthSoft::before,
-.coverDepthSoft::after {
+.coverDepthSoft::before {
   height: 36%;
   -webkit-backdrop-filter: blur(.7px);
   backdrop-filter: blur(.7px);
 }
 
-.coverDepthMedium::before,
-.coverDepthMedium::after {
+.coverDepthMedium::before {
   height: 27%;
   -webkit-backdrop-filter: blur(1.5px);
   backdrop-filter: blur(1.5px);
 }
 
-.coverDepthStrong::before,
-.coverDepthStrong::after {
+.coverDepthStrong::before {
   height: 17%;
   -webkit-backdrop-filter: blur(2.8px);
   backdrop-filter: blur(2.8px);
