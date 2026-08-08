@@ -224,7 +224,7 @@
   position: absolute;
   inset: -34% -24%;
   display: block;
-  transform: rotateX(6deg) rotateZ(var(--scene-angle)) scale(1.08);
+  transform: rotateZ(var(--scene-angle)) scale(1.08);
   transform-origin: 50% 50%;
 }
 
@@ -246,12 +246,16 @@
   object-fit: cover;
 }
 
-.coverLensBlur {
-  z-index: 2;
-  filter: blur(.9px) saturate(.92) brightness(1.005);
+.coverDepthBlur {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: rgba(255, 255, 255, .01);
+  -webkit-backdrop-filter: blur(3.2px) saturate(.88);
+  backdrop-filter: blur(3.2px) saturate(.88);
   pointer-events: none;
-  -webkit-mask-image: radial-gradient(ellipse 70% 72% at 50% 50%, transparent 0 76%, rgba(0, 0, 0, .18) 88%, #000 100%);
-  mask-image: radial-gradient(ellipse 70% 72% at 50% 50%, transparent 0 76%, rgba(0, 0, 0, .18) 88%, #000 100%);
+  -webkit-mask-image: radial-gradient(ellipse 68% 72% at 50% 48%, transparent 0 48%, rgba(0, 0, 0, .64) 72%, #000 100%);
+  mask-image: radial-gradient(ellipse 68% 72% at 50% 48%, transparent 0 48%, rgba(0, 0, 0, .64) 72%, #000 100%);
 }
 
 .coverLensFocus {

@@ -88,8 +88,8 @@ export function ProjectHome() {
                     const focus = locateProjectCoverImage(event.currentTarget, getFallbackCoverFocus(project.id))
                     if (focus) setCoverFocus(previous => ({ ...previous, [project.id]: focus }))
                   }} /></span>
-                  <span className={`${styles.coverPlane} ${styles.coverLensBlur}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
                 </span>
+                <span className={styles.coverDepthBlur} aria-hidden="true" />
               </div>
             : <div className={styles.coverFallback} style={{ background: getMorandiGradient(project.name) }}><Video size={31} /></div>}
           <span className={styles.duration}>{formatDuration(project.durationMs)}</span>

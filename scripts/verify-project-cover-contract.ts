@@ -61,7 +61,9 @@ try {
   assert.match(home, /onProjectCoversUpdated/, 'Projects page refreshes when a cover is ready')
   assert.match(homeStyles, /\.coverScene[\s\S]*?transform-origin:\s*50% 50%/, 'isometric projection keeps the located content pinned to the card center')
   assert.match(homeStyles, /\.coverLensFocus[\s\S]*?filter:\s*none/, 'the readable center is not softened by a second raster filter')
-  assert.match(homeStyles, /\.coverLensBlur[\s\S]*?blur\(\.9px\)[\s\S]*?transparent 0 76%/, 'lens blur stays subtle and outside the readable center')
+  assert.doesNotMatch(home, /coverLensBlur/, 'the clear source image is rendered only once')
+  assert.match(home, /coverDepthBlur/, 'card uses one projection-independent depth blur layer')
+  assert.match(homeStyles, /\.coverDepthBlur[\s\S]*?backdrop-filter:\s*blur\(3\.2px\)[\s\S]*?transparent 0 48%/, 'depth blur uses one visible fixed card-space standard')
   console.log('project cover contract: PASS')
 } finally {
   await fs.rm(root, { recursive: true, force: true })
