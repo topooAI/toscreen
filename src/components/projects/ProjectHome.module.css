@@ -154,9 +154,9 @@
 }
 
 .card {
-  --scene-roll: 2deg;
-  --scene-pitch: 9deg;
-  --scene-yaw: 32deg;
+  --scene-roll: -10deg;
+  --scene-pitch: 48deg;
+  --scene-yaw: -5deg;
   --focus-x: 50%;
   --focus-y: 44%;
   position: relative;
@@ -172,17 +172,17 @@
 }
 
 .card[data-camera='1'] {
-  --scene-roll: 1.5deg;
-  --scene-pitch: 8deg;
-  --scene-yaw: 28deg;
+  --scene-roll: -9deg;
+  --scene-pitch: 45deg;
+  --scene-yaw: -4deg;
   --focus-x: 52%;
   --focus-y: 42%;
 }
 
 .card[data-camera='2'] {
-  --scene-roll: 2.5deg;
-  --scene-pitch: 10deg;
-  --scene-yaw: 36deg;
+  --scene-roll: -12deg;
+  --scene-pitch: 52deg;
+  --scene-yaw: -7deg;
   --focus-x: 63%;
   --focus-y: 50%;
 }
@@ -220,8 +220,8 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  perspective: 460px;
-  perspective-origin: 72% 46%;
+  perspective: 900px;
+  perspective-origin: 50% 44%;
   background:
     radial-gradient(circle at 72% 22%, rgba(255, 255, 255, .96), rgba(242, 242, 240, .72) 40%, transparent 68%),
     repeating-linear-gradient(125deg, rgba(255, 255, 255, .55) 0 1px, rgba(226, 226, 223, .18) 1px 3px),
@@ -230,10 +230,10 @@
 
 .coverScene {
   position: absolute;
-  inset: -48% -42%;
+  inset: -48% -34%;
   display: block;
-  transform: rotateX(var(--scene-pitch)) rotateY(var(--scene-yaw)) rotateZ(var(--scene-roll)) scale(1.22);
-  transform-origin: 70% 52%;
+  transform: rotateX(var(--scene-pitch)) rotateY(var(--scene-yaw)) rotateZ(var(--scene-roll)) scale(1.25);
+  transform-origin: 50% 55%;
   transform-style: preserve-3d;
   backface-visibility: hidden;
 }
