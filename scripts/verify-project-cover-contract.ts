@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import { PROJECT_COVER_WIDTH_PX, resolveProjectCoverCandidate } from '../electron/projectCover'
+import { resolveProjectCoverInteractionFocus } from '../electron/projectLibrary'
 import { locateProjectCoverContent } from '../src/components/projects/projectCoverFocus'
 import { estimateVisibleSourceWidth, getProjectCoverDetailScale } from '../src/components/projects/projectCoverScale'
 
@@ -28,8 +29,8 @@ try {
   const fourKScale = getProjectCoverDetailScale(3840)
   const threeKScale = getProjectCoverDetailScale(3000)
   assert.ok(fourKScale > threeKScale, 'higher-resolution recordings receive proportionally more cover magnification')
-  assert.ok(fourKScale > 5.5 && threeKScale > 4.3, 'project covers magnify into a readable local detail range')
-  assert.ok(estimateVisibleSourceWidth(PROJECT_COVER_WIDTH_PX, fourKScale) >= 400,
+  assert.ok(fourKScale > 3.8 && threeKScale > 3, 'project covers magnify into a readable local detail range')
+  assert.ok(estimateVisibleSourceWidth(PROJECT_COVER_WIDTH_PX, fourKScale) >= 580,
     '4K cover crops remain downsampled instead of being stretched across the card')
   assert.ok(Math.abs(estimateVisibleSourceWidth(3840, fourKScale) - estimateVisibleSourceWidth(3000, threeKScale)) < 2,
     '3K and 4K recordings retain the same readable source-detail span')
@@ -42,7 +43,63 @@ try {
     synthetic[offset] = synthetic[offset + 1] = synthetic[offset + 2] = 28
   }
   const detected = locateProjectCoverContent(synthetic, syntheticWidth, syntheticHeight)
-  assert.ok(detected.x > 55, 'content locator avoids a blank center and selects the information-dense region')
+  assert.ok(detected.x > 51, 'content locator moves a blank center toward the information-dense region')
+
+  const toolbarWidth = 80
+  const toolbarHeight = 44
+  const toolbarFixture = new Uint8ClampedArray(toolbarWidth * toolbarHeight * 4).fill(255)
+  const setDark = (x: number, y: number) => {
+    const offset = (y * toolbarWidth + x) * 4
+    toolbarFixture[offset] = toolbarFixture[offset + 1] = toolbarFixture[offset + 2] = 24
+  }
+  for (let y = 12; y <= 30; y += 6) for (let x = 18; x <= 42; x += 1) setDark(x, y)
+  for (let y = 8; y <= 34; y += 7) for (let yy = y; yy < y + 3; yy += 1) for (let x = 62; x <= 65; x += 1) setDark(x, yy)
+  const toolbarDetected = locateProjectCoverContent(toolbarFixture, toolbarWidth, toolbarHeight)
+  assert.ok(toolbarDetected.x < 56, 'content locator prefers distributed text over a narrow high-contrast toolbar')
+
+  const edgeChromeFixture = new Uint8ClampedArray(toolbarWidth * toolbarHeight * 4).fill(255)
+  for (let y = 1; y <= 4; y += 1) for (let x = 3; x <= 76; x += 2) {
+    const offset = (y * toolbarWidth + x) * 4
+    edgeChromeFixture[offset] = edgeChromeFixture[offset + 1] = edgeChromeFixture[offset + 2] = 18
+  }
+  for (let y = 15; y <= 31; y += 5) for (let x = 26; x <= 49; x += 2) {
+    const offset = (y * toolbarWidth + x) * 4
+    edgeChromeFixture[offset] = edgeChromeFixture[offset + 1] = edgeChromeFixture[offset + 2] = 36
+  }
+  const edgeChromeDetected = locateProjectCoverContent(edgeChromeFixture, toolbarWidth, toolbarHeight)
+  assert.ok(edgeChromeDetected.y > 24, 'content locator ignores dense browser chrome at the frame edge')
+
+  const stableFixture = new Uint8ClampedArray(toolbarWidth * toolbarHeight * 4).fill(255)
+  for (let y = 14; y <= 30; y += 5) for (let x = 31; x <= 49; x += 2) {
+    const offset = (y * toolbarWidth + x) * 4
+    stableFixture[offset] = stableFixture[offset + 1] = stableFixture[offset + 2] = 34
+  }
+  for (let y = 9; y <= 34; y += 4) for (let x = 60; x <= 66; x += 1) {
+    const offset = (y * toolbarWidth + x) * 4
+    stableFixture[offset] = stableFixture[offset + 1] = stableFixture[offset + 2] = 20
+  }
+  const stableDetected = locateProjectCoverContent(stableFixture, toolbarWidth, toolbarHeight)
+  assert.ok(stableDetected.x < 58, 'a usable center regularizes isolated high-contrast landmarks')
+
+  const illustrationFixture = new Uint8ClampedArray(toolbarWidth * toolbarHeight * 4).fill(248)
+  for (let y = 12; y <= 31; y += 4) for (let x = 20; x <= 45; x += 2) {
+    const offset = (y * toolbarWidth + x) * 4
+    illustrationFixture[offset] = illustrationFixture[offset + 1] = illustrationFixture[offset + 2] = 190
+  }
+  for (let y = 10; y <= 34; y += 1) for (let x = 57; x <= 67; x += 1) {
+    const offset = (y * toolbarWidth + x) * 4
+    illustrationFixture[offset] = illustrationFixture[offset + 1] = illustrationFixture[offset + 2] = 18
+  }
+  const illustrationDetected = locateProjectCoverContent(illustrationFixture, toolbarWidth, toolbarHeight, { x: 53, y: 55 })
+  assert.ok(illustrationDetected.x < 56, 'fine interface detail outranks one large dark illustration landmark')
+
+  assert.deepEqual(
+    resolveProjectCoverInteractionFocus({ cursorData: [{ cx: .55, cy: .69 }] }),
+    { x: 53.25, y: 66.7 },
+    'the first valid recording interaction guides the cover while staying inside the title-safe area',
+  )
+  assert.equal(resolveProjectCoverInteractionFocus({ cursorData: [] }), undefined,
+    'projects without pointer telemetry fall back to image content location')
 
   await fs.appendFile(mediaPath, '-changed')
   const changed = await resolveProjectCoverCandidate(project, coversPath)
@@ -53,12 +110,18 @@ try {
   const saveProjectBlock = handlers.match(/ipcMain\.handle\('save-project'[\s\S]*?\n  \}\);/)?.[0] || ''
   assert.doesNotMatch(saveProjectBlock, /generateProjectCover|scheduleProjectCover/, 'autosave never invokes FFmpeg cover generation')
   assert.match(handlers, /project-list-recent[\s\S]*?scheduleProjectCover/, 'missing covers are backfilled from the Projects page')
+  assert.match(handlers, /project-list-recent[\s\S]*?thumbnailFocus:\s*resolveProjectCoverInteractionFocus\(project\)/,
+    'Projects exposes interaction-guided cover focus without mutating the saved project')
+  assert.match(handlers, /writeRecentIndex\(recentIndexPath,\s*refreshed\.map\(\(\{\s*thumbnailFocus:/,
+    'derived cover focus is returned to the UI without persisting into the Recent index')
 
   const preload = await fs.readFile(path.join(process.cwd(), 'electron/preload.ts'), 'utf8')
   const home = await fs.readFile(path.join(process.cwd(), 'src/components/projects/ProjectHome.tsx'), 'utf8')
   const homeStyles = await fs.readFile(path.join(process.cwd(), 'src/components/projects/ProjectHome.module.css'), 'utf8')
   assert.match(preload, /onProjectCoversUpdated/, 'main process exposes one cover-ready event')
   assert.match(home, /onProjectCoversUpdated/, 'Projects page refreshes when a cover is ready')
+  assert.match(home, /project\.thumbnailFocus\s*\|\|\s*locateProjectCoverImage/,
+    'recorded interaction focus takes authority over image-only saliency')
   assert.match(homeStyles, /\.coverScene[\s\S]*?transform-origin:\s*50% 50%/, 'oblique projection stays centered on the located content')
   assert.match(homeStyles, /\.coverLensFocus[\s\S]*?filter:\s*none/, 'the readable center is not softened by a second raster filter')
   assert.doesNotMatch(home, /coverLensBlur/, 'the clear source image is rendered only once')

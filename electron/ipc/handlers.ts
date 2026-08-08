@@ -46,6 +46,7 @@ import {
   inspectProjectAssets,
   readRecentIndex,
   readJsonWithBackup,
+  resolveProjectCoverInteractionFocus,
   validatePreset,
   writeRecentIndex,
   type RecentProjectEntry,
@@ -856,6 +857,7 @@ export function registerIpcHandlers(
         )
         const nextEntry = {
           ...entry,
+          thumbnailFocus: resolveProjectCoverInteractionFocus(project),
           thumbnailPath: coverIsCurrent ? entry.thumbnailPath : undefined,
           thumbnailSourceSignature: coverIsCurrent ? entry.thumbnailSourceSignature : undefined,
           thumbnailSourceWidth: candidate?.sourceWidth ?? entry.thumbnailSourceWidth,
@@ -867,7 +869,7 @@ export function registerIpcHandlers(
         return nextEntry
       } catch (error) { return { ...entry, assetStatus: (typeof error === 'object' && error && 'code' in error && (error as any).code === 'ENOENT') ? 'missing-project' as const : 'corrupt' as const } }
     }))
-    await writeRecentIndex(recentIndexPath, refreshed)
+    await writeRecentIndex(recentIndexPath, refreshed.map(({ thumbnailFocus: _thumbnailFocus, ...entry }) => entry))
     coverRequests.forEach(({ entry, project }) => scheduleProjectCover(entry, project))
     return { success: true, projects: refreshed }
   })

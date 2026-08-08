@@ -13,6 +13,7 @@ import styles from './ProjectHome.module.css'
 interface RecentProject {
   id: string; name: string; projectPath: string; thumbnailPath?: string; updatedAt: string
   thumbnailSourceWidth?: number; thumbnailSourceHeight?: number
+  thumbnailFocus?: ProjectCoverFocus
   durationMs: number; assetStatus: 'ready' | 'missing' | 'missing-project' | 'corrupt' | 'recovered'; missingAssets: string[]
 }
 
@@ -85,7 +86,7 @@ export function ProjectHome() {
                 <span className={styles.coverScene}>
                   <span className={`${styles.coverPlane} ${styles.coverLensFocus}`}><img src={toFileUrl(project.thumbnailPath)} alt="" onLoad={event => {
                     if (!project.thumbnailSourceWidth || !project.thumbnailSourceHeight) return
-                    const focus = locateProjectCoverImage(event.currentTarget, getFallbackCoverFocus())
+                    const focus = project.thumbnailFocus || locateProjectCoverImage(event.currentTarget, getFallbackCoverFocus())
                     if (focus) setCoverFocus(previous => ({ ...previous, [project.id]: focus }))
                   }} /></span>
                 </span>

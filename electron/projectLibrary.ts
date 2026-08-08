@@ -25,10 +25,34 @@ export interface RecentProjectEntry {
   thumbnailSourceSignature?: string
   thumbnailSourceWidth?: number
   thumbnailSourceHeight?: number
+  thumbnailFocus?: { x: number; y: number }
   updatedAt: string
   durationMs: number
   assetStatus: 'ready' | 'missing' | 'missing-project' | 'corrupt' | 'recovered'
   missingAssets: string[]
+}
+
+export function resolveProjectCoverInteractionFocus(project: any): { x: number; y: number } | undefined {
+  const event = Array.isArray(project?.cursorData)
+    ? project.cursorData.find((candidate: any) => {
+        const width = Number(candidate?.videoInfo?.width)
+        const height = Number(candidate?.videoInfo?.height)
+        const x = Number.isFinite(Number(candidate?.cx)) ? Number(candidate.cx) : Number(candidate?.x) / width
+        const y = Number.isFinite(Number(candidate?.cy)) ? Number(candidate.cy) : Number(candidate?.y) / height
+        return Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= 1 && y >= 0 && y <= 1
+      })
+    : undefined
+  if (!event) return undefined
+  const width = Number(event?.videoInfo?.width)
+  const height = Number(event?.videoInfo?.height)
+  const normalizedX = Number.isFinite(Number(event?.cx)) ? Number(event.cx) : Number(event.x) / width
+  const normalizedY = Number.isFinite(Number(event?.cy)) ? Number(event.cy) : Number(event.y) / height
+  const horizontalBlend = .65
+  const verticalBlend = .9
+  return {
+    x: Number(Math.min(62, Math.max(38, 50 + (normalizedX * 100 - 50) * horizontalBlend)).toFixed(2)),
+    y: Number(Math.min(70, Math.max(38, 46 + (normalizedY * 100 - 46) * verticalBlend)).toFixed(2)),
+  }
 }
 
 export interface PortableAsset {
