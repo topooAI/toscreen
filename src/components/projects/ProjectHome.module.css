@@ -154,7 +154,7 @@
 }
 
 .card {
-  --scene-angle: -7deg;
+  --scene-angle: -4deg;
   --focus-x: 50%;
   --focus-y: 44%;
   position: relative;
@@ -170,13 +170,13 @@
 }
 
 .card[data-camera='1'] {
-  --scene-angle: -5deg;
+  --scene-angle: -3deg;
   --focus-x: 52%;
   --focus-y: 42%;
 }
 
 .card[data-camera='2'] {
-  --scene-angle: -8deg;
+  --scene-angle: -5deg;
   --focus-x: 63%;
   --focus-y: 50%;
 }
@@ -224,7 +224,7 @@
   position: absolute;
   inset: -34% -24%;
   display: block;
-  transform: rotateX(12deg) rotateZ(var(--scene-angle)) scale(1.08);
+  transform: rotateX(6deg) rotateZ(var(--scene-angle)) scale(1.08);
   transform-origin: 50% 50%;
 }
 
@@ -248,10 +248,10 @@
 
 .coverLensBlur {
   z-index: 2;
-  filter: blur(1.6px) saturate(.86) brightness(1.01);
+  filter: blur(.9px) saturate(.92) brightness(1.005);
   pointer-events: none;
-  -webkit-mask-image: radial-gradient(ellipse 53% 58% at 50% 50%, transparent 0 52%, rgba(0, 0, 0, .38) 72%, #000 100%);
-  mask-image: radial-gradient(ellipse 53% 58% at 50% 50%, transparent 0 52%, rgba(0, 0, 0, .38) 72%, #000 100%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 72% at 50% 50%, transparent 0 76%, rgba(0, 0, 0, .18) 88%, #000 100%);
+  mask-image: radial-gradient(ellipse 70% 72% at 50% 50%, transparent 0 76%, rgba(0, 0, 0, .18) 88%, #000 100%);
 }
 
 .coverLensFocus {

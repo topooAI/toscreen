@@ -23,12 +23,14 @@ try {
   assert.equal(path.dirname(first.outputPath), coversPath, 'covers stay in the project-library cache')
   assert.equal(first.sourceWidth, 3840, 'cover candidate preserves the recording width')
   assert.equal(first.sourceHeight, 2160, 'cover candidate preserves the recording height')
-  assert.equal(PROJECT_COVER_WIDTH_PX, 1920, 'cached covers retain enough pixels for local detail magnification')
+  assert.equal(PROJECT_COVER_WIDTH_PX, 3840, '4K covers retain native pixels for local detail magnification')
 
   const fourKScale = getProjectCoverDetailScale(3840)
   const threeKScale = getProjectCoverDetailScale(3000)
   assert.ok(fourKScale > threeKScale, 'higher-resolution recordings receive proportionally more cover magnification')
   assert.ok(fourKScale > 5.5 && threeKScale > 4.3, 'project covers magnify into a readable local detail range')
+  assert.ok(estimateVisibleSourceWidth(PROJECT_COVER_WIDTH_PX, fourKScale) >= 400,
+    '4K cover crops remain downsampled instead of being stretched across the card')
   assert.ok(Math.abs(estimateVisibleSourceWidth(3840, fourKScale) - estimateVisibleSourceWidth(3000, threeKScale)) < 2,
     '3K and 4K recordings retain the same readable source-detail span')
 
@@ -59,6 +61,7 @@ try {
   assert.match(home, /onProjectCoversUpdated/, 'Projects page refreshes when a cover is ready')
   assert.match(homeStyles, /\.coverScene[\s\S]*?transform-origin:\s*50% 50%/, 'isometric projection keeps the located content pinned to the card center')
   assert.match(homeStyles, /\.coverLensFocus[\s\S]*?filter:\s*none/, 'the readable center is not softened by a second raster filter')
+  assert.match(homeStyles, /\.coverLensBlur[\s\S]*?blur\(\.9px\)[\s\S]*?transparent 0 76%/, 'lens blur stays subtle and outside the readable center')
   console.log('project cover contract: PASS')
 } finally {
   await fs.rm(root, { recursive: true, force: true })
