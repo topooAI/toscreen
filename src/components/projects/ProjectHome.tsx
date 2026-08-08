@@ -89,7 +89,11 @@ export function ProjectHome() {
                     if (focus) setCoverFocus(previous => ({ ...previous, [project.id]: focus }))
                   }} /></span>
                 </span>
-                <span className={styles.coverDepthBlur} aria-hidden="true" />
+                <span className={styles.coverDepthBlur} aria-hidden="true">
+                  <span className={styles.coverDepthSoft} />
+                  <span className={styles.coverDepthMedium} />
+                  <span className={styles.coverDepthStrong} />
+                </span>
               </div>
             : <div className={styles.coverFallback} style={{ background: getMorandiGradient(project.name) }}><Video size={31} /></div>}
           <span className={styles.duration}>{formatDuration(project.durationMs)}</span>

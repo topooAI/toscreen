@@ -253,28 +253,61 @@
   pointer-events: none;
 }
 
-.coverDepthBlur::before,
-.coverDepthBlur::after {
+.coverDepthSoft,
+.coverDepthMedium,
+.coverDepthStrong {
+  position: absolute;
+  inset: 0;
+}
+
+.coverDepthSoft::before,
+.coverDepthSoft::after,
+.coverDepthMedium::before,
+.coverDepthMedium::after,
+.coverDepthStrong::before,
+.coverDepthStrong::after {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
-  height: 32%;
-  background: rgba(255, 255, 255, .01);
-  -webkit-backdrop-filter: blur(3.2px) saturate(.88);
-  backdrop-filter: blur(3.2px) saturate(.88);
+  background: rgba(255, 255, 255, .001);
 }
 
-.coverDepthBlur::before {
+.coverDepthSoft::before,
+.coverDepthMedium::before,
+.coverDepthStrong::before {
   top: 0;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0 55%, rgba(0, 0, 0, .65) 76%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0 55%, rgba(0, 0, 0, .65) 76%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
 }
 
-.coverDepthBlur::after {
+.coverDepthSoft::after,
+.coverDepthMedium::after,
+.coverDepthStrong::after {
   bottom: 0;
-  -webkit-mask-image: linear-gradient(to top, #000 0 55%, rgba(0, 0, 0, .65) 76%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 0 55%, rgba(0, 0, 0, .65) 76%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, .82) 34%, rgba(0, 0, 0, .32) 72%, transparent 100%);
+}
+
+.coverDepthSoft::before,
+.coverDepthSoft::after {
+  height: 36%;
+  -webkit-backdrop-filter: blur(.7px);
+  backdrop-filter: blur(.7px);
+}
+
+.coverDepthMedium::before,
+.coverDepthMedium::after {
+  height: 27%;
+  -webkit-backdrop-filter: blur(1.5px);
+  backdrop-filter: blur(1.5px);
+}
+
+.coverDepthStrong::before,
+.coverDepthStrong::after {
+  height: 17%;
+  -webkit-backdrop-filter: blur(2.8px);
+  backdrop-filter: blur(2.8px);
 }
 
 .coverLensFocus {
