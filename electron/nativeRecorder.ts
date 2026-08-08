@@ -122,7 +122,8 @@ async function concatFiles(inputs: string[], output: string): Promise<string | u
   if (existing.length === 1) { await fs.rename(existing[0], output); return output }
   const listPath = `${output}.concat.txt`
   await fs.writeFile(listPath, existing.map(item => `file '${item.split("'").join("'\\''")}'`).join('\n'))
-  const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path as string
+  const ffmpegPath = (require('@ffmpeg-installer/ffmpeg').path as string)
+    .replace('app.asar', 'app.asar.unpacked')
   await new Promise<void>((resolve, reject) => {
     const process = spawn(ffmpegPath, ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', output], { stdio: 'ignore' })
     process.once('error', reject); process.once('exit', code => code === 0 ? resolve() : reject(new Error(`ffmpeg concat exited ${code}`)))

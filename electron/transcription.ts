@@ -50,7 +50,8 @@ export function registerTranscriptionHandlers(getMainWindow: () => BrowserWindow
         audioPath = transcriptionMixPath(app.getPath('temp'))
         temporaryMix = audioPath
         activeTemporaryMix = audioPath
-        const ffmpeg = require('@ffmpeg-installer/ffmpeg').path as string
+        const ffmpeg = (require('@ffmpeg-installer/ffmpeg').path as string)
+          .replace('app.asar', 'app.asar.unpacked')
         await new Promise<void>((resolve, reject) => {
           const args = input.paths.flatMap(item => ['-i', item])
           args.push('-filter_complex', `amix=inputs=${input.paths.length}:duration=longest:normalize=0`, '-y', audioPath)

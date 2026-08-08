@@ -47,6 +47,7 @@
     "audit:screenstudio-control-wiring": "tsx scripts/verify-screenstudio-control-wiring.ts",
     "audit:screenstudio-full": "tsx scripts/verify-screenstudio-full-audit.ts",
     "audit:electron-editor-runtime": "tsx scripts/verify-electron-editor-runtime-contract.ts",
+    "audit:packaged-native-runtime": "tsx scripts/verify-packaged-native-runtime.ts",
     "audit:electron-window-lifecycle": "tsx scripts/verify-electron-window-lifecycle.ts",
     "audit:project-model-smoke": "tsx scripts/audit-project-model-smoke.ts",
     "audit:project-model-restore": "tsx scripts/verify-project-model-restore.ts",

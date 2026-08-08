@@ -3,8 +3,11 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
 
-// Set ffmpeg path
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+// Electron can read modules from app.asar, but child_process cannot execute a
+// binary through that virtual path. electron-builder places native binaries in
+// the matching app.asar.unpacked location.
+const ffmpegPath = ffmpegInstaller.path.replace('app.asar', 'app.asar.unpacked');
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 export interface ProxyResult {
   success: boolean;
