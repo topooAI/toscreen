@@ -13,6 +13,8 @@ export interface ProjectCoverCandidate {
   sourcePath: string
   sourceSignature: string
   outputPath: string
+  sourceWidth?: number
+  sourceHeight?: number
 }
 
 const activeCoverJobs = new Map<string, Promise<string | null>>()
@@ -24,6 +26,7 @@ export async function resolveProjectCoverCandidate(
   const media = hydrateCurrentProjectMedia(project)
   const sourcePath = media.videoPath || media.proxyPath
   if (!sourcePath) return null
+  const sourceSize = resolveProjectCoverSourceSize(project)
 
   try {
     const stat = await fs.stat(sourcePath)
@@ -36,10 +39,44 @@ export async function resolveProjectCoverCandidate(
       sourcePath,
       sourceSignature,
       outputPath: path.join(coverDirectory, `${sourceSignature}.jpg`),
+      sourceWidth: sourceSize?.width,
+      sourceHeight: sourceSize?.height,
     }
   } catch {
     return null
   }
+}
+
+export function resolveProjectCoverSourceSize(project: unknown): { width: number; height: number } | null {
+  const root = project as any
+  const model = root?.projectModel || root
+  const cursorCollections = [root?.cursorData, model?.cursorData, model?.legacyState?.cursorData]
+  for (const collection of cursorCollections) {
+    if (!Array.isArray(collection)) continue
+    for (const point of collection) {
+      for (const info of [point?.videoInfo, point?.displayInfo]) {
+        const width = Number(info?.width)
+        const height = Number(info?.height)
+        if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) return { width, height }
+      }
+    }
+  }
+
+  const screenAsset = Array.isArray(model?.assets)
+    ? model.assets.find((asset: any) => asset?.type === 'screen-recording')
+    : null
+  const metadata = screenAsset?.metadata || {}
+  for (const [widthKey, heightKey] of [
+    ['sourceWidth', 'sourceHeight'],
+    ['videoWidth', 'videoHeight'],
+    ['displayWidth', 'displayHeight'],
+    ['width', 'height'],
+  ] as const) {
+    const width = Number(metadata[widthKey])
+    const height = Number(metadata[heightKey])
+    if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) return { width, height }
+  }
+  return null
 }
 
 export async function projectCoverExists(candidate: ProjectCoverCandidate): Promise<boolean> {

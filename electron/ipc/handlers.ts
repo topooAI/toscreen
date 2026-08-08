@@ -135,6 +135,8 @@ export function registerIpcHandlers(
       projectPath,
       thumbnailPath: project?.thumbnailPath || existing?.thumbnailPath,
       thumbnailSourceSignature: existing?.thumbnailSourceSignature,
+      thumbnailSourceWidth: existing?.thumbnailSourceWidth,
+      thumbnailSourceHeight: existing?.thumbnailSourceHeight,
       updatedAt: String(project?.projectModel?.updatedAt || project?.updatedAt || new Date().toISOString()),
       durationMs: Number(project?.projectModel?.durationMs || project?.durationMs || 0),
       assetStatus: assets.missing.length ? 'missing' : 'ready',
@@ -155,7 +157,13 @@ export function registerIpcHandlers(
         if (!coverPath) return
         const recent = await readRecentIndex(recentIndexPath)
         const next = recent.map(item => item.projectPath === entry.projectPath
-          ? { ...item, thumbnailPath: coverPath, thumbnailSourceSignature: candidate.sourceSignature }
+          ? {
+              ...item,
+              thumbnailPath: coverPath,
+              thumbnailSourceSignature: candidate.sourceSignature,
+              thumbnailSourceWidth: candidate.sourceWidth,
+              thumbnailSourceHeight: candidate.sourceHeight,
+            }
           : item)
         await writeRecentIndex(recentIndexPath, next)
         BrowserWindow.getAllWindows().forEach(window => window.webContents.send('project-covers-updated'))
@@ -850,6 +858,8 @@ export function registerIpcHandlers(
           ...entry,
           thumbnailPath: coverIsCurrent ? entry.thumbnailPath : undefined,
           thumbnailSourceSignature: coverIsCurrent ? entry.thumbnailSourceSignature : undefined,
+          thumbnailSourceWidth: candidate?.sourceWidth ?? entry.thumbnailSourceWidth,
+          thumbnailSourceHeight: candidate?.sourceHeight ?? entry.thumbnailSourceHeight,
           assetStatus: loaded.recovered ? 'recovered' as const : assets.missing.length ? 'missing' as const : 'ready' as const,
           missingAssets: assets.missing,
         }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { FolderOpen, MoreHorizontal, Search, Trash2, Video, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -6,10 +6,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { TopooUserPill } from '@/components/video-editor/TopooUserPill'
 import { ImportVideoMorphIcon, ImportPackageMorphIcon, NewRecordingMorphIcon } from '@/components/common/MorphIcon'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { getProjectCoverDetailScale } from './projectCoverScale'
 import styles from './ProjectHome.module.css'
 
 interface RecentProject {
   id: string; name: string; projectPath: string; thumbnailPath?: string; updatedAt: string
+  thumbnailSourceWidth?: number; thumbnailSourceHeight?: number
   durationMs: number; assetStatus: 'ready' | 'missing' | 'missing-project' | 'corrupt' | 'recovered'; missingAssets: string[]
 }
 
@@ -77,7 +79,7 @@ export function ProjectHome() {
       {visible.length === 0 ? <div className={styles.empty}><FolderOpen/><h2>No projects yet</h2><p>Record your screen or import a portable ToScreen package.</p></div> : <div className={styles.grid}>{visible.map(project => <article key={project.projectPath} className={styles.card} data-status={project.assetStatus} data-has-cover={project.thumbnailPath ? 'true' : 'false'} data-camera={getCameraDirection(project.id)}>
         <button className={styles.preview} onClick={() => void open(project.projectPath)}>
           {project.thumbnailPath
-            ? <div className={styles.coverStage}>
+            ? <div className={styles.coverStage} style={{ '--detail-scale': getProjectCoverDetailScale(project.thumbnailSourceWidth) } as CSSProperties}>
                 <span className={styles.coverScene}>
                   <span className={`${styles.coverPlane} ${styles.coverLensBlur}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
                   <span className={`${styles.coverPlane} ${styles.coverLensFocus}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
