@@ -99,6 +99,7 @@
     "audit:presentation-recording-contract": "tsx scripts/verify-presentation-recording-contract.ts",
     "audit:audio-captions": "tsx scripts/test-audio-captions.ts",
     "audit:projects-presets": "tsx scripts/verify-projects-presets.ts",
+    "audit:project-covers": "tsx scripts/verify-project-cover-contract.ts",
     "build:transcriber-helper": "bash scripts/build-transcriber-helper.sh",
     "accept:transcription": "node --import tsx scripts/accept-transcription-e2e.ts",
     "test:transcription-acceptance": "node --import tsx scripts/test-transcription-acceptance.ts",

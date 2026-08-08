@@ -22,6 +22,7 @@ export interface RecentProjectEntry {
   name: string
   projectPath: string
   thumbnailPath?: string
+  thumbnailSourceSignature?: string
   updatedAt: string
   durationMs: number
   assetStatus: 'ready' | 'missing' | 'missing-project' | 'corrupt' | 'recovered'

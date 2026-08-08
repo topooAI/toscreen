@@ -101,6 +101,7 @@ interface Window {
     getCurrentProject: () => Promise<{ projectPath: string | null }>;
     newProject: () => Promise<{ success: boolean }>;
     listRecentProjects: () => Promise<any>;
+    onProjectCoversUpdated: (callback: () => void) => () => void;
     openProject: (projectPath: string) => Promise<any>;
     removeRecentProject: (projectPath: string) => Promise<any>;
     deleteProject: (projectPath: string, deleteAssets?: boolean) => Promise<any>;

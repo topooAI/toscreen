@@ -145,6 +145,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCurrentProject: () => ipcRenderer.invoke('project-get-current'),
   newProject: () => ipcRenderer.invoke('project-new'),
   listRecentProjects: () => ipcRenderer.invoke('project-list-recent'),
+  onProjectCoversUpdated: (callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.on('project-covers-updated', listener)
+    return () => ipcRenderer.removeListener('project-covers-updated', listener)
+  },
   openProject: (projectPath: string) => ipcRenderer.invoke('project-open', projectPath),
   removeRecentProject: (projectPath: string) => ipcRenderer.invoke('project-remove-recent', projectPath),
   deleteProject: (projectPath: string, deleteAssets?: boolean) => ipcRenderer.invoke('project-delete', projectPath, deleteAssets),

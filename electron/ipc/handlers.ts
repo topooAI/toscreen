@@ -17,6 +17,11 @@ import {
 
 import { generateProxyVideo } from './proxyGenerator'
 import {
+  generateProjectCover,
+  projectCoverExists,
+  resolveProjectCoverCandidate,
+} from '../projectCover'
+import {
   mergeCursorShapeTelemetry,
   normalizeNativeCursorEvents,
   rebaseCursorEventsToTimeline,
@@ -94,6 +99,7 @@ export function registerIpcHandlers(
 ) {
   const libraryDir = path.join(app.getPath('userData'), 'project-library')
   const recentIndexPath = path.join(libraryDir, 'recent-projects.json')
+  const projectCoverDirectory = path.join(libraryDir, 'covers')
   const presetIndexPath = path.join(libraryDir, 'presets.json')
   let currentProjectPath: string | null = null
   let currentVideoPath: string | null = null
@@ -121,19 +127,42 @@ export function registerIpcHandlers(
 
   const rememberProject = async (projectPath: string, project: any): Promise<RecentProjectEntry> => {
     const assets = await inspectProjectAssets(project)
+    const recent = await readRecentIndex(recentIndexPath)
+    const existing = recent.find(item => item.projectPath === projectPath)
     const entry: RecentProjectEntry = {
       id: String(project?.projectModel?.id || project?.id || projectPath),
       name: String(project?.projectModel?.name || project?.name || path.basename(projectPath, path.extname(projectPath))),
       projectPath,
-      thumbnailPath: project?.thumbnailPath,
+      thumbnailPath: project?.thumbnailPath || existing?.thumbnailPath,
+      thumbnailSourceSignature: existing?.thumbnailSourceSignature,
       updatedAt: String(project?.projectModel?.updatedAt || project?.updatedAt || new Date().toISOString()),
       durationMs: Number(project?.projectModel?.durationMs || project?.durationMs || 0),
       assetStatus: assets.missing.length ? 'missing' : 'ready',
       missingAssets: assets.missing,
     }
-    const recent = await readRecentIndex(recentIndexPath)
     await writeRecentIndex(recentIndexPath, [entry, ...recent.filter(item => item.projectPath !== projectPath)].slice(0, 100))
     return entry
+  }
+  const pendingProjectCovers = new Set<string>()
+  const scheduleProjectCover = (entry: RecentProjectEntry, project: unknown) => {
+    if (pendingProjectCovers.has(entry.projectPath)) return
+    pendingProjectCovers.add(entry.projectPath)
+    void (async () => {
+      try {
+        const candidate = await resolveProjectCoverCandidate(project, projectCoverDirectory)
+        if (!candidate) return
+        const coverPath = await generateProjectCover(candidate)
+        if (!coverPath) return
+        const recent = await readRecentIndex(recentIndexPath)
+        const next = recent.map(item => item.projectPath === entry.projectPath
+          ? { ...item, thumbnailPath: coverPath, thumbnailSourceSignature: candidate.sourceSignature }
+          : item)
+        await writeRecentIndex(recentIndexPath, next)
+        BrowserWindow.getAllWindows().forEach(window => window.webContents.send('project-covers-updated'))
+      } finally {
+        pendingProjectCovers.delete(entry.projectPath)
+      }
+    })()
   }
   const gifControllers = new Map<string, AbortController>();
   const shareControllers = new Map<string, AbortController>();
@@ -804,15 +833,32 @@ export function registerIpcHandlers(
   ipcMain.handle('project-new', () => { currentProjectPath = transitionProjectDocument(currentProjectPath, { type: 'new' }); clearCurrentProjectMedia(); return { success: true } })
   ipcMain.handle('project-list-recent', async () => {
     const recent = await readRecentIndex(recentIndexPath)
+    const coverRequests: Array<{ entry: RecentProjectEntry; project: unknown }> = []
     const refreshed = await Promise.all(recent.map(async entry => {
       try {
         const loaded = await readJsonWithBackup(entry.projectPath)
         const project = loaded.value
         const assets = await inspectProjectAssets(project)
-        return { ...entry, assetStatus: loaded.recovered ? 'recovered' as const : assets.missing.length ? 'missing' as const : 'ready' as const, missingAssets: assets.missing }
+        const candidate = await resolveProjectCoverCandidate(project, projectCoverDirectory)
+        const coverIsCurrent = Boolean(
+          candidate
+          && entry.thumbnailSourceSignature === candidate.sourceSignature
+          && entry.thumbnailPath === candidate.outputPath
+          && await projectCoverExists(candidate),
+        )
+        const nextEntry = {
+          ...entry,
+          thumbnailPath: coverIsCurrent ? entry.thumbnailPath : undefined,
+          thumbnailSourceSignature: coverIsCurrent ? entry.thumbnailSourceSignature : undefined,
+          assetStatus: loaded.recovered ? 'recovered' as const : assets.missing.length ? 'missing' as const : 'ready' as const,
+          missingAssets: assets.missing,
+        }
+        if (candidate && !coverIsCurrent) coverRequests.push({ entry: nextEntry, project })
+        return nextEntry
       } catch (error) { return { ...entry, assetStatus: (typeof error === 'object' && error && 'code' in error && (error as any).code === 'ENOENT') ? 'missing-project' as const : 'corrupt' as const } }
     }))
     await writeRecentIndex(recentIndexPath, refreshed)
+    coverRequests.forEach(({ entry, project }) => scheduleProjectCover(entry, project))
     return { success: true, projects: refreshed }
   })
   ipcMain.handle('project-open', async (_, projectPath: string) => {

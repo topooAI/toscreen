@@ -149,26 +149,26 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(282px, 1fr));
+  gap: 18px;
 }
 
 .card {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  border-radius: 12px;
-  background: #fff;
+  min-height: 198px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 13px;
+  background: #e9e9e7;
   transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.25s;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.01), 0 8px 16px rgba(0, 0, 0, 0.02);
-  /* 强制生成合成图层，修复 Webkit 渲染下的 overflow: hidden 裁剪失效 Bug */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02), 0 10px 24px rgba(0, 0, 0, 0.035);
   isolation: isolate;
   transform: translateZ(0);
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02), 0 12px 28px rgba(0, 0, 0, 0.05);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.025), 0 18px 38px rgba(0, 0, 0, 0.08);
   border-color: rgba(0, 0, 0, 0.08);
 }
 
@@ -186,10 +186,10 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 195px;
+  height: 198px;
   padding: 0;
   border: 0;
-  border-radius: 12px;
+  border-radius: 13px;
   background: #efefed;
   overflow: hidden;
   cursor: pointer;
@@ -199,17 +199,35 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform: scale(1.01);
+  transition: transform .55s cubic-bezier(.2, .8, .2, 1), filter .3s ease;
 }
 
 .card:hover .preview img {
-  transform: scale(1.03);
+  transform: scale(1.045);
+  filter: saturate(1.03);
 }
 
-.preview span {
+.preview::after {
+  position: absolute;
+  inset: 34% 0 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(10, 10, 10, .08) 25%, rgba(10, 10, 10, .7) 100%);
+  content: '';
+  pointer-events: none;
+}
+
+.coverFallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: rgba(255, 255, 255, .82);
+}
+
+.duration {
   position: absolute;
   right: 10px;
-  bottom: 60px;
+  top: 10px;
   padding: 3px 6px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 5px;
@@ -220,6 +238,7 @@
   font-size: 10px;
   font-weight: 500;
   line-height: 1;
+  z-index: 2;
 }
 
 .meta {
@@ -227,18 +246,11 @@
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 11px 40px 11px 14px;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-top: 1px solid rgba(255, 255, 255, 0.25);
-  /* 物理对齐底部圆角，双重保障杜绝底角背景色露出 */
-  border-radius: 0 0 12px 12px;
-  transition: background-color 0.25s;
-}
-
-.card:hover .meta {
-  background: rgba(255, 255, 255, 0.82);
+  z-index: 2;
+  padding: 34px 42px 12px 14px;
+  border-radius: 0 0 13px 13px;
+  background: linear-gradient(180deg, transparent, rgba(10, 10, 10, .76));
+  pointer-events: none;
 }
 
 .meta h2 {
@@ -247,7 +259,8 @@
   font-size: 13px;
   font-weight: 600;
   line-height: 16px;
-  color: #171717;
+  color: #fff;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, .25);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -256,7 +269,7 @@
 .meta em {
   display: block;
   margin: 0;
-  color: rgba(23, 23, 23, 0.55);
+  color: rgba(255, 255, 255, .72);
   font-size: 10.5px;
   font-style: normal;
   line-height: 14px;
@@ -274,14 +287,14 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: rgba(23, 23, 23, 0.55);
+  color: rgba(255, 255, 255, .78);
   z-index: 10;
 }
 
 .more:hover,
 .more[data-state=open] {
-  background: rgba(0, 0, 0, 0.05);
-  color: #171717;
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
 }
 
 .relink {

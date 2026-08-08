@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FolderOpen, MoreHorizontal, Search, Trash2, Video, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -18,8 +18,11 @@ export function ProjectHome() {
   const [projects, setProjects] = useState<RecentProject[]>([])
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'updated' | 'name' | 'duration'>('updated')
-  const refresh = async () => { const result = await window.electronAPI.listRecentProjects(); if (result.success) setProjects(result.projects) }
-  useEffect(() => { void refresh() }, [])
+  const refresh = useCallback(async () => { const result = await window.electronAPI.listRecentProjects(); if (result.success) setProjects(result.projects) }, [])
+  useEffect(() => {
+    void refresh()
+    return window.electronAPI.onProjectCoversUpdated(() => { void refresh() })
+  }, [refresh])
   const visible = useMemo(() => [...projects].filter(item => item.name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'duration' ? b.durationMs - a.durationMs : +new Date(b.updatedAt) - +new Date(a.updatedAt)), [projects, query, sort])
   const open = async (projectPath: string) => { try { const result = await window.electronAPI.openProject(projectPath); if (!result.success) throw new Error(result.error); await window.electronAPI.switchToEditor() } catch (error) { toast.error('Unable to open project', { description: String(error) }); void refresh() } }
   const importPackage = async () => { try { const result = await window.electronAPI.importProjectPackage(); if (result.success) { toast.success('Portable project imported'); await window.electronAPI.switchToEditor() } } catch (error) { toast.error('Package validation failed', { description: String(error) }) } }
@@ -71,10 +74,12 @@ export function ProjectHome() {
           </SelectContent>
         </Select>
       </div>
-      {visible.length === 0 ? <div className={styles.empty}><FolderOpen/><h2>No projects yet</h2><p>Record your screen or import a portable ToScreen package.</p></div> : <div className={styles.grid}>{visible.map(project => <article key={project.projectPath} className={styles.card} data-status={project.assetStatus}>
+      {visible.length === 0 ? <div className={styles.empty}><FolderOpen/><h2>No projects yet</h2><p>Record your screen or import a portable ToScreen package.</p></div> : <div className={styles.grid}>{visible.map(project => <article key={project.projectPath} className={styles.card} data-status={project.assetStatus} data-has-cover={project.thumbnailPath ? 'true' : 'false'}>
         <button className={styles.preview} onClick={() => void open(project.projectPath)}>
-          {project.thumbnailPath ? <img src={`file://${project.thumbnailPath}`} /> : <div style={{ background: getMorandiGradient(project.name), width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Video size={36} className="text-white/80 filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.15)]" /></div>}
-          <span>{formatDuration(project.durationMs)}</span>
+          {project.thumbnailPath
+            ? <img src={toFileUrl(project.thumbnailPath)} alt="" />
+            : <div className={styles.coverFallback} style={{ background: getMorandiGradient(project.name) }}><Video size={31} /></div>}
+          <span className={styles.duration}>{formatDuration(project.durationMs)}</span>
         </button>
         <div className={styles.meta}><h2>{project.name}</h2><p>{new Date(project.updatedAt).toLocaleString()}</p>{project.assetStatus !== 'ready' && <em>{project.assetStatus === 'recovered' ? 'Recovered from backup' : project.assetStatus === 'missing' ? `${project.missingAssets.length} missing asset${project.missingAssets.length === 1 ? '' : 's'}` : project.assetStatus === 'missing-project' ? 'Project file moved or missing' : 'Project file is damaged'}</em>}</div>
         {project.assetStatus === 'missing' && <button className={styles.relink} onClick={async () => { const result = await window.electronAPI.relinkProjectAsset(project.projectPath, project.missingAssets[0]); if (result.success) { toast.success('Media relinked'); void refresh() } }}>Relink</button>}
@@ -95,6 +100,7 @@ export function ProjectHome() {
   </main>
 }
 function formatDuration(ms: number) { const total = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}` }
+function toFileUrl(filePath: string) { return encodeURI(`file://${filePath}`) }
 
 const morandiPalettes = [
   { from: '#e0c3fc', to: '#8ec5fc' }, // 粉紫-冰蓝
