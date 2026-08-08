@@ -63,7 +63,9 @@ try {
   assert.match(homeStyles, /\.coverLensFocus[\s\S]*?filter:\s*none/, 'the readable center is not softened by a second raster filter')
   assert.doesNotMatch(home, /coverLensBlur/, 'the clear source image is rendered only once')
   assert.match(home, /coverDepthBlur/, 'card uses one projection-independent depth blur layer')
-  assert.match(homeStyles, /\.coverDepthBlur[\s\S]*?backdrop-filter:\s*blur\(3\.2px\)[\s\S]*?transparent 0 48%/, 'depth blur uses one visible fixed card-space standard')
+  assert.match(homeStyles, /\.coverDepthBlur::before,[\s\S]*?\.coverDepthBlur::after[\s\S]*?height:\s*32%[\s\S]*?backdrop-filter:\s*blur\(3\.2px\)/, 'depth blur uses fixed top and bottom card-space bands')
+  assert.match(homeStyles, /\.duration\s*\{[\s\S]*?z-index:\s*4;/, 'duration stays sharp above the depth blur')
+  assert.match(homeStyles, /\.meta\s*\{[\s\S]*?z-index:\s*4;/, 'project metadata stays sharp above the depth blur')
   console.log('project cover contract: PASS')
 } finally {
   await fs.rm(root, { recursive: true, force: true })
