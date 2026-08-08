@@ -78,14 +78,14 @@ export function ProjectHome() {
           </SelectContent>
         </Select>
       </div>
-      {visible.length === 0 ? <div className={styles.empty}><FolderOpen/><h2>No projects yet</h2><p>Record your screen or import a portable ToScreen package.</p></div> : <div className={styles.grid}>{visible.map(project => <article key={project.projectPath} className={styles.card} data-status={project.assetStatus} data-has-cover={project.thumbnailPath ? 'true' : 'false'} data-camera={getCameraDirection(project.id)}>
+      {visible.length === 0 ? <div className={styles.empty}><FolderOpen/><h2>No projects yet</h2><p>Record your screen or import a portable ToScreen package.</p></div> : <div className={styles.grid}>{visible.map(project => <article key={project.projectPath} className={styles.card} data-status={project.assetStatus} data-has-cover={project.thumbnailPath ? 'true' : 'false'}>
         <button className={styles.preview} onClick={() => void open(project.projectPath)}>
           {project.thumbnailPath
             ? <div className={styles.coverStage} style={getProjectCoverStyle(project, coverFocus[project.id])}>
                 <span className={styles.coverScene}>
                   <span className={`${styles.coverPlane} ${styles.coverLensFocus}`}><img src={toFileUrl(project.thumbnailPath)} alt="" onLoad={event => {
                     if (!project.thumbnailSourceWidth || !project.thumbnailSourceHeight) return
-                    const focus = locateProjectCoverImage(event.currentTarget, getFallbackCoverFocus(project.id))
+                    const focus = locateProjectCoverImage(event.currentTarget, getFallbackCoverFocus())
                     if (focus) setCoverFocus(previous => ({ ...previous, [project.id]: focus }))
                   }} /></span>
                 </span>
@@ -113,10 +113,9 @@ export function ProjectHome() {
 }
 function formatDuration(ms: number) { const total = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}` }
 function toFileUrl(filePath: string) { return encodeURI(`file://${filePath}`) }
-function getCameraDirection(id: string) { let hash = 0; for (const character of id) hash = ((hash << 5) - hash) + character.charCodeAt(0); return String(Math.abs(hash) % 3) }
-function getFallbackCoverFocus(id: string): ProjectCoverFocus { const direction = getCameraDirection(id); return direction === '1' ? { x: 52, y: 42 } : direction === '2' ? { x: 63, y: 50 } : { x: 50, y: 44 } }
+function getFallbackCoverFocus(): ProjectCoverFocus { return { x: 50, y: 46 } }
 function getProjectCoverStyle(project: RecentProject, detectedFocus?: ProjectCoverFocus): CSSProperties {
-  const focus = detectedFocus || getFallbackCoverFocus(project.id)
+  const focus = detectedFocus || getFallbackCoverFocus()
   const scale = getProjectCoverDetailScale(project.thumbnailSourceWidth)
   const placement = getProjectCoverImagePlacement(scale, focus)
   return {

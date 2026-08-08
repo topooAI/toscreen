@@ -66,6 +66,8 @@ try {
   assert.doesNotMatch(homeStyles, /\.coverDepth(?:Blur|Soft|Medium|Strong)/, 'stylesheet contains no synthetic blur bands')
   assert.match(homeStyles, /\.coverScene[\s\S]*?matrix\(\.96,\s*-\.28,\s*\.42,\s*\.90,\s*0,\s*0\)/, 'cover plane uses the reference oblique axes instead of guessed camera rotations')
   assert.doesNotMatch(homeStyles, /\.coverStage[\s\S]*?perspective:/, 'cover angle remains isometric without near-far perspective distortion')
+  assert.doesNotMatch(home, /data-camera|getCameraDirection/, 'every project card shares one camera geometry')
+  assert.doesNotMatch(homeStyles, /data-camera/, 'stylesheet has no per-card camera variants')
   assert.match(homeStyles, /\.duration\s*\{[\s\S]*?z-index:\s*4;/, 'duration stays sharp above the depth blur')
   assert.match(homeStyles, /\.meta\s*\{[\s\S]*?z-index:\s*4;/, 'project metadata stays sharp above the depth blur')
   console.log('project cover contract: PASS')

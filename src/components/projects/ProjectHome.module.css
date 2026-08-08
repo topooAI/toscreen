@@ -168,16 +168,6 @@
   transform: translateZ(0);
 }
 
-.card[data-camera='1'] {
-  --focus-x: 52%;
-  --focus-y: 42%;
-}
-
-.card[data-camera='2'] {
-  --focus-x: 63%;
-  --focus-y: 50%;
-}
-
 .card:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.025), 0 18px 38px rgba(0, 0, 0, 0.08);
