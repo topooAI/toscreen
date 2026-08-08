@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { resolveProjectCoverCandidate } from '../electron/projectCover'
+import { PROJECT_COVER_WIDTH_PX, resolveProjectCoverCandidate } from '../electron/projectCover'
 import { estimateVisibleSourceWidth, getProjectCoverDetailScale } from '../src/components/projects/projectCoverScale'
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'toscreen-project-cover-'))
@@ -22,10 +22,12 @@ try {
   assert.equal(path.dirname(first.outputPath), coversPath, 'covers stay in the project-library cache')
   assert.equal(first.sourceWidth, 3840, 'cover candidate preserves the recording width')
   assert.equal(first.sourceHeight, 2160, 'cover candidate preserves the recording height')
+  assert.equal(PROJECT_COVER_WIDTH_PX, 1920, 'cached covers retain enough pixels for local detail magnification')
 
   const fourKScale = getProjectCoverDetailScale(3840)
   const threeKScale = getProjectCoverDetailScale(3000)
   assert.ok(fourKScale > threeKScale, 'higher-resolution recordings receive proportionally more cover magnification')
+  assert.ok(fourKScale > 3.5 && threeKScale > 2.8, 'project covers magnify into a readable local detail range')
   assert.ok(Math.abs(estimateVisibleSourceWidth(3840, fourKScale) - estimateVisibleSourceWidth(3000, threeKScale)) < 2,
     '3K and 4K recordings retain the same readable source-detail span')
 

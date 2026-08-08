@@ -8,6 +8,8 @@ import { hydrateCurrentProjectMedia } from './projectLibrary'
 
 const ffmpegPath = ffmpegInstaller.path.replace('app.asar', 'app.asar.unpacked')
 ffmpeg.setFfmpegPath(ffmpegPath)
+const COVER_RECIPE_VERSION = 'detail-1920-v1'
+export const PROJECT_COVER_WIDTH_PX = 1920
 
 export interface ProjectCoverCandidate {
   sourcePath: string
@@ -33,7 +35,7 @@ export async function resolveProjectCoverCandidate(
     if (!stat.isFile() || stat.size === 0) return null
     const sourceSignature = crypto
       .createHash('sha256')
-      .update(`${sourcePath}\0${stat.size}\0${stat.mtimeMs}`)
+      .update(`${COVER_RECIPE_VERSION}\0${sourcePath}\0${stat.size}\0${stat.mtimeMs}`)
       .digest('hex')
     return {
       sourcePath,
@@ -115,7 +117,7 @@ async function generateProjectCoverFile(candidate: ProjectCoverCandidate): Promi
     ffmpeg(candidate.sourcePath)
       // Pick a representative frame from the opening seconds instead of a
       // frequently black first frame, then cache a lightweight dashboard image.
-      .videoFilters(['thumbnail=60', 'scale=960:-2'])
+      .videoFilters(['thumbnail=60', `scale=${PROJECT_COVER_WIDTH_PX}:-2`])
       .outputOptions(['-frames:v 1', '-q:v 3', '-an', '-y'])
       .on('end', async () => {
         try {

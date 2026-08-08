@@ -81,8 +81,9 @@ export function ProjectHome() {
           {project.thumbnailPath
             ? <div className={styles.coverStage} style={{ '--detail-scale': getProjectCoverDetailScale(project.thumbnailSourceWidth) } as CSSProperties}>
                 <span className={styles.coverScene}>
-                  <span className={`${styles.coverPlane} ${styles.coverLensBlur}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
                   <span className={`${styles.coverPlane} ${styles.coverLensFocus}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
+                  <span className={`${styles.coverPlane} ${styles.coverLensBlur} ${styles.coverLensBlurLeft}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
+                  <span className={`${styles.coverPlane} ${styles.coverLensBlur} ${styles.coverLensBlurRight}`}><img src={toFileUrl(project.thumbnailPath)} alt="" /></span>
                 </span>
               </div>
             : <div className={styles.coverFallback} style={{ background: getMorandiGradient(project.name) }}><Video size={31} /></div>}

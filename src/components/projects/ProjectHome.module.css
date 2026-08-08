@@ -220,23 +220,6 @@
     #eeeeec;
 }
 
-.coverStage::before,
-.coverStage::after {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  content: '';
-  pointer-events: none;
-}
-
-.coverStage::before {
-  background: radial-gradient(ellipse 48% 48% at var(--focus-x) var(--focus-y), transparent 45%, rgba(250, 250, 248, .13) 100%);
-}
-
-.coverStage::after {
-  background: linear-gradient(122deg, rgba(255, 255, 255, .1), transparent 34% 76%, rgba(225, 225, 222, .12));
-}
-
 .coverScene {
   position: absolute;
   inset: -34% -24%;
@@ -262,14 +245,26 @@
 }
 
 .coverLensBlur {
-  filter: blur(2.8px) saturate(.68) brightness(1.03);
+  z-index: 2;
+  filter: blur(3.2px) saturate(.72) brightness(1.02);
+  pointer-events: none;
+}
+
+.coverLensBlurLeft {
+  clip-path: inset(0 62% 0 0);
+  -webkit-mask-image: linear-gradient(to right, #000 0 42%, rgba(0, 0, 0, .74) 62%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0 42%, rgba(0, 0, 0, .74) 62%, transparent 100%);
+}
+
+.coverLensBlurRight {
+  clip-path: inset(0 0 0 62%);
+  -webkit-mask-image: linear-gradient(to left, #000 0 42%, rgba(0, 0, 0, .74) 62%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 0 42%, rgba(0, 0, 0, .74) 62%, transparent 100%);
 }
 
 .coverLensFocus {
   z-index: 1;
-  filter: contrast(1.1) saturate(.86) brightness(.98);
-  -webkit-mask-image: radial-gradient(ellipse 46% 50% at var(--focus-x) var(--focus-y), #000 0 56%, rgba(0, 0, 0, .9) 68%, transparent 92%);
-  mask-image: radial-gradient(ellipse 46% 50% at var(--focus-x) var(--focus-y), #000 0 56%, rgba(0, 0, 0, .9) 68%, transparent 92%);
+  filter: contrast(1.12) saturate(.9) brightness(.99);
 }
 
 .coverFallback {
