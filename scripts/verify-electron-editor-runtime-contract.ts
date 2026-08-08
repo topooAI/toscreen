@@ -18,6 +18,9 @@ const files = {
   videoThumbnails: path.join(repoRoot, "src", "components", "video-editor", "timeline", "VideoThumbnails.tsx"),
   row: path.join(repoRoot, "src", "components", "video-editor", "timeline", "Row.tsx"),
   itemGlass: path.join(repoRoot, "src", "components", "video-editor", "timeline", "ItemGlass.module.css"),
+  topooUserPill: path.join(repoRoot, "src", "components", "video-editor", "TopooUserPill.tsx"),
+  projectHome: path.join(repoRoot, "src", "components", "projects", "ProjectHome.tsx"),
+  projectHomeStyles: path.join(repoRoot, "src", "components", "projects", "ProjectHome.module.css"),
 };
 
 const content = Object.fromEntries(
@@ -147,6 +150,56 @@ const checks = [
       "data-timeline-track-area=\"true\"",
       "marginLeft: TIMELINE_BREATHING_GAP_PX",
       "id !== \"row-video\"",
+    ],
+  },
+  {
+    area: "projects-window-titlebar",
+    file: "projectHome",
+    needles: [
+      "<TopooUserPill />",
+      "className={styles.account}",
+      "className={styles.pageHeader}",
+      "<ImportVideoMorphIcon",
+      "<ImportPackageMorphIcon",
+      "<NewRecordingMorphIcon",
+      "<MoreHorizontal size={15}/>",
+      "Remove from recent",
+      "Delete project",
+    ],
+  },
+  {
+    area: "projects-window-titlebar-layout",
+    file: "projectHomeStyles",
+    needles: [
+      "height: 38px",
+      "-webkit-app-region: drag",
+      "-webkit-app-region: no-drag",
+      "padding: 4px",
+      "background: #fafafa",
+      "height: 32px",
+      "font-size: 12px",
+      "width: 24px",
+    ],
+  },
+  {
+    area: "projects-window-native-controls-alignment",
+    file: "electronWindows",
+    needles: [
+      "trafficLightPosition: { x: 12, y: 17 }",
+    ],
+  },
+  {
+    area: "topoo-account-trigger",
+    file: "topooUserPill",
+    needles: [
+      "if (session.state === 'loading') return null",
+      "if (session.state !== 'signed-in') return <button",
+      "h-[26px]",
+      "border-0 bg-transparent",
+      "size-[13px]",
+      "textAnchor=\"middle\" dominantBaseline=\"central\"",
+      "text-[12.8694px]",
+      "leading-[13px]",
     ],
   },
   {

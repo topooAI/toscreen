@@ -244,6 +244,8 @@ body,
 #root * {
   font-family: 'Geist Sans', sans-serif;
   font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Smooth timeline cursor animations */
