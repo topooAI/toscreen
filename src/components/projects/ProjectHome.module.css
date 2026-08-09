@@ -354,12 +354,23 @@
   border: 0;
   border-radius: 14px;
   background: #f7f7f5;
+  animation: none !important;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+}
+
+.coverEditorDialog,
+.coverEditorDialog * {
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 transparent;
 }
 
 .coverEditorTitle {
   color: #171717;
   font-size: 14px !important;
-  font-weight: 600 !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
   line-height: 18px !important;
 }
 

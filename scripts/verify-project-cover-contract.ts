@@ -136,11 +136,15 @@ try {
     'cover editor exposes a directly draggable crop box')
   assert.match(coverEditor, /beginCropResize[\s\S]*?Resize cover from top left[\s\S]*?Resize cover from bottom right/,
     'cover editor exposes direct corner handles for enlarging and shrinking the crop box')
+  assert.match(coverEditor, /updateCropDrag[\s\S]*?stopPropagation\(\)/,
+    'crop resize movement cannot bubble into preview repositioning')
   assert.doesNotMatch(coverEditor, /Cover frame size|coverEditorSize/,
     'cover editor does not add a separate size slider')
   assert.match(coverEditor, /Use automatic/, 'cover editor keeps automatic selection available')
   assert.match(home, /project\.thumbnailFocus\s*\|\|\s*locateProjectCoverImage/,
     'recorded interaction focus takes authority over image-only saliency')
+  assert.match(home, /const focus = project\.thumbnailFocus \|\| detectedFocus/,
+    'saved custom cover focus takes authority over stale detected card focus')
   assert.match(home, /getProjectCoverDetailScale\(project\.thumbnailSourceWidth\)\s*\/\s*Math\.max\(\.65,\s*project\.thumbnailFrameScale/,
     'saved frame size controls the rendered project-cover magnification')
   assert.match(homeStyles, /\.coverScene[\s\S]*?transform-origin:\s*50% 50%/, 'oblique projection stays centered on the located content')
@@ -148,6 +152,8 @@ try {
     'crop editor clearly masks the area outside the selected frame')
   assert.match(homeStyles, /\.coverEditorHandleNW[\s\S]*?nwse-resize[\s\S]*?\.coverEditorHandleSE/,
     'crop box corner handles advertise direct resize interaction')
+  assert.match(homeStyles, /\.coverEditorDialog[\s\S]*?font-synthesis:\s*none[\s\S]*?text-shadow:\s*none/,
+    'cover editor uses the loaded font weight without synthetic or shadowed text')
   assert.match(homeStyles, /::-webkit-slider-runnable-track[\s\S]*?::-webkit-slider-thumb/,
     'cover frame timeline has a visible track and draggable thumb')
   assert.match(homeStyles, /\.coverLensFocus[\s\S]*?filter:\s*none/, 'the readable center is not softened by a second raster filter')

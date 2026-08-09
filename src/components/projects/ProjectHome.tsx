@@ -123,7 +123,7 @@ function formatDuration(ms: number) { const total = Math.max(0, Math.round(ms / 
 function toFileUrl(filePath: string) { return encodeURI(`file://${filePath}`) }
 function getFallbackCoverFocus(): ProjectCoverFocus { return { x: 50, y: 46 } }
 function getProjectCoverStyle(project: RecentProject, detectedFocus?: ProjectCoverFocus): CSSProperties {
-  const focus = detectedFocus || getFallbackCoverFocus()
+  const focus = project.thumbnailFocus || detectedFocus || getFallbackCoverFocus()
   const scale = getProjectCoverDetailScale(project.thumbnailSourceWidth) / Math.max(.65, project.thumbnailFrameScale || 1)
   const placement = getProjectCoverImagePlacement(scale, focus)
   return {

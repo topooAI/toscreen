@@ -78,6 +78,7 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
   }
 
   const beginCropDrag = (event: PointerEvent<HTMLElement>) => {
+    event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     dragRef.current = {
@@ -90,6 +91,7 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
   }
 
   const beginCropResize = (event: PointerEvent<HTMLButtonElement>, cornerX: -1 | 1, cornerY: -1 | 1) => {
+    event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     dragRef.current = {
@@ -104,6 +106,8 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
   }
 
   const updateCropDrag = (event: PointerEvent<HTMLElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
     if (!info || !dragRef.current) return
     const preview = event.currentTarget.closest(`.${styles.coverEditorPreview}`) as HTMLElement | null
     if (!preview) return
@@ -132,8 +136,9 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
   }
 
   const endCropDrag = (event: PointerEvent<HTMLElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
     dragRef.current = null
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
 
   const save = async () => {
@@ -175,8 +180,15 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
           className={styles.coverEditorPreview}
           style={{ aspectRatio: `${info.sourceWidth || 16} / ${info.sourceHeight || 9}` }}
           onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); chooseFocus(event) }}
-          onPointerMove={event => { if ((event.buttons & 1) === 1 || event.currentTarget.hasPointerCapture(event.pointerId)) chooseFocus(event) }}
-          onPointerUp={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }}
+          onPointerMoveCapture={event => {
+            if (dragRef.current) updateCropDrag(event)
+            else if ((event.buttons & 1) === 1 || event.currentTarget.hasPointerCapture(event.pointerId)) chooseFocus(event)
+          }}
+          onPointerUpCapture={event => {
+            if (dragRef.current) endCropDrag(event)
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+          }}
+          onPointerCancelCapture={event => { if (dragRef.current) endCropDrag(event) }}
         >
           <video
             ref={videoRef}
@@ -193,14 +205,11 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
             height: `${getCropSize(info, frameScale).height}%`,
           }}
             onPointerDown={beginCropDrag}
-            onPointerMove={updateCropDrag}
-            onPointerUp={endCropDrag}
-            onPointerCancel={endCropDrag}
           >
-            <button type="button" aria-label="Resize cover from top left" className={styles.coverEditorHandleNW} onPointerDown={event => beginCropResize(event, -1, -1)} onPointerMove={updateCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} />
-            <button type="button" aria-label="Resize cover from top right" className={styles.coverEditorHandleNE} onPointerDown={event => beginCropResize(event, 1, -1)} onPointerMove={updateCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} />
-            <button type="button" aria-label="Resize cover from bottom left" className={styles.coverEditorHandleSW} onPointerDown={event => beginCropResize(event, -1, 1)} onPointerMove={updateCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} />
-            <button type="button" aria-label="Resize cover from bottom right" className={styles.coverEditorHandleSE} onPointerDown={event => beginCropResize(event, 1, 1)} onPointerMove={updateCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} />
+            <button type="button" aria-label="Resize cover from top left" className={styles.coverEditorHandleNW} onPointerDown={event => beginCropResize(event, -1, -1)} />
+            <button type="button" aria-label="Resize cover from top right" className={styles.coverEditorHandleNE} onPointerDown={event => beginCropResize(event, 1, -1)} />
+            <button type="button" aria-label="Resize cover from bottom left" className={styles.coverEditorHandleSW} onPointerDown={event => beginCropResize(event, -1, 1)} />
+            <button type="button" aria-label="Resize cover from bottom right" className={styles.coverEditorHandleSE} onPointerDown={event => beginCropResize(event, 1, 1)} />
           </span>
         </div>
         <div className={styles.coverEditorTimeline}>
