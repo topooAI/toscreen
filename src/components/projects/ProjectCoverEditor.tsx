@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { toast } from 'sonner'
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ProjectCoverFocus } from './projectCoverFocus'
+import { estimateVisibleSourceWidth, getProjectCoverDetailScale } from './projectCoverScale'
 import styles from './ProjectHome.module.css'
 
 interface CoverProject {
@@ -13,6 +14,8 @@ interface CoverProject {
 
 interface CoverEditorInfo {
   sourcePath: string
+  sourceWidth?: number
+  sourceHeight?: number
   durationMs: number
   timeMs: number
   focus: ProjectCoverFocus
@@ -27,6 +30,7 @@ interface ProjectCoverEditorProps {
 
 export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEditorProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const draggingRef = useRef(false)
   const [info, setInfo] = useState<CoverEditorInfo | null>(null)
   const [timeMs, setTimeMs] = useState(0)
   const [focus, setFocus] = useState<ProjectCoverFocus>({ x: 50, y: 46 })
@@ -51,11 +55,14 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
     if (videoRef.current) videoRef.current.currentTime = nextTimeMs / 1000
   }
 
-  const chooseFocus = (event: MouseEvent<HTMLDivElement>) => {
+  const chooseFocus = (event: MouseEvent<HTMLDivElement> | PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
+    const crop = info ? getCropSize(info) : { width: 20, height: 20 }
+    const x = (event.clientX - rect.left) / rect.width * 100
+    const y = (event.clientY - rect.top) / rect.height * 100
     setFocus({
-      x: Number(((event.clientX - rect.left) / rect.width * 100).toFixed(2)),
-      y: Number(((event.clientY - rect.top) / rect.height * 100).toFixed(2)),
+      x: Number(Math.min(100 - crop.width / 2, Math.max(crop.width / 2, x)).toFixed(2)),
+      y: Number(Math.min(100 - crop.height / 2, Math.max(crop.height / 2, y)).toFixed(2)),
     })
   }
 
@@ -91,10 +98,20 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
     <DialogContent className={styles.coverEditorDialog}>
       <DialogHeader>
         <DialogTitle className={styles.coverEditorTitle}>Choose cover</DialogTitle>
-        <DialogDescription className={styles.coverEditorDescription}>Choose a frame, then click the point that should stay centered.</DialogDescription>
+        <DialogDescription className={styles.coverEditorDescription}>Drag the timeline to choose a frame. Drag the crop box to position it.</DialogDescription>
       </DialogHeader>
       {info ? <>
-        <div className={styles.coverEditorPreview} onClick={chooseFocus}>
+        <div
+          className={styles.coverEditorPreview}
+          style={{ aspectRatio: `${info.sourceWidth || 16} / ${info.sourceHeight || 9}` }}
+          onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); chooseFocus(event) }}
+          onPointerMove={event => { if ((event.buttons & 1) === 1 || event.currentTarget.hasPointerCapture(event.pointerId)) chooseFocus(event) }}
+          onPointerUp={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }}
+          onMouseDown={event => { draggingRef.current = true; chooseFocus(event) }}
+          onMouseMove={event => { if (draggingRef.current) chooseFocus(event) }}
+          onMouseUp={() => { draggingRef.current = false }}
+          onMouseLeave={() => { draggingRef.current = false }}
+        >
           <video
             ref={videoRef}
             src={toFileUrl(info.sourcePath)}
@@ -103,7 +120,12 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
             preload="metadata"
             onLoadedMetadata={event => { event.currentTarget.currentTime = timeMs / 1000 }}
           />
-          <span className={styles.coverEditorTarget} style={{ left: `${focus.x}%`, top: `${focus.y}%` }} />
+          <span className={styles.coverEditorCrop} style={{
+            left: `${focus.x}%`,
+            top: `${focus.y}%`,
+            width: `${getCropSize(info).width}%`,
+            height: `${getCropSize(info).height}%`,
+          }}><i /><i /></span>
         </div>
         <div className={styles.coverEditorTimeline}>
           <input
@@ -132,3 +154,14 @@ function formatTime(ms: number) {
 }
 
 function toFileUrl(filePath: string) { return encodeURI(`file://${filePath}`) }
+
+function getCropSize(info: CoverEditorInfo) {
+  const sourceWidth = Math.max(1, Number(info.sourceWidth || 3840))
+  const sourceHeight = Math.max(1, Number(info.sourceHeight || sourceWidth * 9 / 16))
+  const visibleWidth = estimateVisibleSourceWidth(sourceWidth, getProjectCoverDetailScale(sourceWidth))
+  const visibleHeight = visibleWidth / (350 / 198)
+  return {
+    width: Math.min(92, visibleWidth / sourceWidth * 100),
+    height: Math.min(92, visibleHeight / sourceHeight * 100),
+  }
+}

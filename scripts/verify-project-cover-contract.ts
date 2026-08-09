@@ -130,10 +130,16 @@ try {
   assert.match(home, /Choose cover…/, 'card actions expose the custom cover editor')
   assert.match(coverEditor, /chooseFocus[\s\S]*?type="range"[\s\S]*?Save cover/,
     'cover editor selects both a source frame and a focal point')
+  assert.match(coverEditor, /onPointerDown[\s\S]*?setPointerCapture[\s\S]*?onPointerMove[\s\S]*?coverEditorCrop/,
+    'cover editor exposes a directly draggable crop box')
   assert.match(coverEditor, /Use automatic/, 'cover editor keeps automatic selection available')
   assert.match(home, /project\.thumbnailFocus\s*\|\|\s*locateProjectCoverImage/,
     'recorded interaction focus takes authority over image-only saliency')
   assert.match(homeStyles, /\.coverScene[\s\S]*?transform-origin:\s*50% 50%/, 'oblique projection stays centered on the located content')
+  assert.match(homeStyles, /\.coverEditorCrop[\s\S]*?box-shadow:[^;]*9999px/,
+    'crop editor clearly masks the area outside the selected frame')
+  assert.match(homeStyles, /::-webkit-slider-runnable-track[\s\S]*?::-webkit-slider-thumb/,
+    'cover frame timeline has a visible track and draggable thumb')
   assert.match(homeStyles, /\.coverLensFocus[\s\S]*?filter:\s*none/, 'the readable center is not softened by a second raster filter')
   assert.doesNotMatch(home, /coverLensBlur/, 'the clear source image is rendered only once')
   assert.doesNotMatch(home, /coverDepth(?:Blur|Soft|Medium|Strong)/, 'card never overlays synthetic blur bands')

@@ -374,8 +374,11 @@
   overflow: hidden;
   border-radius: 10px;
   background: #e9e9e6;
-  cursor: crosshair;
+  cursor: grab;
+  touch-action: none;
 }
+
+.coverEditorPreview:active { cursor: grabbing; }
 
 .coverEditorPreview video {
   display: block;
@@ -384,30 +387,29 @@
   object-fit: contain;
 }
 
-.coverEditorTarget {
+.coverEditorCrop {
   position: absolute;
-  width: 26px;
-  height: 26px;
-  border: 1.5px solid #fff;
-  border-radius: 50%;
-  background: rgba(12, 12, 12, .12);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, .38), 0 2px 8px rgba(0, 0, 0, .16);
+  overflow: visible;
+  border: 2px solid white;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .42), 0 0 0 9999px rgba(9, 9, 9, .34);
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
 
-.coverEditorTarget::before,
-.coverEditorTarget::after {
+.coverEditorCrop::before,
+.coverEditorCrop::after,
+.coverEditorCrop i {
   content: '';
   position: absolute;
-  left: 50%;
-  top: 50%;
-  background: #fff;
-  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, .7);
 }
 
-.coverEditorTarget::before { width: 8px; height: 1px; }
-.coverEditorTarget::after { width: 1px; height: 8px; }
+.coverEditorCrop::before { left: 33.333%; top: 0; bottom: 0; width: 1px; }
+.coverEditorCrop::after { right: 33.333%; top: 0; bottom: 0; width: 1px; }
+.coverEditorCrop i:first-child { left: 0; right: 0; top: 33.333%; height: 1px; }
+.coverEditorCrop i:last-child { left: 0; right: 0; bottom: 33.333%; height: 1px; }
 
 .coverEditorTimeline {
   display: flex;
@@ -416,10 +418,29 @@
 }
 
 .coverEditorTimeline input {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
-  height: 16px;
+  height: 18px;
   margin: 0;
-  accent-color: #171717;
+  background: transparent;
+}
+
+.coverEditorTimeline input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: #d3d3cf;
+}
+
+.coverEditorTimeline input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #171717;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .24);
 }
 
 .coverEditorTimeline span {

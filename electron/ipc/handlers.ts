@@ -901,6 +901,8 @@ export function registerIpcHandlers(
     return {
       success: true,
       sourcePath: candidate.sourcePath,
+      sourceWidth: candidate.sourceWidth,
+      sourceHeight: candidate.sourceHeight,
       durationMs: Number(entry?.durationMs || project?.projectModel?.durationMs || project?.durationMs || 0),
       timeMs: entry?.thumbnailMode === 'custom' ? Number(entry.thumbnailTimeMs || 0) : 0,
       focus: entry?.thumbnailMode === 'custom'
