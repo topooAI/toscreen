@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { toast } from 'sonner'
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -18,6 +18,7 @@ interface CoverEditorInfo {
   sourceHeight?: number
   durationMs: number
   timeMs: number
+  frameScale: number
   focus: ProjectCoverFocus
   mode: 'auto' | 'custom'
 }
@@ -30,9 +31,18 @@ interface ProjectCoverEditorProps {
 
 export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEditorProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const draggingRef = useRef(false)
+  const dragRef = useRef<{
+    mode: 'move' | 'resize'
+    startClientX: number
+    startClientY: number
+    startFocus: ProjectCoverFocus
+    startFrameScale: number
+    cornerX?: -1 | 1
+    cornerY?: -1 | 1
+  } | null>(null)
   const [info, setInfo] = useState<CoverEditorInfo | null>(null)
   const [timeMs, setTimeMs] = useState(0)
+  const [frameScale, setFrameScale] = useState(1)
   const [focus, setFocus] = useState<ProjectCoverFocus>({ x: 50, y: 46 })
   const [saving, setSaving] = useState(false)
 
@@ -45,6 +55,7 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
       const next = result as CoverEditorInfo & { success: true }
       setInfo(next)
       setTimeMs(next.timeMs)
+      setFrameScale(next.frameScale)
       setFocus(next.focus)
     })
     return () => { active = false }
@@ -55,9 +66,9 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
     if (videoRef.current) videoRef.current.currentTime = nextTimeMs / 1000
   }
 
-  const chooseFocus = (event: MouseEvent<HTMLDivElement> | PointerEvent<HTMLDivElement>) => {
+  const chooseFocus = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
-    const crop = info ? getCropSize(info) : { width: 20, height: 20 }
+    const crop = info ? getCropSize(info, frameScale) : { width: 20, height: 20 }
     const x = (event.clientX - rect.left) / rect.width * 100
     const y = (event.clientY - rect.top) / rect.height * 100
     setFocus({
@@ -66,11 +77,70 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
     })
   }
 
+  const beginCropDrag = (event: PointerEvent<HTMLElement>) => {
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    dragRef.current = {
+      mode: 'move',
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startFocus: focus,
+      startFrameScale: frameScale,
+    }
+  }
+
+  const beginCropResize = (event: PointerEvent<HTMLButtonElement>, cornerX: -1 | 1, cornerY: -1 | 1) => {
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    dragRef.current = {
+      mode: 'resize',
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startFocus: focus,
+      startFrameScale: frameScale,
+      cornerX,
+      cornerY,
+    }
+  }
+
+  const updateCropDrag = (event: PointerEvent<HTMLElement>) => {
+    if (!info || !dragRef.current) return
+    const preview = event.currentTarget.closest(`.${styles.coverEditorPreview}`) as HTMLElement | null
+    if (!preview) return
+    const rect = preview.getBoundingClientRect()
+    const drag = dragRef.current
+    const dx = (event.clientX - drag.startClientX) / rect.width * 100
+    const dy = (event.clientY - drag.startClientY) / rect.height * 100
+    const startCrop = getCropSize(info, drag.startFrameScale)
+
+    if (drag.mode === 'move') {
+      setFocus(clampFocus({ x: drag.startFocus.x + dx, y: drag.startFocus.y + dy }, startCrop))
+      return
+    }
+
+    const widthRatio = (drag.cornerX || 1) * dx / Math.max(1, startCrop.width)
+    const heightRatio = (drag.cornerY || 1) * dy / Math.max(1, startCrop.height)
+    const nextScale = Math.min(1.8, Math.max(.65, drag.startFrameScale * (1 + (widthRatio + heightRatio) / 2)))
+    const nextCrop = getCropSize(info, nextScale)
+    const oppositeX = drag.startFocus.x - (drag.cornerX || 1) * startCrop.width / 2
+    const oppositeY = drag.startFocus.y - (drag.cornerY || 1) * startCrop.height / 2
+    setFrameScale(Number(nextScale.toFixed(3)))
+    setFocus(clampFocus({
+      x: oppositeX + (drag.cornerX || 1) * nextCrop.width / 2,
+      y: oppositeY + (drag.cornerY || 1) * nextCrop.height / 2,
+    }, nextCrop))
+  }
+
+  const endCropDrag = (event: PointerEvent<HTMLElement>) => {
+    dragRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+
   const save = async () => {
     if (!project || !info) return
     setSaving(true)
     try {
-      const result = await window.electronAPI.setProjectCover(project.projectPath, { timeMs, focus })
+      const result = await window.electronAPI.setProjectCover(project.projectPath, { timeMs, frameScale, focus })
       if (!result.success) throw new Error(result.error)
       toast.success('Cover updated')
       onSaved()
@@ -98,7 +168,7 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
     <DialogContent className={styles.coverEditorDialog}>
       <DialogHeader>
         <DialogTitle className={styles.coverEditorTitle}>Choose cover</DialogTitle>
-        <DialogDescription className={styles.coverEditorDescription}>Drag the timeline to choose a frame. Drag the crop box to position it.</DialogDescription>
+        <DialogDescription className={styles.coverEditorDescription}>Choose a frame, then drag or resize the crop box.</DialogDescription>
       </DialogHeader>
       {info ? <>
         <div
@@ -107,10 +177,6 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
           onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); chooseFocus(event) }}
           onPointerMove={event => { if ((event.buttons & 1) === 1 || event.currentTarget.hasPointerCapture(event.pointerId)) chooseFocus(event) }}
           onPointerUp={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId) }}
-          onMouseDown={event => { draggingRef.current = true; chooseFocus(event) }}
-          onMouseMove={event => { if (draggingRef.current) chooseFocus(event) }}
-          onMouseUp={() => { draggingRef.current = false }}
-          onMouseLeave={() => { draggingRef.current = false }}
         >
           <video
             ref={videoRef}
@@ -123,9 +189,19 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
           <span className={styles.coverEditorCrop} style={{
             left: `${focus.x}%`,
             top: `${focus.y}%`,
-            width: `${getCropSize(info).width}%`,
-            height: `${getCropSize(info).height}%`,
-          }}><i /><i /></span>
+            width: `${getCropSize(info, frameScale).width}%`,
+            height: `${getCropSize(info, frameScale).height}%`,
+          }}
+            onPointerDown={beginCropDrag}
+            onPointerMove={updateCropDrag}
+            onPointerUp={endCropDrag}
+            onPointerCancel={endCropDrag}
+          >
+            <button type="button" aria-label="Resize cover from top left" className={styles.coverEditorHandleNW} onPointerDown={event => beginCropResize(event, -1, -1)} onPointerMove={updateCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} />
+            <button type="button" aria-label="Resize cover from top right" className={styles.coverEditorHandleNE} onPointerDown={event => beginCropResize(event, 1, -1)} onPointerMove={updateCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} />
+            <button type="button" aria-label="Resize cover from bottom left" className={styles.coverEditorHandleSW} onPointerDown={event => beginCropResize(event, -1, 1)} onPointerMove={updateCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} />
+            <button type="button" aria-label="Resize cover from bottom right" className={styles.coverEditorHandleSE} onPointerDown={event => beginCropResize(event, 1, 1)} onPointerMove={updateCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} />
+          </span>
         </div>
         <div className={styles.coverEditorTimeline}>
           <input
@@ -155,13 +231,20 @@ function formatTime(ms: number) {
 
 function toFileUrl(filePath: string) { return encodeURI(`file://${filePath}`) }
 
-function getCropSize(info: CoverEditorInfo) {
+function getCropSize(info: CoverEditorInfo, frameScale = 1) {
   const sourceWidth = Math.max(1, Number(info.sourceWidth || 3840))
   const sourceHeight = Math.max(1, Number(info.sourceHeight || sourceWidth * 9 / 16))
-  const visibleWidth = estimateVisibleSourceWidth(sourceWidth, getProjectCoverDetailScale(sourceWidth))
+  const visibleWidth = estimateVisibleSourceWidth(sourceWidth, getProjectCoverDetailScale(sourceWidth)) * frameScale
   const visibleHeight = visibleWidth / (350 / 198)
   return {
     width: Math.min(92, visibleWidth / sourceWidth * 100),
     height: Math.min(92, visibleHeight / sourceHeight * 100),
+  }
+}
+
+function clampFocus(focus: ProjectCoverFocus, crop: { width: number; height: number }): ProjectCoverFocus {
+  return {
+    x: Number(Math.min(100 - crop.width / 2, Math.max(crop.width / 2, focus.x)).toFixed(2)),
+    y: Number(Math.min(100 - crop.height / 2, Math.max(crop.height / 2, focus.y)).toFixed(2)),
   }
 }

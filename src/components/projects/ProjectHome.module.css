@@ -358,14 +358,15 @@
 
 .coverEditorTitle {
   color: #171717;
-  font-size: 15px;
-  line-height: 20px;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 18px !important;
 }
 
 .coverEditorDescription {
   color: rgba(23, 23, 23, .55);
-  font-size: 11.5px;
-  line-height: 16px;
+  font-size: 12px !important;
+  line-height: 17px !important;
 }
 
 .coverEditorPreview {
@@ -390,26 +391,31 @@
 .coverEditorCrop {
   position: absolute;
   overflow: visible;
-  border: 2px solid white;
-  border-radius: 5px;
+  border: 1.5px solid #0d99ff;
+  border-radius: 1px;
   background: transparent;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .42), 0 0 0 9999px rgba(9, 9, 9, .34);
   transform: translate(-50%, -50%);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: move;
+  touch-action: none;
 }
 
-.coverEditorCrop::before,
-.coverEditorCrop::after,
-.coverEditorCrop i {
-  content: '';
+.coverEditorCrop button {
   position: absolute;
-  background: rgba(255, 255, 255, .7);
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 1.5px solid #0d99ff;
+  border-radius: 1px;
+  background: #fff;
+  touch-action: none;
 }
 
-.coverEditorCrop::before { left: 33.333%; top: 0; bottom: 0; width: 1px; }
-.coverEditorCrop::after { right: 33.333%; top: 0; bottom: 0; width: 1px; }
-.coverEditorCrop i:first-child { left: 0; right: 0; top: 33.333%; height: 1px; }
-.coverEditorCrop i:last-child { left: 0; right: 0; bottom: 33.333%; height: 1px; }
+.coverEditorHandleNW { left: 0; top: 0; transform: translate(-50%, -50%); cursor: nwse-resize; }
+.coverEditorHandleNE { right: 0; top: 0; transform: translate(50%, -50%); cursor: nesw-resize; }
+.coverEditorHandleSW { left: 0; bottom: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
+.coverEditorHandleSE { right: 0; bottom: 0; transform: translate(50%, 50%); cursor: nwse-resize; }
 
 .coverEditorTimeline {
   display: flex;
@@ -468,7 +474,7 @@
   padding: 0 11px;
   border: 0;
   border-radius: 7px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 550;
 }
 

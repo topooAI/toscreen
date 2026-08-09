@@ -14,6 +14,7 @@ import styles from './ProjectHome.module.css'
 interface RecentProject {
   id: string; name: string; projectPath: string; thumbnailPath?: string; updatedAt: string
   thumbnailSourceWidth?: number; thumbnailSourceHeight?: number
+  thumbnailFrameScale?: number
   thumbnailFocus?: ProjectCoverFocus
   durationMs: number; assetStatus: 'ready' | 'missing' | 'missing-project' | 'corrupt' | 'recovered'; missingAssets: string[]
 }
@@ -123,7 +124,7 @@ function toFileUrl(filePath: string) { return encodeURI(`file://${filePath}`) }
 function getFallbackCoverFocus(): ProjectCoverFocus { return { x: 50, y: 46 } }
 function getProjectCoverStyle(project: RecentProject, detectedFocus?: ProjectCoverFocus): CSSProperties {
   const focus = detectedFocus || getFallbackCoverFocus()
-  const scale = getProjectCoverDetailScale(project.thumbnailSourceWidth)
+  const scale = getProjectCoverDetailScale(project.thumbnailSourceWidth) / Math.max(.65, project.thumbnailFrameScale || 1)
   const placement = getProjectCoverImagePlacement(scale, focus)
   return {
     '--focus-x': `${focus.x}%`,

@@ -102,7 +102,7 @@ interface Window {
     newProject: () => Promise<{ success: boolean }>;
     listRecentProjects: () => Promise<any>;
     getProjectCoverEditor: (projectPath: string) => Promise<any>;
-    setProjectCover: (projectPath: string, input: { timeMs: number; focus: { x: number; y: number } }) => Promise<any>;
+    setProjectCover: (projectPath: string, input: { timeMs: number; frameScale: number; focus: { x: number; y: number } }) => Promise<any>;
     resetProjectCover: (projectPath: string) => Promise<any>;
     onProjectCoversUpdated: (callback: () => void) => () => void;
     openProject: (projectPath: string) => Promise<any>;

@@ -146,7 +146,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   newProject: () => ipcRenderer.invoke('project-new'),
   listRecentProjects: () => ipcRenderer.invoke('project-list-recent'),
   getProjectCoverEditor: (projectPath: string) => ipcRenderer.invoke('project-get-cover-editor', projectPath),
-  setProjectCover: (projectPath: string, input: { timeMs: number; focus: { x: number; y: number } }) => ipcRenderer.invoke('project-set-cover', projectPath, input),
+  setProjectCover: (projectPath: string, input: { timeMs: number; frameScale: number; focus: { x: number; y: number } }) => ipcRenderer.invoke('project-set-cover', projectPath, input),
   resetProjectCover: (projectPath: string) => ipcRenderer.invoke('project-reset-cover', projectPath),
   onProjectCoversUpdated: (callback: () => void) => {
     const listener = () => callback()

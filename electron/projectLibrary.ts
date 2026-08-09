@@ -27,6 +27,7 @@ export interface RecentProjectEntry {
   thumbnailSourceHeight?: number
   thumbnailMode?: 'auto' | 'custom'
   thumbnailTimeMs?: number
+  thumbnailFrameScale?: number
   thumbnailFocus?: { x: number; y: number }
   updatedAt: string
   durationMs: number
