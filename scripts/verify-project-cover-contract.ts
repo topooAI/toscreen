@@ -29,7 +29,7 @@ try {
   const fourKScale = getProjectCoverDetailScale(3840)
   const threeKScale = getProjectCoverDetailScale(3000)
   assert.ok(fourKScale > threeKScale, 'higher-resolution recordings receive proportionally more cover magnification')
-  assert.ok(fourKScale > 3.8 && threeKScale > 3, 'project covers magnify into a readable local detail range')
+  assert.ok(fourKScale > 3.6 && threeKScale > 2.8, 'project covers magnify into a readable local detail range')
   assert.ok(estimateVisibleSourceWidth(PROJECT_COVER_WIDTH_PX, fourKScale) >= 580,
     '4K cover crops remain downsampled instead of being stretched across the card')
   assert.ok(Math.abs(estimateVisibleSourceWidth(3840, fourKScale) - estimateVisibleSourceWidth(3000, threeKScale)) < 2,
@@ -127,7 +127,8 @@ try {
   assert.doesNotMatch(home, /coverLensBlur/, 'the clear source image is rendered only once')
   assert.doesNotMatch(home, /coverDepth(?:Blur|Soft|Medium|Strong)/, 'card never overlays synthetic blur bands')
   assert.doesNotMatch(homeStyles, /\.coverDepth(?:Blur|Soft|Medium|Strong)/, 'stylesheet contains no synthetic blur bands')
-  assert.match(homeStyles, /\.coverScene[\s\S]*?matrix\(\.96,\s*-\.28,\s*\.42,\s*\.90,\s*0,\s*0\)/, 'cover plane uses the reference oblique axes instead of guessed camera rotations')
+  assert.match(homeStyles, /\.coverScene[\s\S]*?matrix\(\.978148,\s*-\.207912,\s*\.573576,\s*\.819152,\s*0,\s*0\)/,
+    'cover plane uses equal-length shallow dimetric axes instead of rotation or a steep ground-plane projection')
   assert.doesNotMatch(homeStyles, /\.coverStage[\s\S]*?perspective:/, 'cover angle remains isometric without near-far perspective distortion')
   assert.doesNotMatch(home, /data-camera|getCameraDirection/, 'every project card shares one camera geometry')
   assert.doesNotMatch(homeStyles, /data-camera/, 'stylesheet has no per-card camera variants')

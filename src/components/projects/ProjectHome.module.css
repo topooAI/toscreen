@@ -211,7 +211,7 @@
   position: absolute;
   inset: -44% -34%;
   display: block;
-  transform: matrix(.96, -.28, .42, .90, 0, 0) scale(1.18);
+  transform: matrix(.978148, -.207912, .573576, .819152, 0, 0) scale(1.18);
   transform-origin: 50% 50%;
 }
 
