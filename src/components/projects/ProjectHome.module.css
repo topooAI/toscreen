@@ -345,3 +345,114 @@
 .empty h2 {
   color: inherit;
 }
+
+.coverEditorDialog {
+  width: min(720px, calc(100vw - 48px));
+  max-width: 720px !important;
+  gap: 14px;
+  padding: 18px;
+  border: 0;
+  border-radius: 14px;
+  background: #f7f7f5;
+}
+
+.coverEditorTitle {
+  color: #171717;
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.coverEditorDescription {
+  color: rgba(23, 23, 23, .55);
+  font-size: 11.5px;
+  line-height: 16px;
+}
+
+.coverEditorPreview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #e9e9e6;
+  cursor: crosshair;
+}
+
+.coverEditorPreview video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.coverEditorTarget {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid #fff;
+  border-radius: 50%;
+  background: rgba(12, 12, 12, .12);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .38), 0 2px 8px rgba(0, 0, 0, .16);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.coverEditorTarget::before,
+.coverEditorTarget::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+}
+
+.coverEditorTarget::before { width: 8px; height: 1px; }
+.coverEditorTarget::after { width: 1px; height: 8px; }
+
+.coverEditorTimeline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.coverEditorTimeline input {
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  accent-color: #171717;
+}
+
+.coverEditorTimeline span {
+  min-width: 74px;
+  color: rgba(23, 23, 23, .55);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.coverEditorLoading {
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background: #ececea;
+}
+
+.coverEditorFooter {
+  align-items: center;
+  justify-content: space-between !important;
+  margin-top: 0;
+}
+
+.coverEditorFooter button {
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 550;
+}
+
+.coverEditorSecondary { background: transparent; color: rgba(23, 23, 23, .68); }
+.coverEditorSecondary:hover { background: rgba(0, 0, 0, .05); color: #171717; }
+.coverEditorPrimary { background: #171717; color: white; }
+.coverEditorPrimary:hover { background: #292929; }
+.coverEditorFooter button:disabled { opacity: .45; }

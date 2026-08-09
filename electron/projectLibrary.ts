@@ -25,6 +25,8 @@ export interface RecentProjectEntry {
   thumbnailSourceSignature?: string
   thumbnailSourceWidth?: number
   thumbnailSourceHeight?: number
+  thumbnailMode?: 'auto' | 'custom'
+  thumbnailTimeMs?: number
   thumbnailFocus?: { x: number; y: number }
   updatedAt: string
   durationMs: number

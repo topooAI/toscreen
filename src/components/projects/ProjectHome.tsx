@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { FolderOpen, MoreHorizontal, Search, Trash2, Video, X } from 'lucide-react'
+import { FolderOpen, Image as ImageIcon, MoreHorizontal, Search, Trash2, Video, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -8,6 +8,7 @@ import { ImportVideoMorphIcon, ImportPackageMorphIcon, NewRecordingMorphIcon } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { locateProjectCoverImage, type ProjectCoverFocus } from './projectCoverFocus'
 import { getProjectCoverDetailScale, getProjectCoverImagePlacement } from './projectCoverScale'
+import { ProjectCoverEditor } from './ProjectCoverEditor'
 import styles from './ProjectHome.module.css'
 
 interface RecentProject {
@@ -21,6 +22,7 @@ export function ProjectHome() {
   const [hoveredButton, setHoveredButton] = useState<'video' | 'package' | 'record' | null>(null)
   const [projects, setProjects] = useState<RecentProject[]>([])
   const [coverFocus, setCoverFocus] = useState<Record<string, ProjectCoverFocus>>({})
+  const [coverProject, setCoverProject] = useState<RecentProject | null>(null)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'updated' | 'name' | 'duration'>('updated')
   const refresh = useCallback(async () => { const result = await window.electronAPI.listRecentProjects(); if (result.success) setProjects(result.projects) }, [])
@@ -34,6 +36,7 @@ export function ProjectHome() {
   const importVideo = async () => { const result = await window.electronAPI.openVideoFilePicker(); if (result.success && result.path) { await window.electronAPI.newProject(); await window.electronAPI.setCurrentVideoPath(result.path); await window.electronAPI.switchToEditor() } }
   return <main className={styles.home}>
     <Toaster />
+    <ProjectCoverEditor project={coverProject} onClose={() => setCoverProject(null)} onSaved={() => { void refresh() }} />
     <header className={styles.titlebar}>
       <div className={styles.account}><TopooUserPill /></div>
     </header>
@@ -99,6 +102,9 @@ export function ProjectHome() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild><button aria-label={`More actions for ${project.name}`} className={styles.more}><MoreHorizontal size={15}/></button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="toscreen-dropdown-menu z-[220] min-w-[160px] rounded-[8px] border-0 p-[3px] shadow-xl">
+            <DropdownMenuItem className="h-[26px] rounded-[5px] pl-2 pr-2 text-[12px] font-medium" onSelect={() => setCoverProject(project)}>
+              <ImageIcon size={13} strokeWidth={1.5} className="mr-[5.5px] text-neutral-500 shrink-0" />Choose cover…
+            </DropdownMenuItem>
             <DropdownMenuItem className="h-[26px] rounded-[5px] pl-2 pr-2 text-[12px] font-medium" onSelect={async () => { await window.electronAPI.removeRecentProject(project.projectPath); void refresh() }}>
               <X size={13} strokeWidth={1.5} className="mr-[5.5px] text-neutral-500 shrink-0" />Remove from recent
             </DropdownMenuItem>

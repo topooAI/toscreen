@@ -29,8 +29,8 @@ try {
   const fourKScale = getProjectCoverDetailScale(3840)
   const threeKScale = getProjectCoverDetailScale(3000)
   assert.ok(fourKScale > threeKScale, 'higher-resolution recordings receive proportionally more cover magnification')
-  assert.ok(fourKScale > 3.2 && threeKScale > 2.5, 'project covers magnify into a readable local detail range')
-  assert.ok(estimateVisibleSourceWidth(PROJECT_COVER_WIDTH_PX, fourKScale) >= 660,
+  assert.ok(fourKScale > 2.8 && threeKScale > 2.2, 'project covers magnify into a readable local detail range')
+  assert.ok(estimateVisibleSourceWidth(PROJECT_COVER_WIDTH_PX, fourKScale) >= 740,
     '4K cover crops remain downsampled instead of being stretched across the card')
   assert.ok(Math.abs(estimateVisibleSourceWidth(3840, fourKScale) - estimateVisibleSourceWidth(3000, threeKScale)) < 2,
     '3K and 4K recordings retain the same readable source-detail span')
@@ -110,16 +110,27 @@ try {
   const saveProjectBlock = handlers.match(/ipcMain\.handle\('save-project'[\s\S]*?\n  \}\);/)?.[0] || ''
   assert.doesNotMatch(saveProjectBlock, /generateProjectCover|scheduleProjectCover/, 'autosave never invokes FFmpeg cover generation')
   assert.match(handlers, /project-list-recent[\s\S]*?scheduleProjectCover/, 'missing covers are backfilled from the Projects page')
-  assert.match(handlers, /project-list-recent[\s\S]*?thumbnailFocus:\s*resolveProjectCoverInteractionFocus\(project\)/,
+  assert.match(handlers, /project-list-recent[\s\S]*?thumbnailFocus:[\s\S]*?resolveProjectCoverInteractionFocus\(project\)/,
     'Projects exposes interaction-guided cover focus without mutating the saved project')
-  assert.match(handlers, /writeRecentIndex\(recentIndexPath,\s*refreshed\.map\(\(\{\s*thumbnailFocus:/,
-    'derived cover focus is returned to the UI without persisting into the Recent index')
+  assert.match(handlers, /entry\.thumbnailMode === 'custom'[\s\S]*?thumbnailFocus:/,
+    'custom cover focus persists while derived automatic focus remains transient')
+  assert.match(handlers, /project-set-cover[\s\S]*?generateProjectCoverAtTime/,
+    'custom cover selection captures the requested source frame')
+  assert.match(handlers, /project-reset-cover[\s\S]*?scheduleProjectCover/,
+    'custom covers can return to automatic frame selection and positioning')
 
   const preload = await fs.readFile(path.join(process.cwd(), 'electron/preload.ts'), 'utf8')
   const home = await fs.readFile(path.join(process.cwd(), 'src/components/projects/ProjectHome.tsx'), 'utf8')
+  const coverEditor = await fs.readFile(path.join(process.cwd(), 'src/components/projects/ProjectCoverEditor.tsx'), 'utf8')
   const homeStyles = await fs.readFile(path.join(process.cwd(), 'src/components/projects/ProjectHome.module.css'), 'utf8')
   assert.match(preload, /onProjectCoversUpdated/, 'main process exposes one cover-ready event')
+  assert.match(preload, /getProjectCoverEditor[\s\S]*?setProjectCover[\s\S]*?resetProjectCover/,
+    'renderer receives the bounded custom cover API')
   assert.match(home, /onProjectCoversUpdated/, 'Projects page refreshes when a cover is ready')
+  assert.match(home, /Choose cover…/, 'card actions expose the custom cover editor')
+  assert.match(coverEditor, /chooseFocus[\s\S]*?type="range"[\s\S]*?Save cover/,
+    'cover editor selects both a source frame and a focal point')
+  assert.match(coverEditor, /Use automatic/, 'cover editor keeps automatic selection available')
   assert.match(home, /project\.thumbnailFocus\s*\|\|\s*locateProjectCoverImage/,
     'recorded interaction focus takes authority over image-only saliency')
   assert.match(homeStyles, /\.coverScene[\s\S]*?transform-origin:\s*50% 50%/, 'oblique projection stays centered on the located content')

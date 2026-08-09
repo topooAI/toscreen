@@ -97,7 +97,25 @@ export function generateProjectCover(candidate: ProjectCoverCandidate): Promise<
   return promise
 }
 
-async function generateProjectCoverFile(candidate: ProjectCoverCandidate): Promise<string | null> {
+export function generateProjectCoverAtTime(candidate: ProjectCoverCandidate, timeMs: number): Promise<string | null> {
+  const normalizedTimeMs = Math.max(0, Math.round(timeMs))
+  const outputPath = path.join(
+    path.dirname(candidate.outputPath),
+    `${candidate.sourceSignature}-manual-${normalizedTimeMs}.jpg`,
+  )
+  const customCandidate = { ...candidate, outputPath }
+  const existing = activeCoverJobs.get(outputPath)
+  if (existing) return existing
+
+  const promise = generateProjectCoverFile(customCandidate, normalizedTimeMs)
+  activeCoverJobs.set(outputPath, promise)
+  void promise.finally(() => {
+    if (activeCoverJobs.get(outputPath) === promise) activeCoverJobs.delete(outputPath)
+  })
+  return promise
+}
+
+async function generateProjectCoverFile(candidate: ProjectCoverCandidate, timeMs?: number): Promise<string | null> {
   if (await projectCoverExists(candidate)) return candidate.outputPath
   await fs.mkdir(path.dirname(candidate.outputPath), { recursive: true })
   const temporaryPath = path.join(
@@ -114,10 +132,13 @@ async function generateProjectCoverFile(candidate: ProjectCoverCandidate): Promi
       resolve(result)
     }
 
-    ffmpeg(candidate.sourcePath)
-      // Pick a representative frame from the opening seconds instead of a
-      // frequently black first frame, then cache a lightweight dashboard image.
-      .videoFilters(['thumbnail=60', `scale='min(${PROJECT_COVER_WIDTH_PX},iw)':-2`])
+    const command = ffmpeg(candidate.sourcePath)
+    if (timeMs !== undefined) command.seekInput(timeMs / 1000)
+    command
+      .videoFilters([
+        ...(timeMs === undefined ? ['thumbnail=60'] : []),
+        `scale='min(${PROJECT_COVER_WIDTH_PX},iw)':-2`,
+      ])
       .outputOptions(['-frames:v 1', '-q:v 2', '-an', '-y'])
       .on('end', async () => {
         try {

@@ -18,6 +18,7 @@ import {
 import { generateProxyVideo } from './proxyGenerator'
 import {
   generateProjectCover,
+  generateProjectCoverAtTime,
   projectCoverExists,
   resolveProjectCoverCandidate,
 } from '../projectCover'
@@ -138,6 +139,9 @@ export function registerIpcHandlers(
       thumbnailSourceSignature: existing?.thumbnailSourceSignature,
       thumbnailSourceWidth: existing?.thumbnailSourceWidth,
       thumbnailSourceHeight: existing?.thumbnailSourceHeight,
+      thumbnailMode: existing?.thumbnailMode,
+      thumbnailTimeMs: existing?.thumbnailTimeMs,
+      thumbnailFocus: existing?.thumbnailMode === 'custom' ? existing.thumbnailFocus : undefined,
       updatedAt: String(project?.projectModel?.updatedAt || project?.updatedAt || new Date().toISOString()),
       durationMs: Number(project?.projectModel?.durationMs || project?.durationMs || 0),
       assetStatus: assets.missing.length ? 'missing' : 'ready',
@@ -164,6 +168,9 @@ export function registerIpcHandlers(
               thumbnailSourceSignature: candidate.sourceSignature,
               thumbnailSourceWidth: candidate.sourceWidth,
               thumbnailSourceHeight: candidate.sourceHeight,
+              thumbnailMode: 'auto' as const,
+              thumbnailTimeMs: undefined,
+              thumbnailFocus: undefined,
             }
           : item)
         await writeRecentIndex(recentIndexPath, next)
@@ -849,15 +856,24 @@ export function registerIpcHandlers(
         const project = loaded.value
         const assets = await inspectProjectAssets(project)
         const candidate = await resolveProjectCoverCandidate(project, projectCoverDirectory)
-        const coverIsCurrent = Boolean(
+        const customCoverIsCurrent = Boolean(
           candidate
+          && entry.thumbnailMode === 'custom'
+          && entry.thumbnailSourceSignature === candidate.sourceSignature
+          && entry.thumbnailPath
+          && await fs.access(entry.thumbnailPath).then(() => true).catch(() => false),
+        )
+        const autoCoverIsCurrent = Boolean(
+          candidate
+          && entry.thumbnailMode !== 'custom'
           && entry.thumbnailSourceSignature === candidate.sourceSignature
           && entry.thumbnailPath === candidate.outputPath
           && await projectCoverExists(candidate),
         )
+        const coverIsCurrent = customCoverIsCurrent || autoCoverIsCurrent
         const nextEntry = {
           ...entry,
-          thumbnailFocus: resolveProjectCoverInteractionFocus(project),
+          thumbnailFocus: customCoverIsCurrent ? entry.thumbnailFocus : resolveProjectCoverInteractionFocus(project),
           thumbnailPath: coverIsCurrent ? entry.thumbnailPath : undefined,
           thumbnailSourceSignature: coverIsCurrent ? entry.thumbnailSourceSignature : undefined,
           thumbnailSourceWidth: candidate?.sourceWidth ?? entry.thumbnailSourceWidth,
@@ -869,9 +885,75 @@ export function registerIpcHandlers(
         return nextEntry
       } catch (error) { return { ...entry, assetStatus: (typeof error === 'object' && error && 'code' in error && (error as any).code === 'ENOENT') ? 'missing-project' as const : 'corrupt' as const } }
     }))
-    await writeRecentIndex(recentIndexPath, refreshed.map(({ thumbnailFocus: _thumbnailFocus, ...entry }) => entry))
+    await writeRecentIndex(recentIndexPath, refreshed.map(entry => {
+      if (entry.thumbnailMode === 'custom') return entry
+      const { thumbnailFocus: _thumbnailFocus, ...persisted } = entry
+      return persisted
+    }))
     coverRequests.forEach(({ entry, project }) => scheduleProjectCover(entry, project))
     return { success: true, projects: refreshed }
+  })
+  ipcMain.handle('project-get-cover-editor', async (_, projectPath: string) => {
+    const project = (await readJsonWithBackup(projectPath)).value
+    const candidate = await resolveProjectCoverCandidate(project, projectCoverDirectory)
+    if (!candidate) return { success: false, error: 'The project has no available screen recording.' }
+    const entry = (await readRecentIndex(recentIndexPath)).find(item => item.projectPath === projectPath)
+    return {
+      success: true,
+      sourcePath: candidate.sourcePath,
+      durationMs: Number(entry?.durationMs || project?.projectModel?.durationMs || project?.durationMs || 0),
+      timeMs: entry?.thumbnailMode === 'custom' ? Number(entry.thumbnailTimeMs || 0) : 0,
+      focus: entry?.thumbnailMode === 'custom'
+        ? entry.thumbnailFocus || { x: 50, y: 46 }
+        : resolveProjectCoverInteractionFocus(project) || { x: 50, y: 46 },
+      mode: entry?.thumbnailMode || 'auto',
+    }
+  })
+  ipcMain.handle('project-set-cover', async (_, projectPath: string, input: { timeMs?: number; focus?: { x?: number; y?: number } }) => {
+    const project = (await readJsonWithBackup(projectPath)).value
+    const candidate = await resolveProjectCoverCandidate(project, projectCoverDirectory)
+    if (!candidate) return { success: false, error: 'The project has no available screen recording.' }
+    const recent = await readRecentIndex(recentIndexPath)
+    const existing = recent.find(item => item.projectPath === projectPath) || await rememberProject(projectPath, project)
+    const durationMs = Math.max(0, Number(existing.durationMs || project?.projectModel?.durationMs || project?.durationMs || 0))
+    const timeMs = Math.min(durationMs || Number.MAX_SAFE_INTEGER, Math.max(0, Math.round(Number(input?.timeMs || 0))))
+    const focus = {
+      x: Number(Math.min(95, Math.max(5, Number(input?.focus?.x || 50))).toFixed(2)),
+      y: Number(Math.min(95, Math.max(5, Number(input?.focus?.y || 46))).toFixed(2)),
+    }
+    const coverPath = await generateProjectCoverAtTime(candidate, timeMs)
+    if (!coverPath) return { success: false, error: 'The selected video frame could not be captured.' }
+    const current = await readRecentIndex(recentIndexPath)
+    const nextEntry: RecentProjectEntry = {
+      ...existing,
+      thumbnailPath: coverPath,
+      thumbnailSourceSignature: candidate.sourceSignature,
+      thumbnailSourceWidth: candidate.sourceWidth,
+      thumbnailSourceHeight: candidate.sourceHeight,
+      thumbnailMode: 'custom',
+      thumbnailTimeMs: timeMs,
+      thumbnailFocus: focus,
+    }
+    await writeRecentIndex(recentIndexPath, [nextEntry, ...current.filter(item => item.projectPath !== projectPath)].slice(0, 100))
+    BrowserWindow.getAllWindows().forEach(window => window.webContents.send('project-covers-updated'))
+    return { success: true, thumbnailPath: coverPath, timeMs, focus }
+  })
+  ipcMain.handle('project-reset-cover', async (_, projectPath: string) => {
+    const project = (await readJsonWithBackup(projectPath)).value
+    const recent = await readRecentIndex(recentIndexPath)
+    const existing = recent.find(item => item.projectPath === projectPath) || await rememberProject(projectPath, project)
+    const nextEntry: RecentProjectEntry = {
+      ...existing,
+      thumbnailPath: undefined,
+      thumbnailSourceSignature: undefined,
+      thumbnailMode: 'auto',
+      thumbnailTimeMs: undefined,
+      thumbnailFocus: undefined,
+    }
+    const current = await readRecentIndex(recentIndexPath)
+    await writeRecentIndex(recentIndexPath, [nextEntry, ...current.filter(item => item.projectPath !== projectPath)].slice(0, 100))
+    scheduleProjectCover(nextEntry, project)
+    return { success: true }
   })
   ipcMain.handle('project-open', async (_, projectPath: string) => {
     const loaded = await readJsonWithBackup(projectPath)
