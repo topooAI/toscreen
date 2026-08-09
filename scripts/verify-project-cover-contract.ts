@@ -176,6 +176,8 @@ try {
   assert.doesNotMatch(homeStyles, /data-camera/, 'stylesheet has no per-card camera variants')
   assert.match(homeStyles, /\.duration\s*\{[\s\S]*?z-index:\s*4;/, 'duration stays sharp above the depth blur')
   assert.match(homeStyles, /\.meta\s*\{[\s\S]*?z-index:\s*4;/, 'project metadata stays sharp above the depth blur')
+  assert.match(homeStyles, /\.card\s*\{[\s\S]*?box-shadow:\s*none;[\s\S]*?\.card:hover\s*\{[\s\S]*?box-shadow:\s*none;/,
+    'project cards remain flat without default or hover shadows')
   console.log('project cover contract: PASS')
 } finally {
   await fs.rm(root, { recursive: true, force: true })
