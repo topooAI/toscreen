@@ -6,7 +6,7 @@ import path from 'node:path'
 import { PROJECT_COVER_WIDTH_PX, resolveProjectCoverCandidate } from '../electron/projectCover'
 import { resolveProjectCoverInteractionFocus } from '../electron/projectLibrary'
 import { locateProjectCoverContent } from '../src/components/projects/projectCoverFocus'
-import { estimateVisibleSourceWidth, getProjectCoverDetailScale } from '../src/components/projects/projectCoverScale'
+import { estimateVisibleSourceWidth, getProjectCoverDetailScale, getProjectCoverMaxFrameScale } from '../src/components/projects/projectCoverScale'
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'toscreen-project-cover-'))
 try {
@@ -34,6 +34,11 @@ try {
     '4K cover crops remain downsampled instead of being stretched across the card')
   assert.ok(Math.abs(estimateVisibleSourceWidth(3840, fourKScale) - estimateVisibleSourceWidth(3000, threeKScale)) < 2,
     '3K and 4K recordings retain the same readable source-detail span')
+  const fourKMaxFrameScale = getProjectCoverMaxFrameScale(3840, 2160)
+  assert.ok(fourKMaxFrameScale > 4.5,
+    '4K cover frames can grow well beyond the former 1.8x ceiling')
+  assert.ok(estimateVisibleSourceWidth(3840, fourKScale) * fourKMaxFrameScale / 3840 * 100 <= 92.1,
+    'maximum cover frame stays inside the safe preview boundary')
 
   const syntheticWidth = 40
   const syntheticHeight = 24
@@ -118,6 +123,8 @@ try {
     'custom cover selection captures the requested source frame')
   assert.match(handlers, /project-set-cover[\s\S]*?frameScale[\s\S]*?thumbnailFrameScale:\s*frameScale/,
     'custom cover selection persists its bounded frame size')
+  assert.match(handlers, /project-set-cover[\s\S]*?getProjectCoverMaxFrameScale\(candidate\.sourceWidth, candidate\.sourceHeight\)/,
+    'custom cover persistence shares the source-aware frame boundary')
   assert.match(handlers, /project-reset-cover[\s\S]*?scheduleProjectCover/,
     'custom covers can return to automatic frame selection and positioning')
 
@@ -136,6 +143,8 @@ try {
     'cover editor exposes a directly draggable crop box')
   assert.match(coverEditor, /beginCropResize[\s\S]*?Resize cover from top left[\s\S]*?Resize cover from bottom right/,
     'cover editor exposes direct corner handles for enlarging and shrinking the crop box')
+  assert.match(coverEditor, /getProjectCoverMaxFrameScale\(info\.sourceWidth, info\.sourceHeight\)/,
+    'cover editor expands to the source-aware preview boundary instead of a fixed 1.8x ceiling')
   assert.match(coverEditor, /updateCropDrag[\s\S]*?stopPropagation\(\)/,
     'crop resize movement cannot bubble into preview repositioning')
   assert.doesNotMatch(coverEditor, /Cover frame size|coverEditorSize/,

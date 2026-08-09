@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ProjectCoverFocus } from './projectCoverFocus'
-import { estimateVisibleSourceWidth, getProjectCoverDetailScale } from './projectCoverScale'
+import { estimateVisibleSourceWidth, getProjectCoverDetailScale, getProjectCoverMaxFrameScale } from './projectCoverScale'
 import styles from './ProjectHome.module.css'
 
 interface CoverProject {
@@ -124,7 +124,10 @@ export function ProjectCoverEditor({ project, onClose, onSaved }: ProjectCoverEd
 
     const widthRatio = (drag.cornerX || 1) * dx / Math.max(1, startCrop.width)
     const heightRatio = (drag.cornerY || 1) * dy / Math.max(1, startCrop.height)
-    const nextScale = Math.min(1.8, Math.max(.65, drag.startFrameScale * (1 + (widthRatio + heightRatio) / 2)))
+    const nextScale = Math.min(
+      getProjectCoverMaxFrameScale(info.sourceWidth, info.sourceHeight),
+      Math.max(.65, drag.startFrameScale * (1 + (widthRatio + heightRatio) / 2)),
+    )
     const nextCrop = getCropSize(info, nextScale)
     const oppositeX = drag.startFocus.x - (drag.cornerX || 1) * startCrop.width / 2
     const oppositeY = drag.startFocus.y - (drag.cornerY || 1) * startCrop.height / 2

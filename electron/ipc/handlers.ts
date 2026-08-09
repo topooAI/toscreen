@@ -55,6 +55,7 @@ import {
   transitionProjectDocument,
   hydrateCurrentProjectMedia,
 } from '../projectLibrary'
+import { getProjectCoverMaxFrameScale } from '../../src/components/projects/projectCoverScale'
 
 let selectedSource: any = null
 let activeRecordingBounds: { x: number; y: number; width: number; height: number } | undefined
@@ -922,7 +923,8 @@ export function registerIpcHandlers(
     const existing = recent.find(item => item.projectPath === projectPath) || await rememberProject(projectPath, project)
     const durationMs = Math.max(0, Number(existing.durationMs || project?.projectModel?.durationMs || project?.durationMs || 0))
     const timeMs = Math.min(durationMs || Number.MAX_SAFE_INTEGER, Math.max(0, Math.round(Number(input?.timeMs || 0))))
-    const frameScale = Number(Math.min(1.8, Math.max(.65, Number(input?.frameScale || 1))).toFixed(2))
+    const maxFrameScale = getProjectCoverMaxFrameScale(candidate.sourceWidth, candidate.sourceHeight)
+    const frameScale = Number(Math.min(maxFrameScale, Math.max(.65, Number(input?.frameScale || 1))).toFixed(2))
     const focus = {
       x: Number(Math.min(95, Math.max(5, Number(input?.focus?.x || 50))).toFixed(2)),
       y: Number(Math.min(95, Math.max(5, Number(input?.focus?.y || 46))).toFixed(2)),

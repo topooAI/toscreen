@@ -3,6 +3,8 @@ const COVER_SCENE_WIDTH_FACTOR = 1.48 * 1.18
 const DEFAULT_SOURCE_WIDTH_PX = 3200
 const MIN_DETAIL_SCALE = 1.5
 const MAX_DETAIL_SCALE = 6.2
+const COVER_FRAME_ASPECT_RATIO = 350 / 198
+const MAX_CROP_PERCENT = 92
 
 export function getProjectCoverDetailScale(sourceWidth?: number): number {
   const normalizedWidth = Number.isFinite(sourceWidth) && Number(sourceWidth) > 0
@@ -14,6 +16,19 @@ export function getProjectCoverDetailScale(sourceWidth?: number): number {
 
 export function estimateVisibleSourceWidth(sourceWidth: number, detailScale: number): number {
   return sourceWidth / (COVER_SCENE_WIDTH_FACTOR * detailScale)
+}
+
+export function getProjectCoverMaxFrameScale(sourceWidth?: number, sourceHeight?: number): number {
+  const normalizedWidth = Number.isFinite(sourceWidth) && Number(sourceWidth) > 0
+    ? Number(sourceWidth)
+    : DEFAULT_SOURCE_WIDTH_PX
+  const normalizedHeight = Number.isFinite(sourceHeight) && Number(sourceHeight) > 0
+    ? Number(sourceHeight)
+    : normalizedWidth * 9 / 16
+  const visibleWidth = estimateVisibleSourceWidth(normalizedWidth, getProjectCoverDetailScale(normalizedWidth))
+  const baseWidthPercent = visibleWidth / normalizedWidth * 100
+  const baseHeightPercent = (visibleWidth / COVER_FRAME_ASPECT_RATIO) / normalizedHeight * 100
+  return Number(Math.max(.65, MAX_CROP_PERCENT / Math.max(baseWidthPercent, baseHeightPercent)).toFixed(3))
 }
 
 export function getProjectCoverImagePlacement(detailScale: number, focus: { x: number; y: number }) {
