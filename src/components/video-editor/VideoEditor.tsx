@@ -77,6 +77,7 @@ const EDITOR_SPLIT_HANDLE_HEIGHT_PX = 8;
 export default function VideoEditor({ theme }: { theme: AppTheme }) {
   const [editorDefaults] = useState(loadEditorPreferences);
   const [isLayoutResizing, setIsLayoutResizing] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [videoPath, setVideoPath] = useState<string | null>(null);
   const [originalVideoPath, setOriginalVideoPath] = useState<string | null>(null);
   const [companionAudioPath, setCompanionAudioPath] = useState<string | null>(null);
@@ -2024,7 +2025,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           </div>
         </div>
       )}
-      <div className="h-10 flex-shrink-0 z-50 flex items-center gap-2 pl-20 pr-3" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+      <div className="h-10 flex-shrink-0 z-50 flex items-center gap-2 pl-20 pr-3" style={{ WebkitAppRegion: accountMenuOpen ? 'no-drag' : 'drag' } as React.CSSProperties}>
         <strong className="max-w-48 truncate text-xs">{projectName}</strong>
         <span className={`text-[10px] ${saveStatus === 'error' ? 'text-red-500' : 'text-[var(--ui-text-secondary)]'}`}>{saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Save failed' : 'Saved'}</span>
         <div className="ml-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
@@ -2049,7 +2050,7 @@ export default function VideoEditor({ theme }: { theme: AppTheme }) {
           </DropdownMenu>
         </div>
         <div className="ml-auto flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <TopooUserPill />
+          <TopooUserPill onMenuOpenChange={setAccountMenuOpen} />
         </div>
       </div>
 

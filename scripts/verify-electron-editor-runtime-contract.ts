@@ -19,6 +19,7 @@ const files = {
   row: path.join(repoRoot, "src", "components", "video-editor", "timeline", "Row.tsx"),
   itemGlass: path.join(repoRoot, "src", "components", "video-editor", "timeline", "ItemGlass.module.css"),
   topooUserPill: path.join(repoRoot, "src", "components", "video-editor", "TopooUserPill.tsx"),
+  videoEditor: path.join(repoRoot, "src", "components", "video-editor", "VideoEditor.tsx"),
   projectHome: path.join(repoRoot, "src", "components", "projects", "ProjectHome.tsx"),
   projectHomeStyles: path.join(repoRoot, "src", "components", "projects", "ProjectHome.module.css"),
 };
@@ -156,8 +157,8 @@ const checks = [
     area: "projects-window-titlebar",
     file: "projectHome",
     needles: [
-      "<TopooUserPill />",
-      "className={styles.account}",
+      "<TopooUserPill onMenuOpenChange={setAccountMenuOpen} />",
+      "accountMenuOpen ? styles.titlebarInteractive",
       "className={styles.pageHeader}",
       "<ImportVideoMorphIcon",
       "<ImportPackageMorphIcon",
@@ -165,6 +166,15 @@ const checks = [
       "<MoreHorizontal size={15}/>",
       "Remove from recent",
       "Delete project",
+    ],
+  },
+  {
+    area: "editor-account-menu-titlebar-dismiss",
+    file: "videoEditor",
+    needles: [
+      "const [accountMenuOpen, setAccountMenuOpen] = useState(false)",
+      "WebkitAppRegion: accountMenuOpen ? 'no-drag' : 'drag'",
+      "<TopooUserPill onMenuOpenChange={setAccountMenuOpen} />",
     ],
   },
   {
