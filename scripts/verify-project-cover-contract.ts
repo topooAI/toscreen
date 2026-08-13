@@ -24,14 +24,12 @@ try {
   assert.equal(path.dirname(first.outputPath), coversPath, 'covers stay in the project-library cache')
   assert.equal(first.sourceWidth, 3840, 'cover candidate preserves the recording width')
   assert.equal(first.sourceHeight, 2160, 'cover candidate preserves the recording height')
-  assert.equal(PROJECT_COVER_WIDTH_PX, 3840, '4K covers retain native pixels for local detail magnification')
+  assert.equal(PROJECT_COVER_WIDTH_PX, 1400, 'projected covers use the accepted bounded output width')
 
   const fourKScale = getProjectCoverDetailScale(3840)
   const threeKScale = getProjectCoverDetailScale(3000)
   assert.ok(fourKScale > threeKScale, 'higher-resolution recordings receive proportionally more cover magnification')
   assert.ok(fourKScale > 2.8 && threeKScale > 2.2, 'project covers magnify into a readable local detail range')
-  assert.ok(estimateVisibleSourceWidth(PROJECT_COVER_WIDTH_PX, fourKScale) >= 740,
-    '4K cover crops remain downsampled instead of being stretched across the card')
   assert.ok(Math.abs(estimateVisibleSourceWidth(3840, fourKScale) - estimateVisibleSourceWidth(3000, threeKScale)) < 2,
     '3K and 4K recordings retain the same readable source-detail span')
   const fourKMaxFrameScale = getProjectCoverMaxFrameScale(3840, 2160)
@@ -150,13 +148,12 @@ try {
   assert.doesNotMatch(coverEditor, /Cover frame size|coverEditorSize/,
     'cover editor does not add a separate size slider')
   assert.match(coverEditor, /Use automatic/, 'cover editor keeps automatic selection available')
-  assert.match(home, /project\.thumbnailFocus\s*\|\|\s*locateProjectCoverImage/,
-    'recorded interaction focus takes authority over image-only saliency')
-  assert.match(home, /const focus = project\.thumbnailFocus \|\| detectedFocus/,
-    'saved custom cover focus takes authority over stale detected card focus')
-  assert.match(home, /getProjectCoverDetailScale\(project\.thumbnailSourceWidth\)\s*\/\s*Math\.max\(\.65,\s*project\.thumbnailFrameScale/,
-    'saved frame size controls the rendered project-cover magnification')
-  assert.match(homeStyles, /\.coverScene[\s\S]*?transform-origin:\s*50% 50%/, 'oblique projection stays centered on the located content')
+  assert.match(home, /<img className=\{styles\.bakedCover\}/,
+    'Projects renders the generated projection as one cover image')
+  assert.doesNotMatch(home, /locateProjectCoverImage|getProjectCoverDetailScale|getProjectCoverImagePlacement/,
+    'Projects does not repeat cover projection or saliency work in the renderer')
+  assert.match(homeStyles, /\.bakedCover[\s\S]*?object-fit:\s*cover/,
+    'the baked cover fills the preview without another transform layer')
   assert.match(homeStyles, /\.coverEditorCrop[\s\S]*?box-shadow:[^;]*9999px/,
     'crop editor clearly masks the area outside the selected frame')
   assert.match(homeStyles, /\.coverEditorHandleNW[\s\S]*?nwse-resize[\s\S]*?\.coverEditorHandleSE/,
@@ -165,19 +162,22 @@ try {
     'cover editor uses the loaded font weight without synthetic or shadowed text')
   assert.match(homeStyles, /::-webkit-slider-runnable-track[\s\S]*?::-webkit-slider-thumb/,
     'cover frame timeline has a visible track and draggable thumb')
-  assert.match(homeStyles, /\.coverLensFocus[\s\S]*?filter:\s*none/, 'the readable center is not softened by a second raster filter')
-  assert.doesNotMatch(home, /coverLensBlur/, 'the clear source image is rendered only once')
+  assert.doesNotMatch(home, /coverLensFocus|coverLensBlur/, 'the clear baked source image is rendered only once')
   assert.doesNotMatch(home, /coverDepth(?:Blur|Soft|Medium|Strong)/, 'card never overlays synthetic blur bands')
   assert.doesNotMatch(homeStyles, /\.coverDepth(?:Blur|Soft|Medium|Strong)/, 'stylesheet contains no synthetic blur bands')
-  assert.match(homeStyles, /\.coverScene[\s\S]*?matrix\(\.978148,\s*-\.207912,\s*\.573576,\s*\.819152,\s*0,\s*0\)/,
-    'cover plane uses equal-length shallow dimetric axes instead of rotation or a steep ground-plane projection')
-  assert.doesNotMatch(homeStyles, /\.coverStage[\s\S]*?perspective:/, 'cover angle remains isometric without near-far perspective distortion')
+  const coverGenerator = await fs.readFile(path.join(process.cwd(), 'electron/projectCover.ts'), 'utf8')
+  assert.match(coverGenerator, /projected-clean-1400[^']*/,
+    'cover cache invalidates against the accepted clean projected recipe')
+  assert.match(coverGenerator, /0\.754147\*\(X-[\s\S]*?-0\.528059\*\(Y-/,
+    'the baked cover keeps the accepted shallow dimetric projection')
   assert.doesNotMatch(home, /data-camera|getCameraDirection/, 'every project card shares one camera geometry')
   assert.doesNotMatch(homeStyles, /data-camera/, 'stylesheet has no per-card camera variants')
-  assert.match(homeStyles, /\.duration\s*\{[\s\S]*?z-index:\s*4;/, 'duration stays sharp above the depth blur')
-  assert.match(homeStyles, /\.meta\s*\{[\s\S]*?z-index:\s*4;/, 'project metadata stays sharp above the depth blur')
-  assert.match(homeStyles, /\.card\s*\{[\s\S]*?box-shadow:\s*none;[\s\S]*?\.card:hover\s*\{[\s\S]*?box-shadow:\s*none;/,
-    'project cards remain flat without default or hover shadows')
+  assert.match(homeStyles, /\.meta\s*\{[\s\S]*?background:\s*#fff;/,
+    'project metadata stays in a clean white information bar')
+  assert.match(homeStyles, /\.card\s*\{[\s\S]*?box-shadow:\s*none;/,
+    'project cards remain flat without a default shadow')
+  assert.doesNotMatch(homeStyles.match(/\.card:hover\s*\{[^}]*\}/)?.[0] || '', /box-shadow:/,
+    'project card hover only changes its border')
   console.log('project cover contract: PASS')
 } finally {
   await fs.rm(root, { recursive: true, force: true })

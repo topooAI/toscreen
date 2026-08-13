@@ -160,7 +160,14 @@ export function registerIpcHandlers(
       try {
         const candidate = await resolveProjectCoverCandidate(project, projectCoverDirectory)
         if (!candidate) return
-        const coverPath = await generateProjectCover(candidate)
+        const isCustom = entry.thumbnailMode === 'custom'
+        const framing = {
+          frameScale: isCustom ? entry.thumbnailFrameScale : 1,
+          focus: entry.thumbnailFocus || resolveProjectCoverInteractionFocus(project) || { x: 50, y: 46 },
+        }
+        const coverPath = isCustom
+          ? await generateProjectCoverAtTime(candidate, Number(entry.thumbnailTimeMs || 0), framing)
+          : await generateProjectCover(candidate, framing)
         if (!coverPath) return
         const recent = await readRecentIndex(recentIndexPath)
         const next = recent.map(item => item.projectPath === entry.projectPath
@@ -170,10 +177,10 @@ export function registerIpcHandlers(
               thumbnailSourceSignature: candidate.sourceSignature,
               thumbnailSourceWidth: candidate.sourceWidth,
               thumbnailSourceHeight: candidate.sourceHeight,
-              thumbnailMode: 'auto' as const,
-              thumbnailTimeMs: undefined,
-              thumbnailFrameScale: undefined,
-              thumbnailFocus: undefined,
+              thumbnailMode: isCustom ? 'custom' as const : 'auto' as const,
+              thumbnailTimeMs: isCustom ? entry.thumbnailTimeMs : undefined,
+              thumbnailFrameScale: isCustom ? entry.thumbnailFrameScale : undefined,
+              thumbnailFocus: isCustom ? entry.thumbnailFocus : undefined,
             }
           : item)
         await writeRecentIndex(recentIndexPath, next)
@@ -929,7 +936,7 @@ export function registerIpcHandlers(
       x: Number(Math.min(95, Math.max(5, Number(input?.focus?.x || 50))).toFixed(2)),
       y: Number(Math.min(95, Math.max(5, Number(input?.focus?.y || 46))).toFixed(2)),
     }
-    const coverPath = await generateProjectCoverAtTime(candidate, timeMs)
+    const coverPath = await generateProjectCoverAtTime(candidate, timeMs, { frameScale, focus })
     if (!coverPath) return { success: false, error: 'The selected video frame could not be captured.' }
     const current = await readRecentIndex(recentIndexPath)
     const nextEntry: RecentProjectEntry = {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FolderOpen, Image as ImageIcon, MoreHorizontal, Search, Trash2, Video, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -6,8 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { TopooUserPill } from '@/components/video-editor/TopooUserPill'
 import { ImportVideoMorphIcon, ImportPackageMorphIcon, NewRecordingMorphIcon } from '@/components/common/MorphIcon'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { locateProjectCoverImage, type ProjectCoverFocus } from './projectCoverFocus'
-import { getProjectCoverDetailScale, getProjectCoverImagePlacement } from './projectCoverScale'
+import type { ProjectCoverFocus } from './projectCoverFocus'
 import { ProjectCoverEditor } from './ProjectCoverEditor'
 import styles from './ProjectHome.module.css'
 
@@ -21,8 +20,8 @@ interface RecentProject {
 
 export function ProjectHome() {
   const [hoveredButton, setHoveredButton] = useState<'video' | 'package' | 'record' | null>(null)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [projects, setProjects] = useState<RecentProject[]>([])
-  const [coverFocus, setCoverFocus] = useState<Record<string, ProjectCoverFocus>>({})
   const [coverProject, setCoverProject] = useState<RecentProject | null>(null)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'updated' | 'name' | 'duration'>('updated')
@@ -38,8 +37,8 @@ export function ProjectHome() {
   return <main className={styles.home}>
     <Toaster />
     <ProjectCoverEditor project={coverProject} onClose={() => setCoverProject(null)} onSaved={() => { void refresh() }} />
-    <header className={styles.titlebar}>
-      <div className={styles.account}><TopooUserPill /></div>
+    <header className={`${styles.titlebar} ${accountMenuOpen ? styles.titlebarInteractive : ''}`}>
+      <div className={styles.account}><TopooUserPill onMenuOpenChange={setAccountMenuOpen} /></div>
     </header>
     <div className={styles.workspace}>
       <div className={styles.content}>
@@ -73,7 +72,7 @@ export function ProjectHome() {
       <div className={styles.tools}>
         <label><Search size={16}/><input aria-label="Search projects" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search projects"/></label>
         <Select value={sort} onValueChange={(val) => setSort(val as typeof sort)}>
-          <SelectTrigger aria-label="Sort projects" className="h-[36px] w-[135px] shrink-0 rounded-[9px] border border-[#d8d8d5] bg-white px-3 text-[12.5px] font-medium text-neutral-800 shadow-none hover:bg-neutral-50 focus:ring-0 focus:ring-offset-0 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+          <SelectTrigger aria-label="Sort projects" className="h-[28px] w-[135px] shrink-0 rounded-[9px] border border-[#d8d8d5] bg-white px-3 text-[12.5px] font-medium text-neutral-800 shadow-none hover:bg-neutral-50 focus:ring-0 focus:ring-offset-0 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
             <SelectValue placeholder="Sort projects" />
           </SelectTrigger>
           <SelectContent className="toscreen-dropdown-menu z-[220] min-w-[135px] rounded-[8px] border-0 p-[3px] shadow-xl">
@@ -86,15 +85,7 @@ export function ProjectHome() {
       {visible.length === 0 ? <div className={styles.empty}><FolderOpen/><h2>No projects yet</h2><p>Record your screen or import a portable ToScreen package.</p></div> : <div className={styles.grid}>{visible.map(project => <article key={project.projectPath} className={styles.card} data-status={project.assetStatus} data-has-cover={project.thumbnailPath ? 'true' : 'false'}>
         <button className={styles.preview} onClick={() => void open(project.projectPath)}>
           {project.thumbnailPath
-            ? <div className={styles.coverStage} style={getProjectCoverStyle(project, coverFocus[project.id])}>
-                <span className={styles.coverScene}>
-                  <span className={`${styles.coverPlane} ${styles.coverLensFocus}`}><img src={toFileUrl(project.thumbnailPath)} alt="" onLoad={event => {
-                    if (!project.thumbnailSourceWidth || !project.thumbnailSourceHeight) return
-                    const focus = project.thumbnailFocus || locateProjectCoverImage(event.currentTarget, getFallbackCoverFocus())
-                    if (focus) setCoverFocus(previous => ({ ...previous, [project.id]: focus }))
-                  }} /></span>
-                </span>
-              </div>
+            ? <img className={styles.bakedCover} src={toFileUrl(project.thumbnailPath)} alt="" />
             : <div className={styles.coverFallback} style={{ background: getMorandiGradient(project.name) }}><Video size={31} /></div>}
           <span className={styles.duration}>{formatDuration(project.durationMs)}</span>
         </button>
@@ -121,19 +112,6 @@ export function ProjectHome() {
 }
 function formatDuration(ms: number) { const total = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}` }
 function toFileUrl(filePath: string) { return encodeURI(`file://${filePath}`) }
-function getFallbackCoverFocus(): ProjectCoverFocus { return { x: 50, y: 46 } }
-function getProjectCoverStyle(project: RecentProject, detectedFocus?: ProjectCoverFocus): CSSProperties {
-  const focus = project.thumbnailFocus || detectedFocus || getFallbackCoverFocus()
-  const scale = getProjectCoverDetailScale(project.thumbnailSourceWidth) / Math.max(.65, project.thumbnailFrameScale || 1)
-  const placement = getProjectCoverImagePlacement(scale, focus)
-  return {
-    '--focus-x': `${focus.x}%`,
-    '--focus-y': `${focus.y}%`,
-    '--cover-image-size': `${placement.sizePercent}%`,
-    '--cover-image-left': `${placement.leftPercent}%`,
-    '--cover-image-top': `${placement.topPercent}%`,
-  } as CSSProperties
-}
 
 const morandiPalettes = [
   { from: '#e0c3fc', to: '#8ec5fc' }, // 粉紫-冰蓝

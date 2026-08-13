@@ -9,7 +9,7 @@ import {
 import { ShareHistoryDialog } from './ShareHistoryDialog';
 
 type Session = { state: 'loading' | 'signed-out' | 'signed-in' | 'expired' | 'offline'; user?: { displayName?: string; email?: string; avatarUrl?: string }; message?: string };
-export function TopooUserPill() {
+export function TopooUserPill({ onMenuOpenChange }: { onMenuOpenChange?: (open: boolean) => void } = {}) {
   const [session, setSession] = useState<Session>({ state: 'loading' });
   const [history, setHistory] = useState(false);
 
@@ -22,7 +22,7 @@ export function TopooUserPill() {
   if (session.state !== 'signed-in') return <button type="button" title={session.state === 'offline' ? 'Topoo is offline. Local editing and export remain available.' : session.state} onClick={async()=>{setSession({state:'loading'});try{const next=await window.electronAPI.topooSignIn();setSession(next);}catch(error){setSession({state:'offline',message:String(error)});}}} className="h-[26px] rounded-[8px] border-0 bg-transparent px-[9px] text-[12.8694px] leading-[18px] font-medium text-[#5a5a59] shadow-none transition-colors duration-100 hover:bg-[var(--ui-control-hover)] focus-visible:outline-none">{session.state === 'offline' ? 'Topoo offline' : session.state === 'expired' ? 'Session expired' : 'Sign in'}</button>;
   return (
     <div className="relative">
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={onMenuOpenChange}>
         <DropdownMenuTrigger asChild>
           <button
             className="flex h-[26px] items-center gap-2 rounded-[8px] border-0 bg-transparent px-[9px] py-[3px] text-left transition-colors duration-100 hover:bg-[var(--ui-control-hover)] focus-visible:outline-none"
